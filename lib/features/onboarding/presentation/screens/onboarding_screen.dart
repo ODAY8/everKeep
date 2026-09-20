@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:everkeep/core/routing/app_router.dart';
 import 'package:everkeep/core/theme/app_spacing.dart';
 import 'package:everkeep/core/theme/app_text_styles.dart';
 import 'package:everkeep/features/onboarding/presentation/widgets/onboarding_page1.dart';
@@ -7,7 +8,6 @@ import 'package:everkeep/features/onboarding/presentation/widgets/onboarding_pag
 import 'package:everkeep/widgets/page_indicator.dart';
 import 'package:everkeep/widgets/onboarding_next_button.dart';
 import 'package:everkeep/core/theme/app_colors.dart';
-import 'package:everkeep/features/auth/presentation/screens/welcome_screen.dart';
 
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({Key? key}) : super(key: key);
@@ -33,17 +33,12 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         curve: Curves.easeInOut,
       );
     } else {
-      // Last page, go to welcome screen
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const WelcomeScreen()),
-      );
+      Navigator.of(context).pushReplacementNamed(AppRouter.welcome);
     }
   }
 
   void _skip() {
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(builder: (_) => const WelcomeScreen()),
-    );
+    Navigator.of(context).pushReplacementNamed(AppRouter.welcome);
   }
 
   @override

@@ -117,7 +117,7 @@ class _HomeScreenState extends State<HomeScreen> {
             children: [
               _buildSectionLabel('RECENT ACTIVITY'),
               GestureDetector(
-                onTap: () {},
+                onTap: () => Navigator.of(context).pushNamed(AppRouter.settings),
                 child: Text(
                   'See all',
                   style: AppTextStyles.labelMedium.copyWith(
@@ -190,7 +190,7 @@ class _HomeScreenState extends State<HomeScreen> {
           showBadge: true,
           badgeColor: AppColors.glassAccentPink,
           tooltip: 'Notifications',
-          onPressed: () {},
+          onPressed: () => Navigator.of(context).pushNamed(AppRouter.settings),
         ),
         const SizedBox(width: 10),
         GestureDetector(

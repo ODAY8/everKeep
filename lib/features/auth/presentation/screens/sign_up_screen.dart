@@ -9,56 +9,76 @@ import '../../../../widgets/glass/frosted_glass_card.dart';
 import '../../../../widgets/glass/glass_primary_button.dart';
 import '../../../../widgets/glass/glass_text_field.dart';
 
-/// Full-bleed background photo behind a frosted glass sign-in card,
-/// matching the Figma login frame.
-class SignInScreen extends StatefulWidget {
-  const SignInScreen({super.key});
+class SignUpScreen extends StatefulWidget {
+  const SignUpScreen({super.key});
 
   @override
-  State<SignInScreen> createState() => _SignInScreenState();
+  State<SignUpScreen> createState() => _SignUpScreenState();
 }
 
-class _SignInScreenState extends State<SignInScreen> {
-  final TextEditingController _emailController = TextEditingController();
-  final TextEditingController _passwordController = TextEditingController();
+class _SignUpScreenState extends State<SignUpScreen> {
+  final _nameController = TextEditingController();
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
+
   bool _obscurePassword = true;
+  bool _obscureConfirm = true;
+
+  String? _nameError;
   String? _emailError;
   String? _passwordError;
+  String? _confirmError;
 
-  bool _isValidEmail(String email) {
-    return RegExp(r'^[\w.+\-]+@[a-zA-Z0-9\-]+\.[a-zA-Z]{2,}$').hasMatch(email);
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _emailController.dispose();
+    _passwordController.dispose();
+    _confirmPasswordController.dispose();
+    super.dispose();
   }
 
+  bool _isValidEmail(String email) =>
+      RegExp(r'^[\w.+\-]+@[a-zA-Z0-9\-]+\.[a-zA-Z]{2,}$').hasMatch(email);
+
   void _submit() {
+    final name = _nameController.text.trim();
     final email = _emailController.text.trim();
     final password = _passwordController.text;
+    final confirm = _confirmPasswordController.text;
 
     setState(() {
+      _nameError = name.isEmpty ? 'Full name is required' : null;
+
       _emailError = email.isEmpty
           ? 'Email is required'
           : !_isValidEmail(email)
               ? 'Enter a valid email address'
               : null;
+
       _passwordError = password.isEmpty
           ? 'Password is required'
           : password.length < 6
               ? 'Password must be at least 6 characters'
               : null;
+
+      _confirmError = confirm.isEmpty
+          ? 'Please confirm your password'
+          : confirm != password
+              ? 'Passwords do not match'
+              : null;
     });
 
-    if (_emailError == null && _passwordError == null) {
+    if (_nameError == null &&
+        _emailError == null &&
+        _passwordError == null &&
+        _confirmError == null) {
       Navigator.of(context).pushNamedAndRemoveUntil(
         AppRouter.home,
         (route) => false,
       );
     }
-  }
-
-  @override
-  void dispose() {
-    _emailController.dispose();
-    _passwordController.dispose();
-    super.dispose();
   }
 
   @override
@@ -89,13 +109,13 @@ class _SignInScreenState extends State<SignInScreen> {
                       onPressed: () => Navigator.of(context).pop(),
                     ),
                   ),
-                  const SizedBox(height: 100),
+                  const SizedBox(height: 40),
                   FrostedGlassCard(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         Text(
-                          'Welcome Back',
+                          'Create Account',
                           style: AppTextStyles.serifHeadline.copyWith(
                             color: Colors.white,
                           ),
@@ -103,13 +123,22 @@ class _SignInScreenState extends State<SignInScreen> {
                         ),
                         const SizedBox(height: 6),
                         Text(
-                          'Access your protected digital vault',
+                          'Start protecting your digital legacy',
                           style: AppTextStyles.bodyMedium.copyWith(
                             color: AppColors.glassOnSurfaceMuted,
                           ),
                           textAlign: TextAlign.center,
                         ),
                         const SizedBox(height: 24),
+                        GlassTextField(
+                          controller: _nameController,
+                          label: 'Full Name',
+                          hintText: 'Sarah Mitchell',
+                          keyboardType: TextInputType.name,
+                          textInputAction: TextInputAction.next,
+                          errorText: _nameError,
+                        ),
+                        const SizedBox(height: 16),
                         GlassTextField(
                           controller: _emailController,
                           label: 'Email Address',
@@ -124,7 +153,7 @@ class _SignInScreenState extends State<SignInScreen> {
                           label: 'Password',
                           hintText: '••••••••',
                           obscureText: _obscurePassword,
-                          textInputAction: TextInputAction.done,
+                          textInputAction: TextInputAction.next,
                           suffixIcon: _obscurePassword
                               ? Icons.visibility_outlined
                               : Icons.visibility_off_outlined,
@@ -132,53 +161,24 @@ class _SignInScreenState extends State<SignInScreen> {
                               () => _obscurePassword = !_obscurePassword),
                           errorText: _passwordError,
                         ),
-                        const SizedBox(height: 8),
-                        Align(
-                          alignment: Alignment.centerRight,
-                          child: TextButton(
-                            onPressed: () {},
-                            child: Text(
-                              'Forgot password?',
-                              style: AppTextStyles.labelMedium.copyWith(
-                                color: AppColors.glassAccentPink,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
+                        const SizedBox(height: 16),
+                        GlassTextField(
+                          controller: _confirmPasswordController,
+                          label: 'Confirm Password',
+                          hintText: '••••••••',
+                          obscureText: _obscureConfirm,
+                          textInputAction: TextInputAction.done,
+                          suffixIcon: _obscureConfirm
+                              ? Icons.visibility_outlined
+                              : Icons.visibility_off_outlined,
+                          onSuffixTap: () => setState(
+                              () => _obscureConfirm = !_obscureConfirm),
+                          errorText: _confirmError,
                         ),
-                        const SizedBox(height: 12),
-                        GlassPrimaryButton(text: 'Sign In', onPressed: _submit),
-                        const SizedBox(height: 20),
-                        Center(
-                          child: Column(
-                            children: [
-                              GestureDetector(
-                                onTap: () {},
-                                child: Container(
-                                  width: 56,
-                                  height: 56,
-                                  decoration: BoxDecoration(
-                                    color: AppColors.glassSurface,
-                                    shape: BoxShape.circle,
-                                    border: Border.all(
-                                        color: AppColors.glassBorder),
-                                  ),
-                                  child: const Icon(
-                                    Icons.fingerprint_rounded,
-                                    color: AppColors.glassAccentPink,
-                                    size: 28,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(height: 10),
-                              Text(
-                                'Sign in with Face ID',
-                                style: AppTextStyles.labelMedium.copyWith(
-                                  color: AppColors.glassOnSurfaceMuted,
-                                ),
-                              ),
-                            ],
-                          ),
+                        const SizedBox(height: 24),
+                        GlassPrimaryButton(
+                          text: 'Create Account',
+                          onPressed: _submit,
                         ),
                       ],
                     ),
@@ -188,15 +188,15 @@ class _SignInScreenState extends State<SignInScreen> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text(
-                        "Don't have an account? ",
+                        'Already have an account? ',
                         style: AppTextStyles.bodyMedium.copyWith(
                           color: AppColors.glassOnSurfaceMuted,
                         ),
                       ),
                       GestureDetector(
-                        onTap: () => Navigator.of(context).pushNamed(AppRouter.signUp),
+                        onTap: () => Navigator.of(context).pop(),
                         child: Text(
-                          'Sign Up',
+                          'Sign In',
                           style: AppTextStyles.bodyMedium.copyWith(
                             color: AppColors.glassAccentPink,
                             fontWeight: FontWeight.w700,

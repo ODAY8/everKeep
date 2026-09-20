@@ -16,6 +16,7 @@ class GlassTextField extends StatelessWidget {
   final bool obscureText;
   final TextInputType? keyboardType;
   final TextInputAction? textInputAction;
+  final String? errorText;
 
   const GlassTextField({
     Key? key,
@@ -28,6 +29,7 @@ class GlassTextField extends StatelessWidget {
     this.obscureText = false,
     this.keyboardType,
     this.textInputAction,
+    this.errorText,
   }) : super(key: key);
 
   @override
@@ -50,7 +52,9 @@ class GlassTextField extends StatelessWidget {
           decoration: BoxDecoration(
             color: AppColors.glassBackground,
             borderRadius: AppRadius.radiusLG,
-            border: Border.all(color: AppColors.glassBorder),
+            border: Border.all(
+              color: errorText != null ? AppColors.glassDestructive : AppColors.glassBorder,
+            ),
           ),
           child: Row(
             children: [
@@ -87,6 +91,15 @@ class GlassTextField extends StatelessWidget {
             ],
           ),
         ),
+        if (errorText != null) ...[
+          const SizedBox(height: 6),
+          Text(
+            errorText!,
+            style: AppTextStyles.labelSmall.copyWith(
+              color: AppColors.glassDestructive,
+            ),
+          ),
+        ],
       ],
     );
   }

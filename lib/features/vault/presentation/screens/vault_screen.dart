@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:everkeep/core/routing/app_router.dart';
 import 'package:everkeep/core/theme/app_colors.dart';
 import 'package:everkeep/core/theme/app_text_styles.dart';
 import 'package:everkeep/widgets/fade_slide_in.dart';
@@ -75,12 +76,15 @@ class VaultScreen extends StatelessWidget {
                     iconColor: entry.value.iconColor,
                     label: entry.value.label,
                     count: entry.value.count,
-                    onTap: () {},
+                    onTap: () => Navigator.of(context).pushNamed(AppRouter.documents),
                   ),
                 ),
               FadeSlideIn(
                 index: categories.length,
-                child: GlassAddTile(label: 'Add to Vault', onTap: () {}),
+                child: GlassAddTile(
+                  label: 'Add to Vault',
+                  onTap: () => Navigator.of(context).pushNamed(AppRouter.documents),
+                ),
               ),
             ],
           ),

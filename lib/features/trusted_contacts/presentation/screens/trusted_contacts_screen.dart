@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:everkeep/core/config/app_image_urls.dart';
+import 'package:everkeep/core/routing/app_router.dart';
 import 'package:everkeep/core/theme/app_colors.dart';
 import 'package:everkeep/core/theme/app_radius.dart';
 import 'package:everkeep/core/theme/app_text_styles.dart';
@@ -62,7 +63,10 @@ class _TrustedContactsScreenState extends State<TrustedContactsScreen> {
             const SizedBox(height: 12),
           ],
           const SizedBox(height: 8),
-          GlassPrimaryButton(text: 'Invite Someone', onPressed: () {}),
+          GlassPrimaryButton(
+            text: 'Invite Someone',
+            onPressed: () => Navigator.of(context).pushNamed(AppRouter.emergencyAccess),
+          ),
         ],
       ),
     );
@@ -71,7 +75,7 @@ class _TrustedContactsScreenState extends State<TrustedContactsScreen> {
   Widget _buildContactCard(Map<String, dynamic> contact) {
     return GlassCard(
       borderRadius: AppRadius.radiusXXL,
-      onTap: () {},
+      onTap: () => Navigator.of(context).pushNamed(AppRouter.emergencyAccess),
       child: Row(
         children: [
           ProfileAvatar(

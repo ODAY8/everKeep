@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:everkeep/core/theme/app_colors.dart';
 import 'package:everkeep/features/home/presentation/screens/home_screen.dart';
 import 'package:everkeep/features/vault/presentation/screens/vault_screen.dart';
 import 'package:everkeep/features/wishes/presentation/screens/wishes_screen.dart';
@@ -26,6 +27,7 @@ class _MainShellState extends State<MainShell> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppColors.glassBackground,
       body: IndexedStack(
         index: _currentIndex,
         children: _screens,

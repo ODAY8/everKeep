@@ -92,24 +92,15 @@ class _NavItem extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            TweenAnimationBuilder<double>(
-              duration: const Duration(milliseconds: 200),
+            AnimatedScale(
+              scale: isActive ? 1.12 : 1.0,
+              duration: const Duration(milliseconds: 180),
               curve: Curves.easeOut,
-              tween: Tween(begin: 1.0, end: isActive ? 1.12 : 1.0),
-              builder: (context, scale, child) => Transform.scale(
-                scale: scale,
-                child: child,
-              ),
-              child: TweenAnimationBuilder<Color?>(
-                duration: const Duration(milliseconds: 200),
-                tween: ColorTween(end: color),
-                builder: (context, animatedColor, _) =>
-                    Icon(icon, size: 22, color: animatedColor),
-              ),
+              child: Icon(icon, size: 22, color: color),
             ),
             const SizedBox(height: 4),
             AnimatedDefaultTextStyle(
-              duration: const Duration(milliseconds: 200),
+              duration: const Duration(milliseconds: 180),
               style: AppTextStyles.labelSmall.copyWith(
                 color: color,
                 fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,

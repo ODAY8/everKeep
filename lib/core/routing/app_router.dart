@@ -3,7 +3,7 @@ import 'package:everkeep/features/auth/presentation/screens/sign_in_screen.dart'
 import 'package:everkeep/features/auth/presentation/screens/welcome_screen.dart';
 import 'package:everkeep/features/documents/presentation/screens/documents_screen.dart';
 import 'package:everkeep/features/emergency_access/presentation/screens/emergency_access_screen.dart';
-import 'package:everkeep/features/home/presentation/screens/home_screen.dart';
+import 'package:everkeep/features/shell/main_shell.dart';
 import 'package:everkeep/features/onboarding/presentation/screens/onboarding_screen.dart';
 import 'package:everkeep/features/profile/presentation/screens/profile_screen.dart';
 import 'package:everkeep/features/security/presentation/screens/security_screen.dart';
@@ -24,6 +24,7 @@ class AppRouter {
   static const String verification = '/verification';
   static const String createPassword = '/create-password';
   static const String biometricUnlock = '/biometric-unlock';
+  static const String shell = '/home';
   static const String home = '/home';
   static const String vault = '/vault';
   static const String documents = '/documents';
@@ -41,7 +42,7 @@ class AppRouter {
       AppRouter.onboarding => const OnboardingScreen(),
       AppRouter.welcome => const WelcomeScreen(),
       AppRouter.signIn => const SignInScreen(),
-      AppRouter.home => const HomeScreen(),
+      AppRouter.home => const MainShell(),
       AppRouter.vault => const VaultScreen(),
       AppRouter.documents => const DocumentsScreen(),
       AppRouter.accounts => const AccountsScreen(),
@@ -51,7 +52,7 @@ class AppRouter {
       AppRouter.profile => const ProfileScreen(),
       AppRouter.security => const SecurityScreen(),
       AppRouter.settings => const SettingsScreen(),
-      _ => const HomeScreen(),
+      _ => const MainShell(),
     };
 
     return MaterialPageRoute(builder: (_) => page, settings: settings);

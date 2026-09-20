@@ -5,7 +5,6 @@ import 'package:everkeep/core/theme/app_colors.dart';
 import 'package:everkeep/core/theme/app_text_styles.dart';
 import 'package:everkeep/widgets/circular_icon_button.dart';
 import 'package:everkeep/widgets/fade_slide_in.dart';
-import 'package:everkeep/widgets/floating_bottom_nav.dart';
 import 'package:everkeep/widgets/glass/activity_row.dart';
 import 'package:everkeep/widgets/glass/dashboard_grid_card.dart';
 import 'package:everkeep/widgets/glass/glass_scaffold.dart';
@@ -44,25 +43,6 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     return GlassScaffold(
-      bottomNavigationBar: FloatingBottomNav(
-        currentIndex: 0,
-        onTap: (index) {
-          switch (index) {
-            case 1:
-              Navigator.of(context).pushNamed(AppRouter.vault);
-              break;
-            case 2:
-              Navigator.of(context).pushNamed(AppRouter.vault);
-              break;
-            case 3:
-              Navigator.of(context).pushNamed(AppRouter.wishes);
-              break;
-            case 4:
-              Navigator.of(context).pushNamed(AppRouter.profile);
-              break;
-          }
-        },
-      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

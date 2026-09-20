@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:everkeep/core/theme/app_colors.dart';
 import 'package:everkeep/core/theme/app_text_styles.dart';
 import 'package:everkeep/widgets/fade_slide_in.dart';
-import 'package:everkeep/widgets/floating_bottom_nav.dart';
 import 'package:everkeep/widgets/glass/glass_add_tile.dart';
 import 'package:everkeep/widgets/glass/glass_scaffold.dart';
 import 'package:everkeep/widgets/glass/glass_search_bar.dart';
@@ -47,12 +46,6 @@ class VaultScreen extends StatelessWidget {
     ];
 
     return GlassScaffold(
-      bottomNavigationBar: FloatingBottomNav(
-        currentIndex: 1,
-        onTap: (index) {
-          if (index == 0) Navigator.of(context).maybePop();
-        },
-      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

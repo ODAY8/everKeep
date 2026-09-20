@@ -63,9 +63,10 @@ class _AccountsScreenState extends State<AccountsScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const GlassPageHeader(
+          GlassPageHeader(
             title: 'Accounts',
             subtitle: 'Your secure login credentials',
+            showBackButton: Navigator.of(context).canPop(),
           ),
           const SizedBox(height: 18),
           GlassSearchBar(

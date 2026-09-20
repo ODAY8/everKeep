@@ -134,6 +134,16 @@ class _HomeScreenState extends State<HomeScreen> {
               title: activity['title'] as String,
               subtitle: activity['subtitle'] as String,
               dotColor: activity['color'] as Color,
+              onTap: () {
+                final subtitle = activity['subtitle'] as String;
+                if (subtitle.contains('Documents')) {
+                  Navigator.of(context).pushNamed(AppRouter.documents);
+                } else if (subtitle.contains('Trusted Contact')) {
+                  Navigator.of(context).pushNamed(AppRouter.trustedContacts);
+                } else {
+                  Navigator.of(context).pushNamed(AppRouter.settings);
+                }
+              },
             ),
             const SizedBox(height: 10),
           ],

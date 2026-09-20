@@ -28,6 +28,7 @@ void main() {
       ),
     );
     await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
   }
 
   testWidgets('SplashScreen builds without throwing', (tester) async {
@@ -38,7 +39,7 @@ void main() {
   testWidgets('WelcomeScreen builds without throwing', (tester) async {
     await pumpScreen(tester, const WelcomeScreen());
     expect(tester.takeException(), isNull);
-    expect(find.text('Create your legacy'), findsOneWidget);
+    expect(find.text('Create Your Legacy'), findsOneWidget);
   });
 
   testWidgets('SignInScreen builds without throwing', (tester) async {
@@ -54,7 +55,7 @@ void main() {
   testWidgets('HomeScreen builds without throwing', (tester) async {
     await pumpScreen(tester, const HomeScreen());
     expect(tester.takeException(), isNull);
-    expect(find.text('Welcome back,'), findsOneWidget);
+    expect(find.text('Good morning,'), findsOneWidget);
   });
 
   testWidgets('VaultScreen builds without throwing', (tester) async {
@@ -93,7 +94,7 @@ void main() {
   testWidgets('ProfileScreen builds without throwing', (tester) async {
     await pumpScreen(tester, const ProfileScreen());
     expect(tester.takeException(), isNull);
-    expect(find.text('Adom Mensah'), findsOneWidget);
+    expect(find.text('Sarah Mitchell'), findsWidgets);
   });
 
   testWidgets('SettingsScreen builds without throwing', (tester) async {

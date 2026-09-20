@@ -70,6 +70,7 @@ class _SecurityScreenState extends State<SecurityScreen> {
               title: 'Recovery Key',
               description: 'A backup key to regain vault access',
               badge: const StatusBadge.neutral('Set Up'),
+              onTap: () {},
             ),
           ),
           const SizedBox(height: 12),
@@ -79,6 +80,7 @@ class _SecurityScreenState extends State<SecurityScreen> {
               title: 'Emergency Access',
               description: 'Trusted contacts can request access',
               badge: const StatusBadge.pending('Configured'),
+              onTap: () => Navigator.of(context).pushNamed(AppRouter.emergencyAccess),
             ),
           ),
         ],
@@ -172,8 +174,10 @@ class _SecurityScreenState extends State<SecurityScreen> {
     required String title,
     required String description,
     required Widget badge,
+    VoidCallback? onTap,
   }) {
     return GlassCard(
+      onTap: onTap,
       child: Row(
         children: [
           Expanded(

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:everkeep/core/routing/app_router.dart';
 import 'package:everkeep/core/theme/app_colors.dart';
 import 'package:everkeep/features/home/presentation/screens/home_screen.dart';
 import 'package:everkeep/features/vault/presentation/screens/vault_screen.dart';
@@ -28,14 +29,14 @@ class _MainShellState extends State<MainShell> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.glassBackground,
-      body: IndexedStack(
-        index: _currentIndex,
-        children: _screens,
-      ),
+      body: IndexedStack(index: _currentIndex, children: _screens),
       bottomNavigationBar: FloatingBottomNav(
         currentIndex: _currentIndex,
         onTap: (index) {
-          if (index == 2) return;
+          if (index == 2) {
+            Navigator.of(context).pushNamed(AppRouter.documents);
+            return;
+          }
           setState(() => _currentIndex = index);
         },
       ),

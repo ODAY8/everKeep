@@ -76,14 +76,24 @@ class VaultScreen extends StatelessWidget {
                     iconColor: entry.value.iconColor,
                     label: entry.value.label,
                     count: entry.value.count,
-                    onTap: () => Navigator.of(context).pushNamed(AppRouter.documents),
+                    onTap: () {
+                      final label = entry.value.label;
+                      if (label == 'Passwords' || label == 'Financials') {
+                        Navigator.of(context).pushNamed(AppRouter.accounts);
+                      } else if (label == 'Messages' || label == 'Memories') {
+                        Navigator.of(context).pushNamed(AppRouter.wishes);
+                      } else {
+                        Navigator.of(context).pushNamed(AppRouter.documents);
+                      }
+                    },
                   ),
                 ),
               FadeSlideIn(
                 index: categories.length,
                 child: GlassAddTile(
                   label: 'Add to Vault',
-                  onTap: () => Navigator.of(context).pushNamed(AppRouter.documents),
+                  onTap: () =>
+                      Navigator.of(context).pushNamed(AppRouter.documents),
                 ),
               ),
             ],

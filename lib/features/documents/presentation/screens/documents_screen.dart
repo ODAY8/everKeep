@@ -60,6 +60,7 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
         children: [
           GlassPageHeader(
             title: 'Documents',
+            showBackButton: Navigator.of(context).canPop(),
             trailing: CircularIconButton(
               icon: Icons.search_rounded,
               background: AppColors.glassSurface,

@@ -9,8 +9,7 @@ class GlassSearchBar extends StatelessWidget {
   final String hintText;
   final ValueChanged<String>? onChanged;
 
-  const GlassSearchBar({Key? key, required this.hintText, this.onChanged})
-      : super(key: key);
+  const GlassSearchBar({super.key, required this.hintText, this.onChanged});
 
   @override
   Widget build(BuildContext context) {

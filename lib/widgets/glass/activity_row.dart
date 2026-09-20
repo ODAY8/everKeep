@@ -12,12 +12,12 @@ class ActivityRow extends StatelessWidget {
   final VoidCallback? onTap;
 
   const ActivityRow({
-    Key? key,
+    super.key,
     required this.title,
     required this.subtitle,
     required this.dotColor,
     this.onTap,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

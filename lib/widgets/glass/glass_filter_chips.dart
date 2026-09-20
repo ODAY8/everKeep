@@ -11,11 +11,11 @@ class GlassFilterChips extends StatelessWidget {
   final ValueChanged<int> onSelected;
 
   const GlassFilterChips({
-    Key? key,
+    super.key,
     required this.labels,
     required this.selectedIndex,
     required this.onSelected,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

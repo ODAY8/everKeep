@@ -8,7 +8,7 @@ import 'package:everkeep/widgets/glass/glass_primary_button.dart';
 import 'package:everkeep/widgets/glass/glass_scaffold.dart';
 
 class EmergencyAccessScreen extends StatefulWidget {
-  const EmergencyAccessScreen({Key? key}) : super(key: key);
+  const EmergencyAccessScreen({super.key});
 
   @override
   State<EmergencyAccessScreen> createState() => _EmergencyAccessScreenState();

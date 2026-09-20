@@ -7,10 +7,10 @@ class OnboardingNextButton extends StatelessWidget {
   final double size;
 
   const OnboardingNextButton({
-    Key? key,
+    super.key,
     required this.onPressed,
     this.size = 52,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

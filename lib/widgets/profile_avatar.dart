@@ -10,12 +10,12 @@ class ProfileAvatar extends StatelessWidget {
   final double borderWidth;
 
   const ProfileAvatar({
-    Key? key,
+    super.key,
     this.url,
     this.size = 48,
     this.borderColor = Colors.white,
     this.borderWidth = 2,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

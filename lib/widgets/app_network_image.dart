@@ -9,13 +9,13 @@ class AppNetworkImage extends StatelessWidget {
   final Color? placeholderColor;
 
   const AppNetworkImage({
-    Key? key,
+    super.key,
     required this.url,
     this.fit = BoxFit.cover,
     this.borderRadius,
     this.fallbackIcon = Icons.image_outlined,
     this.placeholderColor,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

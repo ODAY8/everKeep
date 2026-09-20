@@ -13,14 +13,14 @@ class GlassScaffold extends StatelessWidget {
   final bool scrollable;
 
   const GlassScaffold({
-    Key? key,
+    super.key,
     required this.child,
     this.bottomNavigationBar,
     this.floatingActionButton,
     this.floatingActionButtonLocation,
     this.padding = const EdgeInsets.fromLTRB(20, 8, 20, 110),
     this.scrollable = true,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

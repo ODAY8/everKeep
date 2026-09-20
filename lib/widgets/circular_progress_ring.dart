@@ -11,14 +11,14 @@ class CircularProgressRing extends StatefulWidget {
   final Widget? child;
 
   const CircularProgressRing({
-    Key? key,
+    super.key,
     required this.progress,
     this.size = 80,
     this.strokeWidth = 7,
     this.trackColor = const Color(0xFFEEEEEE),
     this.progressGradient = AppColors.primaryGradient,
     this.child,
-  }) : super(key: key);
+  });
 
   @override
   State<CircularProgressRing> createState() => _CircularProgressRingState();

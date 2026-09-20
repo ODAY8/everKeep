@@ -13,7 +13,7 @@ class CircularIconButton extends StatelessWidget {
   final String? tooltip;
 
   const CircularIconButton({
-    Key? key,
+    super.key,
     required this.icon,
     required this.onPressed,
     this.size = 44,
@@ -22,7 +22,7 @@ class CircularIconButton extends StatelessWidget {
     this.showBadge = false,
     this.badgeColor = Colors.orange,
     this.tooltip,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

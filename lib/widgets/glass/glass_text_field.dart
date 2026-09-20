@@ -19,7 +19,7 @@ class GlassTextField extends StatelessWidget {
   final String? errorText;
 
   const GlassTextField({
-    Key? key,
+    super.key,
     this.controller,
     this.label,
     required this.hintText,
@@ -30,7 +30,7 @@ class GlassTextField extends StatelessWidget {
     this.keyboardType,
     this.textInputAction,
     this.errorText,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

@@ -9,8 +9,7 @@ class GlassAddTile extends StatelessWidget {
   final String label;
   final VoidCallback onTap;
 
-  const GlassAddTile({Key? key, required this.label, required this.onTap})
-      : super(key: key);
+  const GlassAddTile({super.key, required this.label, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -56,15 +55,10 @@ class GlassAddTile extends StatelessWidget {
 class _DashedRRectPainter extends CustomPainter {
   final Color color;
   final double radius;
-  final double dashWidth;
-  final double gapWidth;
+  static const double dashWidth = 6.0;
+  static const double gapWidth = 5.0;
 
-  const _DashedRRectPainter({
-    required this.color,
-    required this.radius,
-    this.dashWidth = 6,
-    this.gapWidth = 5,
-  });
+  const _DashedRRectPainter({required this.color, required this.radius});
 
   @override
   void paint(Canvas canvas, Size size) {

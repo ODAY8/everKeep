@@ -7,7 +7,7 @@ class User {
   final bool isAuthenticated;
   final DateTime? lastLogin;
 
-  User({
+  const User({
     required this.id,
     required this.name,
     required this.email,
@@ -17,14 +17,37 @@ class User {
     this.lastLogin,
   });
 
-  // Mock user for development
-  static User mockUser = User(
-    id: '1',
-    name: 'Alex Johnson',
-    email: 'alex.johnson@example.com',
+  User copyWith({
+    String? id,
+    String? name,
+    String? email,
+    String? phone,
+    String? avatarUrl,
+    bool? isAuthenticated,
+    DateTime? lastLogin,
+  }) {
+    return User(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      email: email ?? this.email,
+      phone: phone ?? this.phone,
+      avatarUrl: avatarUrl ?? this.avatarUrl,
+      isAuthenticated: isAuthenticated ?? this.isAuthenticated,
+      lastLogin: lastLogin ?? this.lastLogin,
+    );
+  }
+
+  // Default user representing the active profile
+  static final User defaultUser = User(
+    id: 'user-001',
+    name: 'Sarah Mitchell',
+    email: 'sarah.mitchell@editorial.com',
     phone: '+1 (555) 123-4567',
-    avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150',
+    avatarUrl: null,
     isAuthenticated: true,
     lastLogin: DateTime.now().subtract(const Duration(hours: 2)),
   );
+
+  // Mock user for development
+  static User mockUser = defaultUser;
 }

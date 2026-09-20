@@ -12,11 +12,11 @@ class GlassPrimaryButton extends StatelessWidget {
   final double height;
 
   const GlassPrimaryButton({
-    Key? key,
+    super.key,
     required this.text,
     required this.onPressed,
     this.height = 56,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -60,11 +60,11 @@ class GlassOutlineButton extends StatelessWidget {
   final double height;
 
   const GlassOutlineButton({
-    Key? key,
+    super.key,
     required this.text,
     required this.onPressed,
     this.height = 56,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

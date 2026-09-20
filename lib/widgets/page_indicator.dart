@@ -9,12 +9,12 @@ class PageIndicator extends StatelessWidget {
   final Color inactiveColor;
 
   const PageIndicator({
-    Key? key,
+    super.key,
     required this.count,
     required this.currentIndex,
     this.activeColor = AppColors.glassAccentPink,
     this.inactiveColor = AppColors.glassBorder,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

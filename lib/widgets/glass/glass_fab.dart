@@ -15,11 +15,11 @@ class GlassFab extends StatelessWidget {
   final VoidCallback onPressed;
 
   const GlassFab({
-    Key? key,
+    super.key,
     this.label,
     required this.onPressed,
     this.icon = Icons.add_rounded,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

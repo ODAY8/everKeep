@@ -6,7 +6,7 @@ import '../../../../core/theme/app_text_styles.dart';
 import '../../../../widgets/app_network_image.dart';
 
 class OnboardingPage1 extends StatefulWidget {
-  const OnboardingPage1({Key? key}) : super(key: key);
+  const OnboardingPage1({super.key});
 
   @override
   State<OnboardingPage1> createState() => _OnboardingPage1State();

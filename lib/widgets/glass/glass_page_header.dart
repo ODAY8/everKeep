@@ -17,12 +17,12 @@ class GlassPageHeader extends StatelessWidget {
   final Widget? trailing;
 
   const GlassPageHeader({
-    Key? key,
+    super.key,
     required this.title,
     this.subtitle,
     this.showBackButton = false,
     this.trailing,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -50,7 +50,7 @@ class GlassPageHeader extends StatelessWidget {
                 ),
               ),
             ),
-            if (trailing != null) trailing!,
+            ?trailing,
           ],
         ),
         if (subtitle != null) ...[

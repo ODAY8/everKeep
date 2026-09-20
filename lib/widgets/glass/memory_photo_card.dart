@@ -18,7 +18,7 @@ class MemoryPhotoCard extends StatelessWidget {
   final VoidCallback? onTap;
 
   const MemoryPhotoCard({
-    Key? key,
+    super.key,
     required this.imageUrl,
     required this.title,
     required this.subtitle,
@@ -26,7 +26,7 @@ class MemoryPhotoCard extends StatelessWidget {
     required this.height,
     this.rotationDegrees = 0,
     this.onTap,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -128,10 +128,10 @@ class MemoryMasonryGrid extends StatelessWidget {
   final double spacing;
 
   const MemoryMasonryGrid({
-    Key? key,
+    super.key,
     required this.children,
     this.spacing = 14,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

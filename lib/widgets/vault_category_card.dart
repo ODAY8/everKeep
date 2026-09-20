@@ -11,13 +11,13 @@ class VaultCategoryCard extends StatelessWidget {
   final VoidCallback onTap;
 
   const VaultCategoryCard({
-    Key? key,
+    super.key,
     required this.icon,
     required this.iconColor,
     required this.label,
     required this.count,
     required this.onTap,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -73,7 +73,7 @@ class VaultCategoryCard extends StatelessWidget {
 class VaultGrid extends StatelessWidget {
   final List<Widget> cards;
 
-  const VaultGrid({Key? key, required this.cards}) : super(key: key);
+  const VaultGrid({super.key, required this.cards});
 
   @override
   Widget build(BuildContext context) {

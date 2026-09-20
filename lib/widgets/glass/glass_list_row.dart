@@ -27,7 +27,7 @@ class GlassListRow {
 class GlassListCard extends StatelessWidget {
   final List<GlassListRow> rows;
 
-  const GlassListCard({Key? key, required this.rows}) : super(key: key);
+  const GlassListCard({super.key, required this.rows});
 
   @override
   Widget build(BuildContext context) {

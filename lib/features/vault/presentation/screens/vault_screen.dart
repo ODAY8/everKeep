@@ -9,7 +9,7 @@ import 'package:everkeep/widgets/glass/glass_search_bar.dart';
 import 'package:everkeep/widgets/vault_category_card.dart';
 
 class VaultScreen extends StatelessWidget {
-  const VaultScreen({Key? key}) : super(key: key);
+  const VaultScreen({super.key});
 
   @override
   Widget build(BuildContext context) {

@@ -14,12 +14,12 @@ class SecurityScoreCard extends StatelessWidget {
   final VoidCallback? onTap;
 
   const SecurityScoreCard({
-    Key? key,
+    super.key,
     required this.label,
     required this.scoreText,
     required this.progress,
     this.onTap,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

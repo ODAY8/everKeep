@@ -16,14 +16,14 @@ class GlassItemRow extends StatelessWidget {
   final VoidCallback? onTap;
 
   const GlassItemRow({
-    Key? key,
+    super.key,
     required this.icon,
     required this.iconColor,
     required this.title,
     required this.subtitle,
     this.trailing,
     this.onTap,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

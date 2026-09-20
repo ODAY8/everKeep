@@ -62,7 +62,7 @@ class WelcomeScreen extends StatelessWidget {
                   GlassPrimaryButton(
                     text: 'Create Your Legacy',
                     onPressed: () =>
-                        Navigator.of(context).pushNamed(AppRouter.signIn),
+                        Navigator.of(context).pushNamed(AppRouter.signUp),
                   ),
                   const SizedBox(height: AppSpacing.lg),
                   Center(

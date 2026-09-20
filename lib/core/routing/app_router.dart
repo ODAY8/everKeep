@@ -1,4 +1,5 @@
 import 'package:everkeep/features/accounts/presentation/screens/accounts_screen.dart';
+import 'package:everkeep/features/auth/presentation/screens/forgot_password_screen.dart';
 import 'package:everkeep/features/auth/presentation/screens/sign_in_screen.dart';
 import 'package:everkeep/features/auth/presentation/screens/sign_up_screen.dart';
 import 'package:everkeep/features/auth/presentation/screens/welcome_screen.dart';
@@ -21,6 +22,7 @@ class AppRouter {
   static const String welcome = '/welcome';
   static const String signIn = '/sign-in';
   static const String signUp = '/sign-up';
+  static const String forgotPassword = '/forgot-password';
   static const String home = '/home';
   static const String vault = '/vault';
   static const String documents = '/documents';
@@ -39,6 +41,7 @@ class AppRouter {
       AppRouter.welcome => const WelcomeScreen(),
       AppRouter.signIn => const SignInScreen(),
       AppRouter.signUp => const SignUpScreen(),
+      AppRouter.forgotPassword => const ForgotPasswordScreen(),
       AppRouter.home => const MainShell(),
       AppRouter.vault => const VaultScreen(),
       AppRouter.documents => const DocumentsScreen(),

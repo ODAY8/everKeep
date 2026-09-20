@@ -54,30 +54,29 @@ class _SignUpScreenState extends State<SignUpScreen> {
       _emailError = email.isEmpty
           ? 'Email is required'
           : !_isValidEmail(email)
-              ? 'Enter a valid email address'
-              : null;
+          ? 'Enter a valid email address'
+          : null;
 
       _passwordError = password.isEmpty
           ? 'Password is required'
           : password.length < 6
-              ? 'Password must be at least 6 characters'
-              : null;
+          ? 'Password must be at least 6 characters'
+          : null;
 
       _confirmError = confirm.isEmpty
           ? 'Please confirm your password'
           : confirm != password
-              ? 'Passwords do not match'
-              : null;
+          ? 'Passwords do not match'
+          : null;
     });
 
     if (_nameError == null &&
         _emailError == null &&
         _passwordError == null &&
         _confirmError == null) {
-      Navigator.of(context).pushNamedAndRemoveUntil(
-        AppRouter.home,
-        (route) => false,
-      );
+      Navigator.of(
+        context,
+      ).pushNamedAndRemoveUntil(AppRouter.home, (route) => false);
     }
   }
 
@@ -158,7 +157,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
                               ? Icons.visibility_outlined
                               : Icons.visibility_off_outlined,
                           onSuffixTap: () => setState(
-                              () => _obscurePassword = !_obscurePassword),
+                            () => _obscurePassword = !_obscurePassword,
+                          ),
                           errorText: _passwordError,
                         ),
                         const SizedBox(height: 16),
@@ -172,7 +172,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
                               ? Icons.visibility_outlined
                               : Icons.visibility_off_outlined,
                           onSuffixTap: () => setState(
-                              () => _obscureConfirm = !_obscureConfirm),
+                            () => _obscureConfirm = !_obscureConfirm,
+                          ),
                           errorText: _confirmError,
                         ),
                         const SizedBox(height: 24),
@@ -194,7 +195,9 @@ class _SignUpScreenState extends State<SignUpScreen> {
                         ),
                       ),
                       GestureDetector(
-                        onTap: () => Navigator.of(context).pop(),
+                        onTap: () => Navigator.of(
+                          context,
+                        ).pushReplacementNamed(AppRouter.signIn),
                         child: Text(
                           'Sign In',
                           style: AppTextStyles.bodyMedium.copyWith(

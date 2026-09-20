@@ -1,6 +1,8 @@
 import 'package:everkeep/core/routing/app_router.dart';
 import 'package:everkeep/features/accounts/presentation/screens/accounts_screen.dart';
+import 'package:everkeep/features/auth/presentation/screens/forgot_password_screen.dart';
 import 'package:everkeep/features/auth/presentation/screens/sign_in_screen.dart';
+import 'package:everkeep/features/auth/presentation/screens/sign_up_screen.dart';
 import 'package:everkeep/features/auth/presentation/screens/welcome_screen.dart';
 import 'package:everkeep/features/documents/presentation/screens/documents_screen.dart';
 import 'package:everkeep/features/emergency_access/presentation/screens/emergency_access_screen.dart';
@@ -22,10 +24,7 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   Future<void> pumpScreen(WidgetTester tester, Widget screen) async {
     await tester.pumpWidget(
-      MaterialApp(
-        onGenerateRoute: AppRouter.generateRoute,
-        home: screen,
-      ),
+      MaterialApp(onGenerateRoute: AppRouter.generateRoute, home: screen),
     );
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 500));
@@ -44,6 +43,16 @@ void main() {
 
   testWidgets('SignInScreen builds without throwing', (tester) async {
     await pumpScreen(tester, const SignInScreen());
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('SignUpScreen builds without throwing', (tester) async {
+    await pumpScreen(tester, const SignUpScreen());
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('ForgotPasswordScreen builds without throwing', (tester) async {
+    await pumpScreen(tester, const ForgotPasswordScreen());
     expect(tester.takeException(), isNull);
   });
 
@@ -74,7 +83,9 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('WishesScreen (Memories) builds without throwing', (tester) async {
+  testWidgets('WishesScreen (Memories) builds without throwing', (
+    tester,
+  ) async {
     await pumpScreen(tester, const WishesScreen());
     expect(tester.takeException(), isNull);
     // Both the page title and the bottom-nav label read "Memories".

@@ -37,20 +37,19 @@ class _SignInScreenState extends State<SignInScreen> {
       _emailError = email.isEmpty
           ? 'Email is required'
           : !_isValidEmail(email)
-              ? 'Enter a valid email address'
-              : null;
+          ? 'Enter a valid email address'
+          : null;
       _passwordError = password.isEmpty
           ? 'Password is required'
           : password.length < 6
-              ? 'Password must be at least 6 characters'
-              : null;
+          ? 'Password must be at least 6 characters'
+          : null;
     });
 
     if (_emailError == null && _passwordError == null) {
-      Navigator.of(context).pushNamedAndRemoveUntil(
-        AppRouter.home,
-        (route) => false,
-      );
+      Navigator.of(
+        context,
+      ).pushNamedAndRemoveUntil(AppRouter.home, (route) => false);
     }
   }
 
@@ -129,14 +128,17 @@ class _SignInScreenState extends State<SignInScreen> {
                               ? Icons.visibility_outlined
                               : Icons.visibility_off_outlined,
                           onSuffixTap: () => setState(
-                              () => _obscurePassword = !_obscurePassword),
+                            () => _obscurePassword = !_obscurePassword,
+                          ),
                           errorText: _passwordError,
                         ),
                         const SizedBox(height: 8),
                         Align(
                           alignment: Alignment.centerRight,
                           child: TextButton(
-                            onPressed: () {},
+                            onPressed: () => Navigator.of(
+                              context,
+                            ).pushNamed(AppRouter.forgotPassword),
                             child: Text(
                               'Forgot password?',
                               style: AppTextStyles.labelMedium.copyWith(
@@ -153,7 +155,11 @@ class _SignInScreenState extends State<SignInScreen> {
                           child: Column(
                             children: [
                               GestureDetector(
-                                onTap: () {},
+                                onTap: () => Navigator.of(context)
+                                    .pushNamedAndRemoveUntil(
+                                      AppRouter.home,
+                                      (route) => false,
+                                    ),
                                 child: Container(
                                   width: 56,
                                   height: 56,
@@ -161,7 +167,8 @@ class _SignInScreenState extends State<SignInScreen> {
                                     color: AppColors.glassSurface,
                                     shape: BoxShape.circle,
                                     border: Border.all(
-                                        color: AppColors.glassBorder),
+                                      color: AppColors.glassBorder,
+                                    ),
                                   ),
                                   child: const Icon(
                                     Icons.fingerprint_rounded,
@@ -194,7 +201,9 @@ class _SignInScreenState extends State<SignInScreen> {
                         ),
                       ),
                       GestureDetector(
-                        onTap: () => Navigator.of(context).pushNamed(AppRouter.signUp),
+                        onTap: () => Navigator.of(
+                          context,
+                        ).pushReplacementNamed(AppRouter.signUp),
                         child: Text(
                           'Sign Up',
                           style: AppTextStyles.bodyMedium.copyWith(

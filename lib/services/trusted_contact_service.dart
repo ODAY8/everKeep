@@ -8,29 +8,31 @@ abstract class TrustedContactService {
 }
 
 class TrustedContactServiceImpl implements TrustedContactService {
-  final List<TrustedContactItem> _mockDatabase = const [
-    TrustedContactItem(
+  // A growable list (not `const`) so add/remove actually persist across
+  // refetches, like the document and account services.
+  final List<TrustedContactItem> _mockDatabase = [
+    const TrustedContactItem(
       id: 'tc-1',
       name: 'Sarah Johnson',
       relationship: 'Spouse',
       accessLevel: 'Full Access',
       avatarUrl: AppImageUrls.trustedContact1,
     ),
-    TrustedContactItem(
+    const TrustedContactItem(
       id: 'tc-2',
       name: 'Michael Chen',
       relationship: 'Attorney',
       accessLevel: 'On Release',
       avatarUrl: AppImageUrls.trustedContact2,
     ),
-    TrustedContactItem(
+    const TrustedContactItem(
       id: 'tc-3',
       name: 'Emily Davis',
       relationship: 'Financial Advisor',
       accessLevel: 'View Only',
       avatarUrl: AppImageUrls.trustedContact3,
     ),
-    TrustedContactItem(
+    const TrustedContactItem(
       id: 'tc-4',
       name: 'Robert Wilson',
       relationship: 'Family Friend',
@@ -50,11 +52,13 @@ class TrustedContactServiceImpl implements TrustedContactService {
   @override
   Future<TrustedContactItem> addContact(TrustedContactItem contact) async {
     await Future.delayed(const Duration(milliseconds: 300));
+    _mockDatabase.add(contact);
     return contact;
   }
 
   @override
   Future<void> removeContact(String id) async {
     await Future.delayed(const Duration(milliseconds: 300));
+    _mockDatabase.removeWhere((contact) => contact.id == id);
   }
 }

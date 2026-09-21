@@ -33,6 +33,16 @@ class _SignUpScreenState extends State<SignUpScreen> {
   String? _confirmError;
 
   @override
+  void initState() {
+    super.initState();
+    // Don't show a failure left over from another auth screen. Deferred a
+    // frame because clearing notifies listeners.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) context.read<AuthProvider>().clearError();
+    });
+  }
+
+  @override
   void dispose() {
     _nameController.dispose();
     _emailController.dispose();

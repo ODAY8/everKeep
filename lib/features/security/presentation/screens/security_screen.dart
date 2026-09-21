@@ -6,6 +6,7 @@ import 'package:everkeep/core/theme/app_radius.dart';
 import 'package:everkeep/core/theme/app_text_styles.dart';
 import 'package:everkeep/providers/settings_provider.dart';
 import 'package:everkeep/widgets/fade_slide_in.dart';
+import 'package:everkeep/widgets/feedback.dart';
 import 'package:everkeep/widgets/glass/glass_card.dart';
 import 'package:everkeep/widgets/glass/glass_page_header.dart';
 import 'package:everkeep/widgets/glass/glass_scaffold.dart';
@@ -16,6 +17,22 @@ import 'package:everkeep/widgets/glass/status_badge.dart';
 /// emergency access. Matches the Figma Security frame.
 class SecurityScreen extends StatelessWidget {
   const SecurityScreen({super.key});
+
+  /// Runs a toggle. The provider flips the switch immediately and reverts it
+  /// if saving fails; this just tells the user when that happened.
+  Future<void> _update(
+    BuildContext context,
+    Future<bool> Function(SettingsProvider settings) change,
+  ) async {
+    final settings = context.read<SettingsProvider>();
+    final saved = await change(settings);
+    if (saved || !context.mounted) return;
+    showAppSnackBar(
+      context,
+      settings.error ?? 'Could not update this setting.',
+      isError: true,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -35,8 +52,7 @@ class SecurityScreen extends StatelessWidget {
               title: 'Two-Factor Authentication',
               description: 'Require a code from your phone at sign-in',
               value: settingsProv.twoFactorEnabled,
-              onChanged: (v) =>
-                  context.read<SettingsProvider>().toggleTwoFactor(v),
+              onChanged: (v) => _update(context, (s) => s.toggleTwoFactor(v)),
             ),
           ),
           const SizedBox(height: 12),
@@ -46,8 +62,7 @@ class SecurityScreen extends StatelessWidget {
               title: 'Biometric Lock',
               description: 'Use Face ID or fingerprint to open the vault',
               value: settingsProv.biometricEnabled,
-              onChanged: (v) =>
-                  context.read<SettingsProvider>().toggleBiometric(v),
+              onChanged: (v) => _update(context, (s) => s.toggleBiometric(v)),
             ),
           ),
           const SizedBox(height: 12),
@@ -57,8 +72,7 @@ class SecurityScreen extends StatelessWidget {
               title: 'Login Alerts',
               description: 'Get notified of new sign-ins',
               value: settingsProv.loginAlertsEnabled,
-              onChanged: (v) =>
-                  context.read<SettingsProvider>().toggleLoginAlerts(v),
+              onChanged: (v) => _update(context, (s) => s.toggleLoginAlerts(v)),
             ),
           ),
           const SizedBox(height: 12),

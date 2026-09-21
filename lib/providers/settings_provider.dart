@@ -1,8 +1,9 @@
 import 'package:flutter/foundation.dart';
 import '../models/security_settings.dart';
 import '../repositories/settings_repository.dart';
+import 'session_scoped.dart';
 
-class SettingsProvider extends ChangeNotifier {
+class SettingsProvider extends ChangeNotifier with SessionScoped {
   final SettingsRepository _settingsRepository;
 
   SecuritySettings _settings = const SecuritySettings();
@@ -20,60 +21,80 @@ class SettingsProvider extends ChangeNotifier {
   String? get error => _error;
 
   Future<void> fetchSecuritySettings() async {
+    final epoch = sessionEpoch;
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
-      _settings = await _settingsRepository.fetchSecuritySettings();
-      _error = null;
+      final fetched = await _settingsRepository.fetchSecuritySettings();
+      if (isStale(epoch)) return;
+      _settings = fetched;
     } catch (e) {
-      _error = e.toString().replaceFirst('Exception: ', '');
+      if (isStale(epoch)) return;
+      _error = errorMessage(e);
     } finally {
-      _isLoading = false;
-      notifyListeners();
+      if (!isStale(epoch)) {
+        _isLoading = false;
+        notifyListeners();
+      }
     }
   }
 
-  Future<void> toggleTwoFactor(bool value) async {
-    final updated = _settings.copyWith(twoFactorEnabled: value);
+  Future<bool> toggleTwoFactor(bool value) {
+    final previous = _settings.twoFactorEnabled;
+    return _persist(
+      _settings.copyWith(twoFactorEnabled: value),
+      rollback: (s) => s.copyWith(twoFactorEnabled: previous),
+    );
+  }
+
+  Future<bool> toggleBiometric(bool value) {
+    final previous = _settings.biometricEnabled;
+    return _persist(
+      _settings.copyWith(biometricEnabled: value),
+      rollback: (s) => s.copyWith(biometricEnabled: previous),
+    );
+  }
+
+  Future<bool> toggleLoginAlerts(bool value) {
+    final previous = _settings.loginAlertsEnabled;
+    return _persist(
+      _settings.copyWith(loginAlertsEnabled: value),
+      rollback: (s) => s.copyWith(loginAlertsEnabled: previous),
+    );
+  }
+
+  /// Applies [updated] immediately, then saves it. If saving fails, only the
+  /// flag that was changed is put back (via [rollback]) so a concurrent
+  /// change to a different flag isn't lost.
+  Future<bool> _persist(
+    SecuritySettings updated, {
+    required SecuritySettings Function(SecuritySettings current) rollback,
+  }) async {
+    final epoch = sessionEpoch;
     _settings = updated;
+    _error = null;
     notifyListeners();
 
     try {
       await _settingsRepository.updateSecuritySettings(updated);
+      return true;
     } catch (e) {
-      _settings = _settings.copyWith(twoFactorEnabled: !value);
-      _error = e.toString().replaceFirst('Exception: ', '');
+      if (isStale(epoch)) return false;
+      _settings = rollback(_settings);
+      _error = errorMessage(e);
       notifyListeners();
+      return false;
     }
   }
 
-  Future<void> toggleBiometric(bool value) async {
-    final updated = _settings.copyWith(biometricEnabled: value);
-    _settings = updated;
+  /// Restores defaults (called on sign-out).
+  void reset() {
+    invalidateSession();
+    _settings = const SecuritySettings();
+    _isLoading = false;
+    _error = null;
     notifyListeners();
-
-    try {
-      await _settingsRepository.updateSecuritySettings(updated);
-    } catch (e) {
-      _settings = _settings.copyWith(biometricEnabled: !value);
-      _error = e.toString().replaceFirst('Exception: ', '');
-      notifyListeners();
-    }
-  }
-
-  Future<void> toggleLoginAlerts(bool value) async {
-    final updated = _settings.copyWith(loginAlertsEnabled: value);
-    _settings = updated;
-    notifyListeners();
-
-    try {
-      await _settingsRepository.updateSecuritySettings(updated);
-    } catch (e) {
-      _settings = _settings.copyWith(loginAlertsEnabled: !value);
-      _error = e.toString().replaceFirst('Exception: ', '');
-      notifyListeners();
-    }
   }
 }

@@ -1,8 +1,9 @@
 import 'package:flutter/foundation.dart';
 import '../models/document_item.dart';
 import '../repositories/document_repository.dart';
+import 'session_scoped.dart';
 
-class DocumentProvider extends ChangeNotifier {
+class DocumentProvider extends ChangeNotifier with SessionScoped {
   final DocumentRepository _documentRepository;
 
   List<DocumentItem> _documents = [];
@@ -14,6 +15,7 @@ class DocumentProvider extends ChangeNotifier {
       : _documentRepository = documentRepository ?? DocumentRepositoryImpl();
 
   List<DocumentItem> get documents => List.unmodifiable(_documents);
+  int get count => _documents.length;
   bool get isLoading => _isLoading;
   String? get error => _error;
   bool get hasFetched => _hasFetched;
@@ -29,57 +31,80 @@ class DocumentProvider extends ChangeNotifier {
   }
 
   Future<void> fetchDocuments() async {
+    final epoch = sessionEpoch;
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
-      _documents = await _documentRepository.fetchDocuments();
+      final fetched = await _documentRepository.fetchDocuments();
+      if (isStale(epoch)) return;
+      _documents = fetched;
       _hasFetched = true;
-      _error = null;
     } catch (e) {
-      _error = e.toString().replaceFirst('Exception: ', '');
+      if (isStale(epoch)) return;
+      _error = errorMessage(e);
     } finally {
-      _isLoading = false;
-      notifyListeners();
+      if (!isStale(epoch)) {
+        _isLoading = false;
+        notifyListeners();
+      }
     }
   }
 
   Future<bool> addDocument(DocumentItem document) async {
+    final epoch = sessionEpoch;
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
       final added = await _documentRepository.addDocument(document);
+      if (isStale(epoch)) return false;
       _documents.insert(0, added);
-      _error = null;
       return true;
     } catch (e) {
-      _error = e.toString().replaceFirst('Exception: ', '');
+      if (isStale(epoch)) return false;
+      _error = errorMessage(e);
       return false;
     } finally {
-      _isLoading = false;
-      notifyListeners();
+      if (!isStale(epoch)) {
+        _isLoading = false;
+        notifyListeners();
+      }
     }
   }
 
   Future<bool> deleteDocument(String id) async {
+    final epoch = sessionEpoch;
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
       await _documentRepository.deleteDocument(id);
+      if (isStale(epoch)) return false;
       _documents.removeWhere((doc) => doc.id == id);
-      _error = null;
       return true;
     } catch (e) {
-      _error = e.toString().replaceFirst('Exception: ', '');
+      if (isStale(epoch)) return false;
+      _error = errorMessage(e);
       return false;
     } finally {
-      _isLoading = false;
-      notifyListeners();
+      if (!isStale(epoch)) {
+        _isLoading = false;
+        notifyListeners();
+      }
     }
+  }
+
+  /// Drops everything held for the previous user (called on sign-out).
+  void reset() {
+    invalidateSession();
+    _documents = [];
+    _isLoading = false;
+    _error = null;
+    _hasFetched = false;
+    notifyListeners();
   }
 }

@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:everkeep/core/routing/app_router.dart';
 import 'package:everkeep/core/theme/app_colors.dart';
 import 'package:everkeep/core/theme/app_text_styles.dart';
-import 'package:everkeep/providers/auth_provider.dart';
+import 'package:everkeep/core/session/sign_out.dart';
 import 'package:everkeep/providers/user_provider.dart';
 import 'package:everkeep/widgets/glass/glass_list_row.dart';
 import 'package:everkeep/widgets/glass/glass_page_header.dart';
@@ -23,8 +23,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final userProv = context.watch<UserProvider>();
     final email = userProv.displayEmail.isNotEmpty
         ? userProv.displayEmail
-        : 'sarah.mitchell@editorial.com';
-    final phone = userProv.user?.phone ?? '+1 (555) 123-4567';
+        : 'Not set';
+    final phone = (userProv.user?.phone?.isNotEmpty ?? false)
+        ? userProv.user!.phone!
+        : 'Not set';
 
     return GlassScaffold(
       child: Column(
@@ -112,15 +114,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           const SizedBox(height: 24),
           GlassOutlineButton(
             text: 'Log Out',
-            onPressed: () async {
-              await context.read<AuthProvider>().signOut();
-              if (context.mounted) {
-                Navigator.of(context).pushNamedAndRemoveUntil(
-                  AppRouter.welcome,
-                  (route) => false,
-                );
-              }
-            },
+            onPressed: () => signOutAndReturnToWelcome(context),
           ),
           const SizedBox(height: 16),
           Center(

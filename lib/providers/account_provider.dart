@@ -1,8 +1,9 @@
 import 'package:flutter/foundation.dart';
 import '../models/account_item.dart';
 import '../repositories/account_repository.dart';
+import 'session_scoped.dart';
 
-class AccountProvider extends ChangeNotifier {
+class AccountProvider extends ChangeNotifier with SessionScoped {
   final AccountRepository _accountRepository;
 
   List<AccountItem> _accounts = [];
@@ -16,6 +17,7 @@ class AccountProvider extends ChangeNotifier {
   List<AccountItem> get accounts => List.unmodifiable(_accounts);
   List<AccountItem> get favoriteAccounts =>
       List.unmodifiable(_accounts.where((a) => a.isFavorite));
+  int get count => _accounts.length;
   bool get isLoading => _isLoading;
   String? get error => _error;
   bool get hasFetched => _hasFetched;
@@ -31,76 +33,110 @@ class AccountProvider extends ChangeNotifier {
   }
 
   Future<void> fetchAccounts() async {
+    final epoch = sessionEpoch;
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
-      _accounts = await _accountRepository.fetchAccounts();
+      final fetched = await _accountRepository.fetchAccounts();
+      if (isStale(epoch)) return;
+      _accounts = fetched;
       _hasFetched = true;
-      _error = null;
     } catch (e) {
-      _error = e.toString().replaceFirst('Exception: ', '');
+      if (isStale(epoch)) return;
+      _error = errorMessage(e);
     } finally {
-      _isLoading = false;
-      notifyListeners();
+      if (!isStale(epoch)) {
+        _isLoading = false;
+        notifyListeners();
+      }
     }
   }
 
   Future<bool> addAccount(AccountItem item) async {
+    final epoch = sessionEpoch;
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
       final added = await _accountRepository.addAccount(item);
+      if (isStale(epoch)) return false;
       _accounts.insert(0, added);
-      _error = null;
       return true;
     } catch (e) {
-      _error = e.toString().replaceFirst('Exception: ', '');
+      if (isStale(epoch)) return false;
+      _error = errorMessage(e);
       return false;
     } finally {
-      _isLoading = false;
-      notifyListeners();
+      if (!isStale(epoch)) {
+        _isLoading = false;
+        notifyListeners();
+      }
     }
   }
 
-  Future<void> toggleFavorite(String id) async {
+  /// Flips the favorite flag immediately and rolls it back if the backend
+  /// rejects the change. Returns whether the change stuck.
+  Future<bool> toggleFavorite(String id) async {
     final index = _accounts.indexWhere((item) => item.id == id);
-    if (index == -1) return;
+    if (index == -1) return false;
 
-    // Optimistic UI update
-    final current = _accounts[index];
-    _accounts[index] = current.copyWith(isFavorite: !current.isFavorite);
+    final epoch = sessionEpoch;
+    final wasFavorite = _accounts[index].isFavorite;
+    _accounts[index] = _accounts[index].copyWith(isFavorite: !wasFavorite);
+    _error = null;
     notifyListeners();
 
     try {
       await _accountRepository.toggleFavorite(id);
+      return true;
     } catch (e) {
-      // Rollback on error
-      _accounts[index] = current;
-      _error = e.toString().replaceFirst('Exception: ', '');
+      if (isStale(epoch)) return false;
+      // Look the item up again: the list may have shifted (an add or delete)
+      // while the request was in flight, so the original index can be wrong.
+      final current = _accounts.indexWhere((item) => item.id == id);
+      if (current != -1) {
+        _accounts[current] =
+            _accounts[current].copyWith(isFavorite: wasFavorite);
+      }
+      _error = errorMessage(e);
       notifyListeners();
+      return false;
     }
   }
 
   Future<bool> deleteAccount(String id) async {
+    final epoch = sessionEpoch;
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
       await _accountRepository.deleteAccount(id);
+      if (isStale(epoch)) return false;
       _accounts.removeWhere((item) => item.id == id);
-      _error = null;
       return true;
     } catch (e) {
-      _error = e.toString().replaceFirst('Exception: ', '');
+      if (isStale(epoch)) return false;
+      _error = errorMessage(e);
       return false;
     } finally {
-      _isLoading = false;
-      notifyListeners();
+      if (!isStale(epoch)) {
+        _isLoading = false;
+        notifyListeners();
+      }
     }
+  }
+
+  /// Drops everything held for the previous user (called on sign-out).
+  void reset() {
+    invalidateSession();
+    _accounts = [];
+    _isLoading = false;
+    _error = null;
+    _hasFetched = false;
+    notifyListeners();
   }
 }

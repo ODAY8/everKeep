@@ -1,8 +1,9 @@
 import 'package:flutter/foundation.dart';
 import '../models/trusted_contact_item.dart';
 import '../repositories/trusted_contact_repository.dart';
+import 'session_scoped.dart';
 
-class TrustedContactProvider extends ChangeNotifier {
+class TrustedContactProvider extends ChangeNotifier with SessionScoped {
   final TrustedContactRepository _trustedContactRepository;
 
   List<TrustedContactItem> _contacts = [];
@@ -16,63 +17,87 @@ class TrustedContactProvider extends ChangeNotifier {
             trustedContactRepository ?? TrustedContactRepositoryImpl();
 
   List<TrustedContactItem> get contacts => List.unmodifiable(_contacts);
+  int get count => _contacts.length;
   bool get isLoading => _isLoading;
   String? get error => _error;
   bool get hasFetched => _hasFetched;
   bool get isEmpty => _contacts.isEmpty;
 
   Future<void> fetchContacts() async {
+    final epoch = sessionEpoch;
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
-      _contacts = await _trustedContactRepository.fetchContacts();
+      final fetched = await _trustedContactRepository.fetchContacts();
+      if (isStale(epoch)) return;
+      _contacts = fetched;
       _hasFetched = true;
-      _error = null;
     } catch (e) {
-      _error = e.toString().replaceFirst('Exception: ', '');
+      if (isStale(epoch)) return;
+      _error = errorMessage(e);
     } finally {
-      _isLoading = false;
-      notifyListeners();
+      if (!isStale(epoch)) {
+        _isLoading = false;
+        notifyListeners();
+      }
     }
   }
 
   Future<bool> addContact(TrustedContactItem contact) async {
+    final epoch = sessionEpoch;
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
       final added = await _trustedContactRepository.addContact(contact);
+      if (isStale(epoch)) return false;
       _contacts.add(added);
-      _error = null;
       return true;
     } catch (e) {
-      _error = e.toString().replaceFirst('Exception: ', '');
+      if (isStale(epoch)) return false;
+      _error = errorMessage(e);
       return false;
     } finally {
-      _isLoading = false;
-      notifyListeners();
+      if (!isStale(epoch)) {
+        _isLoading = false;
+        notifyListeners();
+      }
     }
   }
 
   Future<bool> removeContact(String id) async {
+    final epoch = sessionEpoch;
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
       await _trustedContactRepository.removeContact(id);
+      if (isStale(epoch)) return false;
       _contacts.removeWhere((c) => c.id == id);
-      _error = null;
       return true;
     } catch (e) {
-      _error = e.toString().replaceFirst('Exception: ', '');
+      if (isStale(epoch)) return false;
+      _error = errorMessage(e);
       return false;
     } finally {
-      _isLoading = false;
-      notifyListeners();
+      if (!isStale(epoch)) {
+        _isLoading = false;
+        notifyListeners();
+      }
     }
+  }
+
+  /// Drops everything held for the previous user (called on sign-out).
+  void reset() {
+    invalidateSession();
+    _contacts = [];
+    _isLoading = false;
+    _error = null;
+    _hasFetched = false;
+    notifyListeners();
   }
 }

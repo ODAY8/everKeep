@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'core/routing/app_router.dart';
+import 'core/session/session_sync.dart';
 import 'core/theme/app_theme.dart';
 import 'providers/account_provider.dart';
 import 'providers/auth_provider.dart';
@@ -23,7 +24,7 @@ void main() {
         ChangeNotifierProvider(create: (_) => TrustedContactProvider()),
         ChangeNotifierProvider(create: (_) => SettingsProvider()),
       ],
-      child: const EverkeepApp(),
+      child: const SessionSync(child: EverkeepApp()),
     ),
   );
 }

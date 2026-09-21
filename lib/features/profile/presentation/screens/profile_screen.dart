@@ -5,19 +5,60 @@ import 'package:everkeep/core/routing/app_router.dart';
 import 'package:everkeep/core/theme/app_colors.dart';
 import 'package:everkeep/core/theme/app_radius.dart';
 import 'package:everkeep/core/theme/app_text_styles.dart';
-import 'package:everkeep/providers/auth_provider.dart';
+import 'package:everkeep/core/session/sign_out.dart';
+import 'package:everkeep/providers/trusted_contact_provider.dart';
 import 'package:everkeep/providers/user_provider.dart';
 import 'package:everkeep/providers/vault_provider.dart';
 import 'package:everkeep/widgets/app_network_image.dart';
 import 'package:everkeep/widgets/circular_progress_ring.dart';
 import 'package:everkeep/widgets/fade_slide_in.dart';
+import 'package:everkeep/widgets/feedback.dart';
 import 'package:everkeep/widgets/glass/dashboard_grid_card.dart';
 import 'package:everkeep/widgets/glass/glass_scaffold.dart';
+import 'package:everkeep/widgets/glass/glass_sheet.dart';
 import 'package:everkeep/widgets/glass/status_badge.dart';
 import 'package:everkeep/widgets/profile_avatar.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
+
+  Future<void> _editProfile(BuildContext context) async {
+    final userProv = context.read<UserProvider>();
+    final current = userProv.user;
+    if (current == null) return;
+
+    final saved = await showGlassFormSheet(
+      context,
+      title: 'Personal Info',
+      submitLabel: 'Save Changes',
+      fields: [
+        GlassFormField(
+          key: 'name',
+          label: 'Full name',
+          hint: 'Your name',
+          initialValue: current.name,
+        ),
+        GlassFormField(
+          key: 'phone',
+          label: 'Phone',
+          hint: 'Optional',
+          required: false,
+          keyboardType: TextInputType.phone,
+          initialValue: current.phone ?? '',
+        ),
+      ],
+      onSubmit: (values) async {
+        final updated = await userProv.updateUserProfile(
+          current.copyWith(name: values['name'], phone: values['phone']),
+        );
+        return updated
+            ? null
+            : userProv.error ?? 'Could not save your changes.';
+      },
+    );
+
+    if (saved && context.mounted) showAppSnackBar(context, 'Profile updated');
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -46,7 +87,7 @@ class ProfileScreen extends StatelessWidget {
                       tintColor: AppColors.glassAccentPink,
                       title: 'Personal Info',
                       meta: name,
-                      onTap: () {},
+                      onTap: () => _editProfile(context),
                     );
                   },
                 ),
@@ -74,13 +115,18 @@ class ProfileScreen extends StatelessWidget {
               ),
               FadeSlideIn(
                 index: 3,
-                child: DashboardGridCard(
-                  icon: Icons.people_outline_rounded,
-                  tintColor: AppColors.glassAccentSecondary,
-                  title: 'Trusted People',
-                  meta: '4 secure trustees',
-                  onTap: () => Navigator.of(context)
-                      .pushNamed(AppRouter.trustedContacts),
+                child: Selector<TrustedContactProvider, int>(
+                  selector: (_, contactProv) => contactProv.count,
+                  builder: (context, count, _) {
+                    return DashboardGridCard(
+                      icon: Icons.people_outline_rounded,
+                      tintColor: AppColors.glassAccentSecondary,
+                      title: 'Trusted People',
+                      meta: '$count secure ${count == 1 ? 'trustee' : 'trustees'}',
+                      onTap: () => Navigator.of(context)
+                          .pushNamed(AppRouter.trustedContacts),
+                    );
+                  },
                 ),
               ),
             ],
@@ -294,15 +340,7 @@ class ProfileScreen extends StatelessWidget {
       borderRadius: AppRadius.radiusXL,
       child: InkWell(
         borderRadius: AppRadius.radiusXL,
-        onTap: () async {
-          await context.read<AuthProvider>().signOut();
-          if (context.mounted) {
-            Navigator.of(context).pushNamedAndRemoveUntil(
-              AppRouter.welcome,
-              (route) => false,
-            );
-          }
-        },
+        onTap: () => signOutAndReturnToWelcome(context),
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 16),
           alignment: Alignment.center,

@@ -52,14 +52,18 @@ void main() {
   });
 
   group('UserProvider Tests', () {
-    test('Default user initialized with Sarah Mitchell', () {
+    test('Starts with no user until one is set', () {
       final userProv = UserProvider();
+      expect(userProv.user, isNull);
+      expect(userProv.displayName, 'User');
+
+      userProv.setUser(User.defaultUser);
       expect(userProv.displayName, 'Sarah Mitchell');
       expect(userProv.firstName, 'Sarah');
     });
 
     test('Update user profile updates display name', () async {
-      final userProv = UserProvider();
+      final userProv = UserProvider()..setUser(User.defaultUser);
       final updated = User.defaultUser.copyWith(name: 'Jane Doe');
       final success = await userProv.updateUserProfile(updated);
       expect(success, isTrue);

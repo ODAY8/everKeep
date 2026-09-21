@@ -10,11 +10,18 @@ abstract class AuthService {
   });
   Future<void> signOut();
   Future<bool> sendPasswordReset({required String email});
+
+  /// The user of an existing session, or null if there isn't one.
+  Future<User?> restoreSession();
 }
 
 /// Default implementation providing backend-ready interface.
 class AuthServiceImpl implements AuthService {
   // TODO: Connect to backend API (e.g. Firebase Auth, Supabase, or custom REST auth)
+
+  // TODO: Persist the session token in secure storage. Until then the session
+  // lives only in memory, so restoreSession() finds nothing on a cold start.
+  User? _sessionUser;
 
   @override
   Future<User?> signIn({
@@ -30,7 +37,7 @@ class AuthServiceImpl implements AuthService {
     }
 
     // TODO: Replace with real response token & user record from backend
-    return User.defaultUser.copyWith(email: email);
+    return _sessionUser = User.defaultUser.copyWith(email: email);
   }
 
   @override
@@ -46,13 +53,21 @@ class AuthServiceImpl implements AuthService {
     }
 
     // TODO: Replace with real user record creation from backend
-    return User.defaultUser.copyWith(name: name, email: email);
+    return _sessionUser = User.defaultUser.copyWith(name: name, email: email);
   }
 
   @override
   Future<void> signOut() async {
     await Future.delayed(const Duration(milliseconds: 300));
     // TODO: Clear backend session, JWT tokens, and secure storage
+    _sessionUser = null;
+  }
+
+  @override
+  Future<User?> restoreSession() async {
+    await Future.delayed(const Duration(milliseconds: 150));
+    // TODO: Verify the stored session token with the backend.
+    return _sessionUser;
   }
 
   @override

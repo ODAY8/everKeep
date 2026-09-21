@@ -27,6 +27,16 @@ class _SignInScreenState extends State<SignInScreen> {
   String? _emailError;
   String? _passwordError;
 
+  @override
+  void initState() {
+    super.initState();
+    // Don't show a failure left over from another auth screen. Deferred a
+    // frame because clearing notifies listeners.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) context.read<AuthProvider>().clearError();
+    });
+  }
+
   bool _isValidEmail(String email) {
     return RegExp(r'^[\w.+\-]+@[a-zA-Z0-9\-]+\.[a-zA-Z]{2,}$').hasMatch(email);
   }

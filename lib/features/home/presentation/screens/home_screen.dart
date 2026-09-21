@@ -5,6 +5,7 @@ import 'package:everkeep/core/routing/app_router.dart';
 import 'package:everkeep/core/theme/app_colors.dart';
 import 'package:everkeep/core/theme/app_text_styles.dart';
 import 'package:everkeep/models/vault_summary.dart';
+import 'package:everkeep/providers/trusted_contact_provider.dart';
 import 'package:everkeep/providers/user_provider.dart';
 import 'package:everkeep/providers/vault_provider.dart';
 import 'package:everkeep/widgets/circular_icon_button.dart';
@@ -72,53 +73,62 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
           const SizedBox(height: 14),
-          DashboardGrid(
-            cards: [
-              FadeSlideIn(
-                index: 0,
-                child: DashboardGridCard(
-                  icon: Icons.image_outlined,
-                  tintColor: AppColors.glassAccentPink,
-                  title: 'Memories',
-                  meta: '142 items saved',
-                  onTap: () =>
-                      Navigator.of(context).pushNamed(AppRouter.wishes),
-                ),
-              ),
-              FadeSlideIn(
-                index: 1,
-                child: DashboardGridCard(
-                  icon: Icons.folder_outlined,
-                  tintColor: AppColors.glassAccentSecondary,
-                  title: 'Documents',
-                  meta: '12 vital files',
-                  onTap: () =>
-                      Navigator.of(context).pushNamed(AppRouter.documents),
-                ),
-              ),
-              FadeSlideIn(
-                index: 2,
-                child: DashboardGridCard(
-                  icon: Icons.people_outline_rounded,
-                  tintColor: AppColors.glassAccentBlue,
-                  title: 'Trusted People',
-                  meta: '4 secure trustees',
-                  onTap: () => Navigator.of(context)
-                      .pushNamed(AppRouter.trustedContacts),
-                ),
-              ),
-              FadeSlideIn(
-                index: 3,
-                child: DashboardGridCard(
-                  icon: Icons.mail_outline_rounded,
-                  tintColor: AppColors.glassAccentCrimson,
-                  title: 'Future Messages',
-                  meta: '8 letters scheduled',
-                  onTap: () =>
-                      Navigator.of(context).pushNamed(AppRouter.wishes),
-                ),
-              ),
-            ],
+          Selector<VaultProvider, VaultSummary>(
+            selector: (_, vault) => vault.vaultSummary,
+            builder: (context, summary, _) {
+              final trustees = context.select<TrustedContactProvider, int>(
+                (contacts) => contacts.count,
+              );
+              return DashboardGrid(
+                cards: [
+                  FadeSlideIn(
+                    index: 0,
+                    child: DashboardGridCard(
+                      icon: Icons.image_outlined,
+                      tintColor: AppColors.glassAccentPink,
+                      title: 'Memories',
+                      meta: '${summary.memoriesCount} items saved',
+                      onTap: () =>
+                          Navigator.of(context).pushNamed(AppRouter.wishes),
+                    ),
+                  ),
+                  FadeSlideIn(
+                    index: 1,
+                    child: DashboardGridCard(
+                      icon: Icons.folder_outlined,
+                      tintColor: AppColors.glassAccentSecondary,
+                      title: 'Documents',
+                      meta: '${summary.documentsCount} vital files',
+                      onTap: () =>
+                          Navigator.of(context).pushNamed(AppRouter.documents),
+                    ),
+                  ),
+                  FadeSlideIn(
+                    index: 2,
+                    child: DashboardGridCard(
+                      icon: Icons.people_outline_rounded,
+                      tintColor: AppColors.glassAccentBlue,
+                      title: 'Trusted People',
+                      meta:
+                          '$trustees secure ${trustees == 1 ? 'trustee' : 'trustees'}',
+                      onTap: () => Navigator.of(context)
+                          .pushNamed(AppRouter.trustedContacts),
+                    ),
+                  ),
+                  FadeSlideIn(
+                    index: 3,
+                    child: DashboardGridCard(
+                      icon: Icons.mail_outline_rounded,
+                      tintColor: AppColors.glassAccentCrimson,
+                      title: 'Future Messages',
+                      meta: '${summary.messagesCount} letters scheduled',
+                      onTap: () =>
+                          Navigator.of(context).pushNamed(AppRouter.wishes),
+                    ),
+                  ),
+                ],
+              );
+            },
           ),
           const SizedBox(height: 26),
           Row(

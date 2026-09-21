@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:everkeep/core/routing/app_router.dart';
 import 'package:everkeep/core/theme/app_colors.dart';
 import 'package:everkeep/core/theme/app_text_styles.dart';
+import 'package:everkeep/providers/auth_provider.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -15,6 +17,7 @@ class _SplashScreenState extends State<SplashScreen>
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   late Animation<double> _scaleAnimation;
+  Future<void>? _sessionCheck;
 
   @override
   void initState() {
@@ -38,11 +41,24 @@ class _SplashScreenState extends State<SplashScreen>
       ),
     );
 
+    // Check for an existing session while the logo animates, so returning
+    // users don't wait on it afterwards. Deferred a frame because it notifies
+    // listeners, which isn't allowed while the tree is still being built.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _sessionCheck = context.read<AuthProvider>().checkSession();
+    });
+
     _animationController.forward().whenComplete(_navigateToNext);
   }
 
-  void _navigateToNext() {
-    Navigator.of(context).pushReplacementNamed(AppRouter.onboarding);
+  Future<void> _navigateToNext() async {
+    await _sessionCheck;
+    if (!mounted) return;
+
+    final isSignedIn = context.read<AuthProvider>().isAuthenticated;
+    Navigator.of(context).pushReplacementNamed(
+      isSignedIn ? AppRouter.home : AppRouter.onboarding,
+    );
   }
 
   @override

@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import '../models/user.dart';
 import '../repositories/auth_repository.dart';
+import 'session_scoped.dart';
 
 enum AuthStatus {
   initial,
@@ -27,17 +28,20 @@ class AuthProvider extends ChangeNotifier {
   String? get error => _error;
   User? get currentUser => _currentUser;
 
-  /// Validates existing session state on app launch.
+  /// Restores an existing session on app launch. A failure to restore is not
+  /// the user's error to see — it simply means they need to sign in.
   Future<void> checkSession() async {
     _setLoading(true);
     try {
-      // TODO: Connect to secure storage/backend session token verification
+      final user = await _authRepository.restoreSession();
+      _currentUser = user;
+      _status =
+          user != null ? AuthStatus.authenticated : AuthStatus.unauthenticated;
+    } catch (_) {
+      _currentUser = null;
       _status = AuthStatus.unauthenticated;
-      _error = null;
-    } catch (e) {
-      _status = AuthStatus.unauthenticated;
-      _error = e.toString();
     } finally {
+      _error = null;
       _setLoading(false);
     }
   }
@@ -61,7 +65,7 @@ class AuthProvider extends ChangeNotifier {
       return true;
     } catch (e) {
       _status = AuthStatus.error;
-      _error = e.toString().replaceFirst('Exception: ', '');
+      _error = errorMessage(e);
       notifyListeners();
       return false;
     } finally {
@@ -90,7 +94,7 @@ class AuthProvider extends ChangeNotifier {
       return true;
     } catch (e) {
       _status = AuthStatus.error;
-      _error = e.toString().replaceFirst('Exception: ', '');
+      _error = errorMessage(e);
       notifyListeners();
       return false;
     } finally {
@@ -98,8 +102,10 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  /// Terminates current user session.
-  Future<void> signOut() async {
+  /// Terminates the current session. Returns false (and stays signed in,
+  /// with [error] set) if the backend couldn't end it, so callers don't
+  /// navigate away from a session that is still live.
+  Future<bool> signOut() async {
     _setLoading(true);
     try {
       await _authRepository.signOut();
@@ -107,9 +113,11 @@ class AuthProvider extends ChangeNotifier {
       _status = AuthStatus.unauthenticated;
       _error = null;
       notifyListeners();
+      return true;
     } catch (e) {
-      _error = e.toString().replaceFirst('Exception: ', '');
+      _error = errorMessage(e);
       notifyListeners();
+      return false;
     } finally {
       _setLoading(false);
     }
@@ -123,7 +131,7 @@ class AuthProvider extends ChangeNotifier {
       final result = await _authRepository.sendPasswordReset(email: email);
       return result;
     } catch (e) {
-      _error = e.toString().replaceFirst('Exception: ', '');
+      _error = errorMessage(e);
       notifyListeners();
       return false;
     } finally {
@@ -131,11 +139,18 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
+  /// Clears a stale error (and the error status it left behind). Auth
+  /// screens call this when they open so one screen's failure isn't shown
+  /// on the next.
   void clearError() {
-    if (_error != null) {
-      _error = null;
-      notifyListeners();
+    if (_error == null && _status != AuthStatus.error) return;
+    _error = null;
+    if (_status == AuthStatus.error) {
+      _status = _currentUser != null
+          ? AuthStatus.authenticated
+          : AuthStatus.unauthenticated;
     }
+    notifyListeners();
   }
 
   void _setLoading(bool value) {

@@ -18,6 +18,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:provider/provider.dart';
+import 'package:everkeep/models/user.dart';
 import 'package:everkeep/providers/account_provider.dart';
 import 'package:everkeep/providers/auth_provider.dart';
 import 'package:everkeep/providers/document_provider.dart';
@@ -31,12 +32,16 @@ import 'package:everkeep/providers/vault_provider.dart';
 /// layout assertions, null derefs during build) surface in CI without ever
 /// needing a real display.
 void main() {
-  Future<void> pumpScreen(WidgetTester tester, Widget screen) async {
+  Future<void> pumpScreen(
+    WidgetTester tester,
+    Widget screen, {
+    User? user,
+  }) async {
     await tester.pumpWidget(
       MultiProvider(
         providers: [
           ChangeNotifierProvider(create: (_) => AuthProvider()),
-          ChangeNotifierProvider(create: (_) => UserProvider()),
+          ChangeNotifierProvider(create: (_) => UserProvider()..setUser(user)),
           ChangeNotifierProvider(create: (_) => VaultProvider()),
           ChangeNotifierProvider(create: (_) => DocumentProvider()),
           ChangeNotifierProvider(create: (_) => AccountProvider()),
@@ -127,7 +132,7 @@ void main() {
   });
 
   testWidgets('ProfileScreen builds without throwing', (tester) async {
-    await pumpScreen(tester, const ProfileScreen());
+    await pumpScreen(tester, const ProfileScreen(), user: User.defaultUser);
     expect(tester.takeException(), isNull);
     expect(find.text('Sarah Mitchell'), findsWidgets);
   });

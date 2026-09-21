@@ -2,13 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:everkeep/core/theme/app_colors.dart';
 import 'package:everkeep/core/theme/app_text_styles.dart';
+import 'package:everkeep/core/utils/id.dart';
+import 'package:everkeep/models/account_item.dart';
 import 'package:everkeep/providers/account_provider.dart';
+import 'package:everkeep/widgets/feedback.dart';
 import 'package:everkeep/widgets/glass/glass_fab.dart';
 import 'package:everkeep/widgets/glass/glass_filter_chips.dart';
 import 'package:everkeep/widgets/glass/glass_item_row.dart';
 import 'package:everkeep/widgets/glass/glass_page_header.dart';
 import 'package:everkeep/widgets/glass/glass_scaffold.dart';
 import 'package:everkeep/widgets/glass/glass_search_bar.dart';
+import 'package:everkeep/widgets/glass/glass_sheet.dart';
 
 class AccountsScreen extends StatefulWidget {
   const AccountsScreen({super.key});
@@ -18,24 +22,139 @@ class AccountsScreen extends StatefulWidget {
 }
 
 class _AccountsScreenState extends State<AccountsScreen> {
+  static const List<String> _categories = ['Banking', 'Social', 'Work', 'Other'];
+
   int _selectedFilter = 0;
-  final List<String> _filters = const [
-    'All',
-    'Banking',
-    'Social',
-    'Work',
-    'Other',
-  ];
+  final List<String> _filters = const ['All', ..._categories];
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
       final accProv = context.read<AccountProvider>();
       if (!accProv.hasFetched) {
         accProv.fetchAccounts();
       }
     });
+  }
+
+  /// Icon and tint for a newly added account, chosen by its category.
+  (IconData, Color) _styleFor(String category) => switch (category) {
+    'Banking' => (Icons.account_balance_rounded, AppColors.glassAccentGreen),
+    'Social' => (Icons.public_rounded, AppColors.glassAccentPink),
+    'Work' => (Icons.work_outline_rounded, AppColors.glassOnSurfaceMuted),
+    _ => (Icons.key_rounded, AppColors.glassAccentBlue),
+  };
+
+  Future<void> _addAccount() async {
+    final accProv = context.read<AccountProvider>();
+    final saved = await showGlassFormSheet(
+      context,
+      title: 'Add Account',
+      subtitle: 'Save a login so your trusted people can find it later.',
+      submitLabel: 'Add Account',
+      fields: const [
+        GlassFormField(
+          key: 'title',
+          label: 'Account name',
+          hint: 'e.g. Netflix',
+        ),
+        GlassFormField(
+          key: 'username',
+          label: 'Username or email',
+          hint: 'Optional',
+          required: false,
+          keyboardType: TextInputType.emailAddress,
+        ),
+      ],
+      choices: const [
+        GlassFormChoice(
+          key: 'category',
+          label: 'Category',
+          options: _categories,
+        ),
+      ],
+      onSubmit: (values) async {
+        final category = values['category']!;
+        final username = values['username']!;
+        final (icon, color) = _styleFor(category);
+        final added = await accProv.addAccount(
+          AccountItem(
+            id: newId('acc'),
+            title: values['title']!,
+            subtitle: username.isEmpty
+                ? 'Added just now'
+                : 'Added just now · $username',
+            category: category,
+            icon: icon,
+            color: color,
+            lastUpdated: DateTime.now(),
+          ),
+        );
+        return added ? null : accProv.error ?? 'Could not add the account.';
+      },
+    );
+
+    if (saved && mounted) showAppSnackBar(context, 'Account added');
+  }
+
+  Future<void> _toggleFavorite(AccountItem account) async {
+    final accProv = context.read<AccountProvider>();
+    final ok = await accProv.toggleFavorite(account.id);
+    if (ok || !mounted) return;
+    showAppSnackBar(
+      context,
+      accProv.error ?? 'Could not update the favorite.',
+      isError: true,
+    );
+  }
+
+  void _showActions(AccountItem account) {
+    showGlassActionSheet(
+      context,
+      title: account.title,
+      subtitle: account.subtitle,
+      actions: [
+        GlassSheetAction(
+          label: account.isFavorite
+              ? 'Remove from favorites'
+              : 'Add to favorites',
+          icon: account.isFavorite
+              ? Icons.favorite_border_rounded
+              : Icons.favorite_rounded,
+          onTap: () => _toggleFavorite(account),
+        ),
+        GlassSheetAction(
+          label: 'Delete account',
+          icon: Icons.delete_outline_rounded,
+          destructive: true,
+          onTap: () => _confirmDelete(account),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _confirmDelete(AccountItem account) async {
+    final confirmed = await confirmDestructive(
+      context,
+      title: 'Delete account?',
+      message: '"${account.title}" will be permanently removed from your vault.',
+      confirmLabel: 'Delete',
+    );
+    if (!confirmed || !mounted) return;
+
+    final accProv = context.read<AccountProvider>();
+    final deleted = await accProv.deleteAccount(account.id);
+    if (!mounted) return;
+
+    showAppSnackBar(
+      context,
+      deleted
+          ? 'Account deleted'
+          : accProv.error ?? 'Could not delete the account.',
+      isError: !deleted,
+    );
   }
 
   @override
@@ -45,7 +164,7 @@ class _AccountsScreenState extends State<AccountsScreen> {
     return GlassScaffold(
       floatingActionButton: GlassFab(
         label: 'Add Account',
-        onPressed: () {},
+        onPressed: _addAccount,
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
       child: Column(
@@ -70,29 +189,18 @@ class _AccountsScreenState extends State<AccountsScreen> {
           const SizedBox(height: 22),
           Consumer<AccountProvider>(
             builder: (context, accProv, _) {
-              if (accProv.isLoading && !accProv.hasFetched) {
-                return const Center(
-                  child: Padding(
-                    padding: EdgeInsets.symmetric(vertical: 32),
-                    child: CircularProgressIndicator(
-                      color: AppColors.glassAccentPink,
-                    ),
-                  ),
-                );
-              }
-
-              if (accProv.error != null) {
-                return Center(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 24),
-                    child: Text(
-                      accProv.error!,
-                      style: AppTextStyles.bodyMedium.copyWith(
-                        color: AppColors.glassDestructive,
-                      ),
-                    ),
-                  ),
-                );
+              // Only a failed *first load* replaces the list. A failed
+              // add/delete/favorite leaves the list alone and is reported in
+              // a snackbar by whoever triggered it.
+              if (!accProv.hasFetched) {
+                final loadError = accProv.error;
+                if (loadError != null && !accProv.isLoading) {
+                  return ErrorRetryView(
+                    message: loadError,
+                    onRetry: accProv.fetchAccounts,
+                  );
+                }
+                return const LoadingView();
               }
 
               final displayedAccounts =
@@ -127,7 +235,7 @@ class _AccountsScreenState extends State<AccountsScreen> {
                       subtitle: account.subtitle,
                       trailing: GestureDetector(
                         behavior: HitTestBehavior.opaque,
-                        onTap: () => accProv.toggleFavorite(account.id),
+                        onTap: () => _toggleFavorite(account),
                         child: Icon(
                           account.isFavorite
                               ? Icons.favorite_rounded
@@ -138,7 +246,7 @@ class _AccountsScreenState extends State<AccountsScreen> {
                           size: 20,
                         ),
                       ),
-                      onTap: () {},
+                      onTap: () => _showActions(account),
                     ),
                     const SizedBox(height: 10),
                   ],
@@ -152,7 +260,7 @@ class _AccountsScreenState extends State<AccountsScreen> {
                         iconColor: account.color,
                         title: account.title,
                         subtitle: account.subtitle,
-                        onTap: () {},
+                        onTap: () => _showActions(account),
                       ),
                       const SizedBox(height: 10),
                     ],

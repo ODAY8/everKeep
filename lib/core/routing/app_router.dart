@@ -1,3 +1,4 @@
+import 'package:everkeep/core/routing/auth_guard.dart';
 import 'package:everkeep/features/accounts/presentation/screens/accounts_screen.dart';
 import 'package:everkeep/features/auth/presentation/screens/forgot_password_screen.dart';
 import 'package:everkeep/features/auth/presentation/screens/sign_in_screen.dart';
@@ -34,6 +35,8 @@ class AppRouter {
   static const String security = '/security';
   static const String settings = '/settings';
 
+  /// Public screens (splash, onboarding, auth) are built as-is; everything
+  /// else is wrapped in an [AuthGuard] so it can't be reached signed out.
   static Route<dynamic> generateRoute(RouteSettings settings) {
     final Widget page = switch (settings.name) {
       AppRouter.splash => const SplashScreen(),
@@ -42,19 +45,22 @@ class AppRouter {
       AppRouter.signIn => const SignInScreen(),
       AppRouter.signUp => const SignUpScreen(),
       AppRouter.forgotPassword => const ForgotPasswordScreen(),
-      AppRouter.home => const MainShell(),
-      AppRouter.vault => const VaultScreen(),
-      AppRouter.documents => const DocumentsScreen(),
-      AppRouter.accounts => const AccountsScreen(),
-      AppRouter.wishes => const WishesScreen(),
-      AppRouter.trustedContacts => const TrustedContactsScreen(),
-      AppRouter.emergencyAccess => const EmergencyAccessScreen(),
-      AppRouter.profile => const ProfileScreen(),
-      AppRouter.security => const SecurityScreen(),
-      AppRouter.settings => const SettingsScreen(),
-      _ => const MainShell(),
+      AppRouter.home => _guarded(const MainShell()),
+      AppRouter.vault => _guarded(const VaultScreen()),
+      AppRouter.documents => _guarded(const DocumentsScreen()),
+      AppRouter.accounts => _guarded(const AccountsScreen()),
+      AppRouter.wishes => _guarded(const WishesScreen()),
+      AppRouter.trustedContacts => _guarded(const TrustedContactsScreen()),
+      AppRouter.emergencyAccess => _guarded(const EmergencyAccessScreen()),
+      AppRouter.profile => _guarded(const ProfileScreen()),
+      AppRouter.security => _guarded(const SecurityScreen()),
+      AppRouter.settings => _guarded(const SettingsScreen()),
+      _ => _guarded(const MainShell()),
     };
 
     return MaterialPageRoute(builder: (_) => page, settings: settings);
   }
+
+  static Widget _guarded(Widget page) =>
+      AuthGuard(redirectTo: welcome, child: page);
 }

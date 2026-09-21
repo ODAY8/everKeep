@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:everkeep/core/routing/app_router.dart';
 import 'package:everkeep/core/theme/app_colors.dart';
 import 'package:everkeep/core/theme/app_radius.dart';
 import 'package:everkeep/core/theme/app_text_styles.dart';
+import 'package:everkeep/providers/settings_provider.dart';
 import 'package:everkeep/widgets/fade_slide_in.dart';
 import 'package:everkeep/widgets/glass/glass_card.dart';
 import 'package:everkeep/widgets/glass/glass_page_header.dart';
@@ -12,20 +14,13 @@ import 'package:everkeep/widgets/glass/status_badge.dart';
 /// Vault-score hero plus the account's security controls — 2FA, biometric
 /// unlock, and login alerts (moved here from Settings), recovery key, and
 /// emergency access. Matches the Figma Security frame.
-class SecurityScreen extends StatefulWidget {
+class SecurityScreen extends StatelessWidget {
   const SecurityScreen({super.key});
 
   @override
-  State<SecurityScreen> createState() => _SecurityScreenState();
-}
-
-class _SecurityScreenState extends State<SecurityScreen> {
-  bool _twoFactor = true;
-  bool _biometric = true;
-  bool _loginAlerts = true;
-
-  @override
   Widget build(BuildContext context) {
+    final settingsProv = context.watch<SettingsProvider>();
+
     return GlassScaffold(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -39,8 +34,9 @@ class _SecurityScreenState extends State<SecurityScreen> {
             child: _buildToggleRow(
               title: 'Two-Factor Authentication',
               description: 'Require a code from your phone at sign-in',
-              value: _twoFactor,
-              onChanged: (v) => setState(() => _twoFactor = v),
+              value: settingsProv.twoFactorEnabled,
+              onChanged: (v) =>
+                  context.read<SettingsProvider>().toggleTwoFactor(v),
             ),
           ),
           const SizedBox(height: 12),
@@ -49,8 +45,9 @@ class _SecurityScreenState extends State<SecurityScreen> {
             child: _buildToggleRow(
               title: 'Biometric Lock',
               description: 'Use Face ID or fingerprint to open the vault',
-              value: _biometric,
-              onChanged: (v) => setState(() => _biometric = v),
+              value: settingsProv.biometricEnabled,
+              onChanged: (v) =>
+                  context.read<SettingsProvider>().toggleBiometric(v),
             ),
           ),
           const SizedBox(height: 12),
@@ -59,8 +56,9 @@ class _SecurityScreenState extends State<SecurityScreen> {
             child: _buildToggleRow(
               title: 'Login Alerts',
               description: 'Get notified of new sign-ins',
-              value: _loginAlerts,
-              onChanged: (v) => setState(() => _loginAlerts = v),
+              value: settingsProv.loginAlertsEnabled,
+              onChanged: (v) =>
+                  context.read<SettingsProvider>().toggleLoginAlerts(v),
             ),
           ),
           const SizedBox(height: 12),

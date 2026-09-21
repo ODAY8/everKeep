@@ -17,6 +17,15 @@ import 'package:everkeep/features/wishes/presentation/screens/wishes_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:provider/provider.dart';
+import 'package:everkeep/providers/account_provider.dart';
+import 'package:everkeep/providers/auth_provider.dart';
+import 'package:everkeep/providers/document_provider.dart';
+import 'package:everkeep/providers/settings_provider.dart';
+import 'package:everkeep/providers/trusted_contact_provider.dart';
+import 'package:everkeep/providers/user_provider.dart';
+import 'package:everkeep/providers/vault_provider.dart';
+
 /// Smoke tests: every top-level screen must build without throwing, so
 /// runtime issues that `flutter analyze` can't see (missing required args,
 /// layout assertions, null derefs during build) surface in CI without ever
@@ -24,10 +33,25 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   Future<void> pumpScreen(WidgetTester tester, Widget screen) async {
     await tester.pumpWidget(
-      MaterialApp(onGenerateRoute: AppRouter.generateRoute, home: screen),
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider(create: (_) => AuthProvider()),
+          ChangeNotifierProvider(create: (_) => UserProvider()),
+          ChangeNotifierProvider(create: (_) => VaultProvider()),
+          ChangeNotifierProvider(create: (_) => DocumentProvider()),
+          ChangeNotifierProvider(create: (_) => AccountProvider()),
+          ChangeNotifierProvider(create: (_) => TrustedContactProvider()),
+          ChangeNotifierProvider(create: (_) => SettingsProvider()),
+        ],
+        child: MaterialApp(
+          onGenerateRoute: AppRouter.generateRoute,
+          home: screen,
+        ),
+      ),
     );
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 500));
+    await tester.pump(const Duration(seconds: 1));
   }
 
   testWidgets('SplashScreen builds without throwing', (tester) async {

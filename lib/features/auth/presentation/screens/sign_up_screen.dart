@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../../../core/config/app_image_urls.dart';
 import '../../../../core/routing/app_router.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_text_styles.dart';
+import '../../../../providers/auth_provider.dart';
 import '../../../../widgets/app_network_image.dart';
 import '../../../../widgets/circular_icon_button.dart';
 import '../../../../widgets/glass/frosted_glass_card.dart';
@@ -42,7 +44,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
   bool _isValidEmail(String email) =>
       RegExp(r'^[\w.+\-]+@[a-zA-Z0-9\-]+\.[a-zA-Z]{2,}$').hasMatch(email);
 
-  void _submit() {
+  Future<void> _submit() async {
     final name = _nameController.text.trim();
     final email = _emailController.text.trim();
     final password = _passwordController.text;
@@ -74,9 +76,20 @@ class _SignUpScreenState extends State<SignUpScreen> {
         _emailError == null &&
         _passwordError == null &&
         _confirmError == null) {
-      Navigator.of(
-        context,
-      ).pushNamedAndRemoveUntil(AppRouter.home, (route) => false);
+      final authProvider = context.read<AuthProvider>();
+      final success = await authProvider.signUp(
+        name: name,
+        email: email,
+        password: password,
+      );
+
+      if (!mounted) return;
+
+      if (success) {
+        Navigator.of(
+          context,
+        ).pushNamedAndRemoveUntil(AppRouter.home, (route) => false);
+      }
     }
   }
 
@@ -176,10 +189,35 @@ class _SignUpScreenState extends State<SignUpScreen> {
                           ),
                           errorText: _confirmError,
                         ),
-                        const SizedBox(height: 24),
-                        GlassPrimaryButton(
-                          text: 'Create Account',
-                          onPressed: _submit,
+                        const SizedBox(height: 16),
+                        Selector<AuthProvider, String?>(
+                          selector: (_, auth) => auth.error,
+                          builder: (context, authError, _) {
+                            if (authError == null) {
+                              return const SizedBox.shrink();
+                            }
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 12),
+                              child: Text(
+                                authError,
+                                style: AppTextStyles.bodySmall.copyWith(
+                                  color: AppColors.glassDestructive,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            );
+                          },
+                        ),
+                        Selector<AuthProvider, bool>(
+                          selector: (_, auth) => auth.isLoading,
+                          builder: (context, isLoading, _) {
+                            return GlassPrimaryButton(
+                              text: isLoading
+                                  ? 'Creating Account...'
+                                  : 'Create Account',
+                              onPressed: isLoading ? null : _submit,
+                            );
+                          },
                         ),
                       ],
                     ),

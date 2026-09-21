@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:everkeep/core/routing/app_router.dart';
 import 'package:everkeep/core/theme/app_colors.dart';
 import 'package:everkeep/core/theme/app_text_styles.dart';
+import 'package:everkeep/models/vault_summary.dart';
+import 'package:everkeep/providers/vault_provider.dart';
 import 'package:everkeep/widgets/fade_slide_in.dart';
 import 'package:everkeep/widgets/glass/glass_add_tile.dart';
 import 'package:everkeep/widgets/glass/glass_scaffold.dart';
@@ -13,93 +16,104 @@ class VaultScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final categories = <_VaultCategory>[
-      const _VaultCategory(
-        icon: Icons.lock_rounded,
-        iconColor: AppColors.glassAccentBlue,
-        label: 'Passwords',
-        count: 24,
-      ),
-      const _VaultCategory(
-        icon: Icons.description_rounded,
-        iconColor: AppColors.glassOnSurfaceMuted,
-        label: 'Documents',
-        count: 11,
-      ),
-      const _VaultCategory(
-        icon: Icons.account_balance_wallet_rounded,
-        iconColor: AppColors.glassAccentGreen,
-        label: 'Financials',
-        count: 6,
-      ),
-      const _VaultCategory(
-        icon: Icons.mail_rounded,
-        iconColor: AppColors.glassAccentCrimson,
-        label: 'Messages',
-        count: 8,
-      ),
-      const _VaultCategory(
-        icon: Icons.photo_library_rounded,
-        iconColor: AppColors.glassAccentPink,
-        label: 'Memories',
-        count: 43,
-      ),
-    ];
+    return Selector<VaultProvider, VaultSummary>(
+      selector: (_, vault) => vault.vaultSummary,
+      builder: (context, summary, _) {
+        final categories = <_VaultCategory>[
+          _VaultCategory(
+            icon: Icons.lock_rounded,
+            iconColor: AppColors.glassAccentBlue,
+            label: 'Passwords',
+            count: summary.passwordsCount,
+          ),
+          _VaultCategory(
+            icon: Icons.description_rounded,
+            iconColor: AppColors.glassOnSurfaceMuted,
+            label: 'Documents',
+            count: summary.documentsCount,
+          ),
+          _VaultCategory(
+            icon: Icons.account_balance_wallet_rounded,
+            iconColor: AppColors.glassAccentGreen,
+            label: 'Financials',
+            count: summary.financialsCount,
+          ),
+          _VaultCategory(
+            icon: Icons.mail_rounded,
+            iconColor: AppColors.glassAccentCrimson,
+            label: 'Messages',
+            count: summary.messagesCount,
+          ),
+          _VaultCategory(
+            icon: Icons.photo_library_rounded,
+            iconColor: AppColors.glassAccentPink,
+            label: 'Memories',
+            count: summary.memoriesCount,
+          ),
+        ];
 
-    return GlassScaffold(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Your Vault',
-            style: AppTextStyles.serifHeadline.copyWith(
-              color: AppColors.glassOnSurface,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            '92 items · All encrypted',
-            style: AppTextStyles.bodyMedium.copyWith(
-              color: AppColors.glassOnSurfaceMuted,
-            ),
-          ),
-          const SizedBox(height: 18),
-          GlassSearchBar(hintText: 'Search your vault...', onChanged: (_) {}),
-          const SizedBox(height: 20),
-          VaultGrid(
-            cards: [
-              for (final entry in categories.asMap().entries)
-                FadeSlideIn(
-                  index: entry.key,
-                  child: VaultCategoryCard(
-                    icon: entry.value.icon,
-                    iconColor: entry.value.iconColor,
-                    label: entry.value.label,
-                    count: entry.value.count,
-                    onTap: () {
-                      final label = entry.value.label;
-                      if (label == 'Passwords' || label == 'Financials') {
-                        Navigator.of(context).pushNamed(AppRouter.accounts);
-                      } else if (label == 'Messages' || label == 'Memories') {
-                        Navigator.of(context).pushNamed(AppRouter.wishes);
-                      } else {
-                        Navigator.of(context).pushNamed(AppRouter.documents);
-                      }
-                    },
+        return GlassScaffold(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Your Vault',
+                style: AppTextStyles.serifHeadline.copyWith(
+                  color: AppColors.glassOnSurface,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                '${summary.totalItems} items · ${summary.encryptionStatus}',
+                style: AppTextStyles.bodyMedium.copyWith(
+                  color: AppColors.glassOnSurfaceMuted,
+                ),
+              ),
+              const SizedBox(height: 18),
+              GlassSearchBar(
+                hintText: 'Search your vault...',
+                onChanged: (_) {},
+              ),
+              const SizedBox(height: 20),
+              VaultGrid(
+                cards: [
+                  for (final entry in categories.asMap().entries)
+                    FadeSlideIn(
+                      index: entry.key,
+                      child: VaultCategoryCard(
+                        icon: entry.value.icon,
+                        iconColor: entry.value.iconColor,
+                        label: entry.value.label,
+                        count: entry.value.count,
+                        onTap: () {
+                          final label = entry.value.label;
+                          if (label == 'Passwords' || label == 'Financials') {
+                            Navigator.of(context).pushNamed(AppRouter.accounts);
+                          } else if (label == 'Messages' ||
+                              label == 'Memories') {
+                            Navigator.of(context).pushNamed(AppRouter.wishes);
+                          } else {
+                            Navigator.of(
+                              context,
+                            ).pushNamed(AppRouter.documents);
+                          }
+                        },
+                      ),
+                    ),
+                  FadeSlideIn(
+                    index: categories.length,
+                    child: GlassAddTile(
+                      label: 'Add to Vault',
+                      onTap: () =>
+                          Navigator.of(context).pushNamed(AppRouter.documents),
+                    ),
                   ),
-                ),
-              FadeSlideIn(
-                index: categories.length,
-                child: GlassAddTile(
-                  label: 'Add to Vault',
-                  onTap: () =>
-                      Navigator.of(context).pushNamed(AppRouter.documents),
-                ),
+                ],
               ),
             ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 }

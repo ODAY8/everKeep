@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:everkeep/core/routing/app_router.dart';
 import 'package:everkeep/core/theme/app_colors.dart';
 import 'package:everkeep/core/theme/app_text_styles.dart';
+import 'package:everkeep/providers/auth_provider.dart';
+import 'package:everkeep/providers/user_provider.dart';
 import 'package:everkeep/widgets/glass/glass_list_row.dart';
 import 'package:everkeep/widgets/glass/glass_page_header.dart';
 import 'package:everkeep/widgets/glass/glass_primary_button.dart';
@@ -17,6 +20,12 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
+    final userProv = context.watch<UserProvider>();
+    final email = userProv.displayEmail.isNotEmpty
+        ? userProv.displayEmail
+        : 'sarah.mitchell@editorial.com';
+    final phone = userProv.user?.phone ?? '+1 (555) 123-4567';
+
     return GlassScaffold(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -26,7 +35,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           _buildSection('ACCOUNT', [
             GlassListRow(
               label: 'Email',
-              subtitle: 'sarah.mitchell@editorial.com',
+              subtitle: email,
               onTap: () {},
             ),
             GlassListRow(
@@ -36,7 +45,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
             GlassListRow(
               label: 'Phone Verification',
-              subtitle: '+1 (555) 123-4567',
+              subtitle: phone,
               onTap: () {},
             ),
           ]),
@@ -103,9 +112,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
           const SizedBox(height: 24),
           GlassOutlineButton(
             text: 'Log Out',
-            onPressed: () => Navigator.of(
-              context,
-            ).pushNamedAndRemoveUntil(AppRouter.welcome, (route) => false),
+            onPressed: () async {
+              await context.read<AuthProvider>().signOut();
+              if (context.mounted) {
+                Navigator.of(context).pushNamedAndRemoveUntil(
+                  AppRouter.welcome,
+                  (route) => false,
+                );
+              }
+            },
           ),
           const SizedBox(height: 16),
           Center(

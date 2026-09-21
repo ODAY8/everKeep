@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../../../core/config/app_image_urls.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_text_styles.dart';
+import '../../../../providers/auth_provider.dart';
 import '../../../../widgets/app_network_image.dart';
 import '../../../../widgets/circular_icon_button.dart';
 import '../../../../widgets/glass/frosted_glass_card.dart';
@@ -25,7 +27,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     return RegExp(r'^[\w.+\-]+@[a-zA-Z0-9\-]+\.[a-zA-Z]{2,}$').hasMatch(email);
   }
 
-  void _submit() {
+  Future<void> _submit() async {
     final email = _emailController.text.trim();
     setState(() {
       _emailError = email.isEmpty
@@ -36,9 +38,14 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     });
 
     if (_emailError == null) {
-      setState(() {
-        _submitted = true;
-      });
+      final authProvider = context.read<AuthProvider>();
+      final success = await authProvider.sendPasswordReset(email: email);
+      if (!mounted) return;
+      if (success) {
+        setState(() {
+          _submitted = true;
+        });
+      }
     }
   }
 
@@ -115,8 +122,32 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           textInputAction: TextInputAction.done,
           errorText: _emailError,
         ),
-        const SizedBox(height: 24),
-        GlassPrimaryButton(text: 'Send Reset Link', onPressed: _submit),
+        const SizedBox(height: 16),
+        Selector<AuthProvider, String?>(
+          selector: (_, auth) => auth.error,
+          builder: (context, authError, _) {
+            if (authError == null) return const SizedBox.shrink();
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Text(
+                authError,
+                style: AppTextStyles.bodySmall.copyWith(
+                  color: AppColors.glassDestructive,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            );
+          },
+        ),
+        Selector<AuthProvider, bool>(
+          selector: (_, auth) => auth.isLoading,
+          builder: (context, isLoading, _) {
+            return GlassPrimaryButton(
+              text: isLoading ? 'Sending Link...' : 'Send Reset Link',
+              onPressed: isLoading ? null : _submit,
+            );
+          },
+        ),
         const SizedBox(height: 16),
         Center(
           child: TextButton(

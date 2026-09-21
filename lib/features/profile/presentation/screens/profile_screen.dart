@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:everkeep/core/config/app_image_urls.dart';
 import 'package:everkeep/core/routing/app_router.dart';
 import 'package:everkeep/core/theme/app_colors.dart';
 import 'package:everkeep/core/theme/app_radius.dart';
 import 'package:everkeep/core/theme/app_text_styles.dart';
+import 'package:everkeep/providers/auth_provider.dart';
+import 'package:everkeep/providers/user_provider.dart';
+import 'package:everkeep/providers/vault_provider.dart';
 import 'package:everkeep/widgets/app_network_image.dart';
 import 'package:everkeep/widgets/circular_progress_ring.dart';
 import 'package:everkeep/widgets/fade_slide_in.dart';
@@ -14,9 +18,6 @@ import 'package:everkeep/widgets/profile_avatar.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
-
-  static const String _userName = 'Sarah Mitchell';
-  static const String _email = 'sarah.mitchell@editorial.com';
 
   @override
   Widget build(BuildContext context) {
@@ -37,12 +38,17 @@ class ProfileScreen extends StatelessWidget {
             cards: [
               FadeSlideIn(
                 index: 0,
-                child: DashboardGridCard(
-                  icon: Icons.person_outline_rounded,
-                  tintColor: AppColors.glassAccentPink,
-                  title: 'Personal Info',
-                  meta: _userName,
-                  onTap: () {},
+                child: Selector<UserProvider, String>(
+                  selector: (_, userProv) => userProv.displayName,
+                  builder: (context, name, _) {
+                    return DashboardGridCard(
+                      icon: Icons.person_outline_rounded,
+                      tintColor: AppColors.glassAccentPink,
+                      title: 'Personal Info',
+                      meta: name,
+                      onTap: () {},
+                    );
+                  },
                 ),
               ),
               FadeSlideIn(
@@ -152,38 +158,48 @@ class ProfileScreen extends StatelessWidget {
                 ),
                 const SizedBox(width: 14),
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        _userName,
-                        style: AppTextStyles.serifTitleSmall.copyWith(
+                  child: Consumer<UserProvider>(
+                    builder: (context, userProv, _) {
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            userProv.displayName,
+                            style: AppTextStyles.serifTitleSmall.copyWith(
+                              color: Colors.white,
+                            ),
+                          ),
+                          Text(
+                            userProv.displayEmail,
+                            style: AppTextStyles.bodySmall.copyWith(
+                              color: Colors.white.withValues(alpha: 0.75),
+                            ),
+                          ),
+                        ],
+                      );
+                    },
+                  ),
+                ),
+                Selector<VaultProvider, double>(
+                  selector: (_, vault) => vault.vaultSummary.legacyProgress,
+                  builder: (context, progress, _) {
+                    final pct = (progress * 100).toInt();
+                    return CircularProgressRing(
+                      progress: progress,
+                      size: 56,
+                      strokeWidth: 5,
+                      trackColor: Colors.white.withValues(alpha: 0.2),
+                      progressGradient: AppColors.glassAccentGradient,
+                      child: Text(
+                        '$pct%',
+                        style: AppTextStyles.labelMedium.copyWith(
+                          fontWeight: FontWeight.w700,
                           color: Colors.white,
                         ),
                       ),
-                      Text(
-                        _email,
-                        style: AppTextStyles.bodySmall.copyWith(
-                          color: Colors.white.withValues(alpha: 0.75),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                CircularProgressRing(
-                  progress: 0.73,
-                  size: 56,
-                  strokeWidth: 5,
-                  trackColor: Colors.white.withValues(alpha: 0.2),
-                  progressGradient: AppColors.glassAccentGradient,
-                  child: Text(
-                    '73%',
-                    style: AppTextStyles.labelMedium.copyWith(
-                      fontWeight: FontWeight.w700,
-                      color: Colors.white,
-                    ),
-                  ),
+                    );
+                  },
                 ),
               ],
             ),
@@ -278,10 +294,15 @@ class ProfileScreen extends StatelessWidget {
       borderRadius: AppRadius.radiusXL,
       child: InkWell(
         borderRadius: AppRadius.radiusXL,
-        onTap: () => Navigator.of(context).pushNamedAndRemoveUntil(
-          AppRouter.welcome,
-          (route) => false,
-        ),
+        onTap: () async {
+          await context.read<AuthProvider>().signOut();
+          if (context.mounted) {
+            Navigator.of(context).pushNamedAndRemoveUntil(
+              AppRouter.welcome,
+              (route) => false,
+            );
+          }
+        },
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 16),
           alignment: Alignment.center,

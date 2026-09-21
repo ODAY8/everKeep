@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:everkeep/core/config/app_image_urls.dart';
 import 'package:everkeep/core/routing/app_router.dart';
 import 'package:everkeep/core/theme/app_colors.dart';
 import 'package:everkeep/core/theme/app_text_styles.dart';
+import 'package:everkeep/models/vault_summary.dart';
+import 'package:everkeep/providers/user_provider.dart';
+import 'package:everkeep/providers/vault_provider.dart';
 import 'package:everkeep/widgets/circular_icon_button.dart';
 import 'package:everkeep/widgets/fade_slide_in.dart';
 import 'package:everkeep/widgets/glass/activity_row.dart';
@@ -20,8 +24,6 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  final String _userFirstName = 'Sarah';
-
   final List<Map<String, dynamic>> _recentActivity = const [
     {
       'title': 'Will & Testament added',
@@ -48,12 +50,19 @@ class _HomeScreenState extends State<HomeScreen> {
         children: [
           _buildHeader(context),
           const SizedBox(height: 24),
-          ProgressCard(
-            progress: 0.73,
-            imageUrl: AppImageUrls.homeHeroCard,
-            title: 'Your Legacy is 73% Complete',
-            subtitle: '3 tasks remaining to safeguard your story',
-            onTap: () => Navigator.of(context).pushNamed(AppRouter.settings),
+          Selector<VaultProvider, VaultSummary>(
+            selector: (_, vault) => vault.vaultSummary,
+            builder: (context, summary, _) {
+              final pct = (summary.legacyProgress * 100).toInt();
+              return ProgressCard(
+                progress: summary.legacyProgress,
+                imageUrl: AppImageUrls.homeHeroCard,
+                title: 'Your Legacy is $pct% Complete',
+                subtitle: '3 tasks remaining to safeguard your story',
+                onTap: () =>
+                    Navigator.of(context).pushNamed(AppRouter.settings),
+              );
+            },
           ),
           const SizedBox(height: 24),
           Text(
@@ -148,11 +157,17 @@ class _HomeScreenState extends State<HomeScreen> {
             const SizedBox(height: 10),
           ],
           const SizedBox(height: 4),
-          SecurityScoreCard(
-            label: 'Security Score',
-            scoreText: 'Excellent — 94/100',
-            progress: 0.94,
-            onTap: () => Navigator.of(context).pushNamed(AppRouter.security),
+          Selector<VaultProvider, VaultSummary>(
+            selector: (_, vault) => vault.vaultSummary,
+            builder: (context, summary, _) {
+              return SecurityScoreCard(
+                label: 'Security Score',
+                scoreText: summary.securityScoreLabel,
+                progress: (summary.securityScore / 100.0).clamp(0.0, 1.0),
+                onTap: () =>
+                    Navigator.of(context).pushNamed(AppRouter.security),
+              );
+            },
           ),
         ],
       ),
@@ -184,11 +199,16 @@ class _HomeScreenState extends State<HomeScreen> {
                   color: AppColors.glassOnSurfaceMuted,
                 ),
               ),
-              Text(
-                _userFirstName,
-                style: AppTextStyles.serifHeadline.copyWith(
-                  color: AppColors.glassOnSurface,
-                ),
+              Selector<UserProvider, String>(
+                selector: (_, userProv) => userProv.firstName,
+                builder: (context, firstName, _) {
+                  return Text(
+                    firstName,
+                    style: AppTextStyles.serifHeadline.copyWith(
+                      color: AppColors.glassOnSurface,
+                    ),
+                  );
+                },
               ),
             ],
           ),

@@ -99,14 +99,19 @@ class _NavItem extends StatelessWidget {
               child: Icon(icon, size: 22, color: color),
             ),
             const SizedBox(height: 4),
-            AnimatedDefaultTextStyle(
-              duration: const Duration(milliseconds: 180),
-              style: AppTextStyles.labelSmall.copyWith(
-                color: color,
-                fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
-                fontSize: 11,
+            // Shrinks a long label (e.g. "Memories" at a large text scale)
+            // to fit the 60px slot instead of wrapping and overflowing.
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              child: AnimatedDefaultTextStyle(
+                duration: const Duration(milliseconds: 180),
+                style: AppTextStyles.labelSmall.copyWith(
+                  color: color,
+                  fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
+                  fontSize: 11,
+                ),
+                child: Text(label, maxLines: 1, softWrap: false),
               ),
-              child: Text(label),
             ),
           ],
         ),

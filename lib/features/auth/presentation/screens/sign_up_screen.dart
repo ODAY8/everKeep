@@ -7,6 +7,7 @@ import '../../../../core/theme/app_text_styles.dart';
 import '../../../../providers/auth_provider.dart';
 import '../../../../widgets/app_network_image.dart';
 import '../../../../widgets/circular_icon_button.dart';
+import '../../../../widgets/feedback.dart';
 import '../../../../widgets/glass/frosted_glass_card.dart';
 import '../../../../widgets/glass/glass_primary_button.dart';
 import '../../../../widgets/glass/glass_text_field.dart';
@@ -99,6 +100,11 @@ class _SignUpScreenState extends State<SignUpScreen> {
         Navigator.of(
           context,
         ).pushNamedAndRemoveUntil(AppRouter.home, (route) => false);
+      } else if (authProvider.notice != null) {
+        // Account created, but the email must be confirmed before there is a
+        // session. Tell the user and send them to sign in.
+        showAppSnackBar(context, authProvider.notice!);
+        Navigator.of(context).pushReplacementNamed(AppRouter.signIn);
       }
     }
   }

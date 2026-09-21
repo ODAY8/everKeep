@@ -77,6 +77,31 @@ class AccountProvider extends ChangeNotifier with SessionScoped {
     }
   }
 
+  /// Saves edits to an account's name, username or category.
+  Future<bool> updateAccount(AccountItem item) async {
+    final epoch = sessionEpoch;
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final saved = await _accountRepository.updateAccount(item);
+      if (isStale(epoch)) return false;
+      final index = _accounts.indexWhere((a) => a.id == saved.id);
+      if (index != -1) _accounts[index] = saved;
+      return true;
+    } catch (e) {
+      if (isStale(epoch)) return false;
+      _error = errorMessage(e);
+      return false;
+    } finally {
+      if (!isStale(epoch)) {
+        _isLoading = false;
+        notifyListeners();
+      }
+    }
+  }
+
   /// Flips the favorite flag immediately and rolls it back if the backend
   /// rejects the change. Returns whether the change stuck.
   Future<bool> toggleFavorite(String id) async {
@@ -90,7 +115,7 @@ class AccountProvider extends ChangeNotifier with SessionScoped {
     notifyListeners();
 
     try {
-      await _accountRepository.toggleFavorite(id);
+      await _accountRepository.setFavorite(id, !wasFavorite);
       return true;
     } catch (e) {
       if (isStale(epoch)) return false;

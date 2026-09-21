@@ -1,6 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:everkeep/models/document_item.dart';
-import 'package:everkeep/models/user.dart';
 import 'package:everkeep/providers/account_provider.dart';
 import 'package:everkeep/providers/auth_provider.dart';
 import 'package:everkeep/providers/document_provider.dart';
@@ -9,10 +8,12 @@ import 'package:everkeep/providers/trusted_contact_provider.dart';
 import 'package:everkeep/providers/user_provider.dart';
 import 'package:everkeep/providers/vault_provider.dart';
 
+import 'fakes.dart';
+
 void main() {
   group('AuthProvider Tests', () {
     test('Initial status is unauthenticated after checkSession', () async {
-      final auth = AuthProvider();
+      final auth = AuthProvider(authRepository: FakeAuthRepository());
       expect(auth.status, AuthStatus.initial);
       await auth.checkSession();
       expect(auth.status, AuthStatus.unauthenticated);
@@ -20,7 +21,7 @@ void main() {
     });
 
     test('SignIn succeeds with valid credentials', () async {
-      final auth = AuthProvider();
+      final auth = AuthProvider(authRepository: FakeAuthRepository());
       final success = await auth.signIn(
         email: 'test@example.com',
         password: 'password123',
@@ -30,19 +31,20 @@ void main() {
       expect(auth.currentUser?.email, 'test@example.com');
     });
 
-    test('SignIn fails with invalid password', () async {
-      final auth = AuthProvider();
+    test('SignIn fails when the backend rejects the credentials', () async {
+      final repo = FakeAuthRepository()..failWith = 'Incorrect email or password.';
+      final auth = AuthProvider(authRepository: repo);
       final success = await auth.signIn(
         email: 'test@example.com',
         password: '123',
       );
       expect(success, isFalse);
       expect(auth.status, AuthStatus.error);
-      expect(auth.error, isNotNull);
+      expect(auth.error, 'Incorrect email or password.');
     });
 
     test('SignOut resets authentication', () async {
-      final auth = AuthProvider();
+      final auth = AuthProvider(authRepository: FakeAuthRepository());
       await auth.signIn(email: 'test@example.com', password: 'password123');
       expect(auth.isAuthenticated, isTrue);
       await auth.signOut();
@@ -53,18 +55,19 @@ void main() {
 
   group('UserProvider Tests', () {
     test('Starts with no user until one is set', () {
-      final userProv = UserProvider();
+      final userProv = UserProvider(userRepository: FakeUserRepository());
       expect(userProv.user, isNull);
       expect(userProv.displayName, 'User');
 
-      userProv.setUser(User.defaultUser);
+      userProv.setUser(testUser);
       expect(userProv.displayName, 'Sarah Mitchell');
       expect(userProv.firstName, 'Sarah');
     });
 
     test('Update user profile updates display name', () async {
-      final userProv = UserProvider()..setUser(User.defaultUser);
-      final updated = User.defaultUser.copyWith(name: 'Jane Doe');
+      final userProv = UserProvider(userRepository: FakeUserRepository())
+        ..setUser(testUser);
+      final updated = testUser.copyWith(name: 'Jane Doe');
       final success = await userProv.updateUserProfile(updated);
       expect(success, isTrue);
       expect(userProv.displayName, 'Jane Doe');
@@ -74,37 +77,48 @@ void main() {
 
   group('DocumentProvider Tests', () {
     test('Fetches initial documents and filters by category', () async {
-      final docProv = DocumentProvider();
+      final repo = FakeDocumentRepository([
+        FakeDocumentRepository.doc('1', 'Will.pdf'),
+        FakeDocumentRepository.doc('2', 'Chart.pdf', category: 'Medical'),
+      ]);
+      final docProv = DocumentProvider(documentRepository: repo);
       expect(docProv.documents, isEmpty);
       await docProv.fetchDocuments();
-      expect(docProv.documents.length, greaterThan(0));
+      expect(docProv.documents.length, 2);
 
       final legalDocs = docProv.filterByCategory('Legal');
+      expect(legalDocs, hasLength(1));
       expect(legalDocs.every((d) => d.category == 'Legal'), isTrue);
     });
 
     test('Add and delete document', () async {
-      final docProv = DocumentProvider();
+      final docProv = DocumentProvider(
+        documentRepository: FakeDocumentRepository(),
+      );
       await docProv.fetchDocuments();
       final initialCount = docProv.documents.length;
 
       const newDoc = DocumentItem(
-        id: 'test-doc-1',
+        id: '',
         title: 'Test Will.pdf',
-        subtitle: 'Legal · Added today',
+        subtitle: '',
         category: 'Legal',
       );
       await docProv.addDocument(newDoc);
       expect(docProv.documents.length, initialCount + 1);
 
-      await docProv.deleteDocument('test-doc-1');
+      // The backend assigns the id; delete by the id it gave back.
+      final saved = docProv.documents.first;
+      expect(saved.id, isNotEmpty);
+      await docProv.deleteDocument(saved.id);
       expect(docProv.documents.length, initialCount);
     });
   });
 
   group('AccountProvider Tests', () {
     test('Fetches accounts and toggles favorite', () async {
-      final accProv = AccountProvider();
+      final repo = FakeAccountRepository();
+      final accProv = AccountProvider(accountRepository: repo);
       await accProv.fetchAccounts();
       expect(accProv.accounts, isNotEmpty);
 
@@ -116,20 +130,31 @@ void main() {
         accProv.accounts.firstWhere((a) => a.id == firstId).isFavorite,
         !initialFav,
       );
+      // The provider sends the new value explicitly rather than "flip it".
+      expect(repo.lastFavorite, (firstId, !initialFav));
     });
   });
 
   group('TrustedContactProvider Tests', () {
     test('Fetches contacts successfully', () async {
-      final contactProv = TrustedContactProvider();
+      final contactProv = TrustedContactProvider(
+        trustedContactRepository: FakeTrustedContactRepository(),
+      );
       await contactProv.fetchContacts();
-      expect(contactProv.contacts.length, greaterThanOrEqualTo(4));
+      expect(contactProv.contacts.length, 2);
     });
   });
 
   group('VaultProvider Tests', () {
-    test('VaultSummary contains correct default values', () async {
-      final vaultProv = VaultProvider();
+    test('Starts as an empty vault, not with invented numbers', () {
+      final vaultProv = VaultProvider(vaultRepository: FakeVaultRepository());
+      expect(vaultProv.vaultSummary.totalItems, 0);
+      expect(vaultProv.vaultSummary.securityScore, 0);
+    });
+
+    test('Loads the summary from the repository', () async {
+      final vaultProv = VaultProvider(vaultRepository: FakeVaultRepository());
+      await vaultProv.fetchVaultSummary();
       expect(vaultProv.vaultSummary.totalItems, 92);
       expect(vaultProv.vaultSummary.securityScore, 94);
     });
@@ -137,17 +162,20 @@ void main() {
 
   group('SettingsProvider Tests', () {
     test('Toggle security settings updates state', () async {
-      final settingsProv = SettingsProvider();
-      expect(settingsProv.twoFactorEnabled, isTrue);
-
-      await settingsProv.toggleTwoFactor(false);
+      final settingsProv = SettingsProvider(
+        settingsRepository: FakeSettingsRepository(),
+      );
+      // Protections start off: a new account must not claim any it hasn't set up.
       expect(settingsProv.twoFactorEnabled, isFalse);
 
-      await settingsProv.toggleBiometric(false);
-      expect(settingsProv.biometricEnabled, isFalse);
+      await settingsProv.toggleTwoFactor(true);
+      expect(settingsProv.twoFactorEnabled, isTrue);
 
-      await settingsProv.toggleLoginAlerts(false);
-      expect(settingsProv.loginAlertsEnabled, isFalse);
+      await settingsProv.toggleBiometric(true);
+      expect(settingsProv.biometricEnabled, isTrue);
+
+      await settingsProv.toggleLoginAlerts(true);
+      expect(settingsProv.loginAlertsEnabled, isTrue);
     });
   });
 }

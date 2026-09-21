@@ -3,7 +3,6 @@ import 'package:everkeep/features/home/presentation/screens/home_screen.dart';
 import 'package:everkeep/features/profile/presentation/screens/profile_screen.dart';
 import 'package:everkeep/features/security/presentation/screens/security_screen.dart';
 import 'package:everkeep/features/trusted_contacts/presentation/screens/trusted_contacts_screen.dart';
-import 'package:everkeep/models/user.dart';
 import 'package:everkeep/providers/auth_provider.dart';
 import 'package:everkeep/providers/document_provider.dart';
 import 'package:everkeep/providers/settings_provider.dart';
@@ -242,7 +241,7 @@ void main() {
 
     Future<void> pumpProfile(WidgetTester tester) async {
       userRepo = FakeUserRepository();
-      user = UserProvider(userRepository: userRepo)..setUser(User.defaultUser);
+      user = UserProvider(userRepository: userRepo)..setUser(testUser);
       await pump(tester, const ProfileScreen(), [
         ChangeNotifierProvider<UserProvider>.value(value: user),
         ChangeNotifierProvider<AuthProvider>(
@@ -297,7 +296,9 @@ void main() {
       await pump(tester, const HomeScreen(), [
         ChangeNotifierProvider<VaultProvider>.value(value: vault),
         ChangeNotifierProvider<TrustedContactProvider>.value(value: contacts),
-        ChangeNotifierProvider<UserProvider>(create: (_) => UserProvider()),
+        ChangeNotifierProvider<UserProvider>(
+          create: (_) => UserProvider(userRepository: FakeUserRepository()),
+        ),
       ]);
 
       await contacts.fetchContacts();
@@ -324,8 +325,9 @@ void main() {
       await tester.tap(find.byType(Switch).first);
       await tester.pumpAndSettle();
 
-      expect(settings.twoFactorEnabled, isTrue); // reverted
-      expect(tester.widget<Switch>(find.byType(Switch).first).value, isTrue);
+      // Protections start off; the tap switched it on, the failed save put it back.
+      expect(settings.twoFactorEnabled, isFalse);
+      expect(tester.widget<Switch>(find.byType(Switch).first).value, isFalse);
       expect(find.text('Could not save'), findsOneWidget);
     });
   });

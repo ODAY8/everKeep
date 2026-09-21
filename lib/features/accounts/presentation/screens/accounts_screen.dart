@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:everkeep/core/theme/app_colors.dart';
 import 'package:everkeep/core/theme/app_text_styles.dart';
-import 'package:everkeep/core/utils/id.dart';
 import 'package:everkeep/models/account_item.dart';
 import 'package:everkeep/providers/account_provider.dart';
 import 'package:everkeep/widgets/feedback.dart';
@@ -39,14 +38,6 @@ class _AccountsScreenState extends State<AccountsScreen> {
     });
   }
 
-  /// Icon and tint for a newly added account, chosen by its category.
-  (IconData, Color) _styleFor(String category) => switch (category) {
-    'Banking' => (Icons.account_balance_rounded, AppColors.glassAccentGreen),
-    'Social' => (Icons.public_rounded, AppColors.glassAccentPink),
-    'Work' => (Icons.work_outline_rounded, AppColors.glassOnSurfaceMuted),
-    _ => (Icons.key_rounded, AppColors.glassAccentBlue),
-  };
-
   Future<void> _addAccount() async {
     final accProv = context.read<AccountProvider>();
     final saved = await showGlassFormSheet(
@@ -78,18 +69,18 @@ class _AccountsScreenState extends State<AccountsScreen> {
       onSubmit: (values) async {
         final category = values['category']!;
         final username = values['username']!;
-        final (icon, color) = _styleFor(category);
+        final (icon, color) = AccountItem.styleFor(category);
+        // The id and the "Added ..." subtitle are assigned by the backend;
+        // the saved account comes back with both.
         final added = await accProv.addAccount(
           AccountItem(
-            id: newId('acc'),
+            id: '',
             title: values['title']!,
-            subtitle: username.isEmpty
-                ? 'Added just now'
-                : 'Added just now · $username',
+            subtitle: '',
             category: category,
             icon: icon,
             color: color,
-            lastUpdated: DateTime.now(),
+            username: username.isEmpty ? null : username,
           ),
         );
         return added ? null : accProv.error ?? 'Could not add the account.';

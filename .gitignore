@@ -55,3 +55,9 @@ android/key.properties
 **/macos/Flutter/ephemeral/
 **/linux/flutter/ephemeral/
 **/windows/flutter/ephemeral/
+
+# Supabase connection settings (per-developer; .env.example is the template)
+.env
+.env.*
+!.env.example
+env.json

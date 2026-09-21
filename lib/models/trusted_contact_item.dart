@@ -13,6 +13,27 @@ class TrustedContactItem {
     required this.avatarUrl,
   });
 
+  /// Builds a contact from a `trusted_contacts` row. A missing avatar is an
+  /// empty string, which the avatar widget renders as a person icon.
+  factory TrustedContactItem.fromRow(Map<String, dynamic> row) {
+    return TrustedContactItem(
+      id: row['id'] as String,
+      name: row['name'] as String,
+      relationship: row['relationship'] as String,
+      accessLevel: row['access_level'] as String,
+      avatarUrl: row['avatar_url'] as String? ?? '',
+    );
+  }
+
+  /// The columns written when adding a contact. The id, owner and timestamps
+  /// are assigned by the database.
+  Map<String, dynamic> toInsertRow() => {
+    'name': name.trim(),
+    'relationship': relationship.trim(),
+    'access_level': accessLevel,
+    'avatar_url': avatarUrl.isEmpty ? null : avatarUrl,
+  };
+
   TrustedContactItem copyWith({
     String? id,
     String? name,

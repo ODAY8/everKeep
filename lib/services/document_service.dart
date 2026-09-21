@@ -1,67 +1,139 @@
-import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+import '../core/supabase/app_supabase.dart';
+import '../core/supabase/client_extensions.dart';
+import '../core/supabase/supabase_errors.dart';
 import '../models/document_item.dart';
+import '../models/document_upload.dart';
 
 abstract class DocumentService {
   Future<List<DocumentItem>> fetchDocuments();
-  Future<DocumentItem> addDocument(DocumentItem document);
+
+  /// Saves the document's metadata. If [upload] is given, its bytes are stored
+  /// in private Storage first and the document points at them.
+  Future<DocumentItem> addDocument(
+    DocumentItem document, {
+    DocumentUpload? upload,
+  });
+
+  /// Deletes the document and, if it has one, its stored file.
   Future<void> deleteDocument(String id);
+
+  /// A short-lived link to view a stored file. Documents are private, so this
+  /// is the only way to reach one outside the app.
+  Future<String> createDownloadUrl(String filePath);
 }
 
+/// [DocumentService] backed by the `documents` table and the private
+/// `documents` Storage bucket. Row Level Security and Storage policies limit
+/// every query and every file to the signed-in user's own.
 class DocumentServiceImpl implements DocumentService {
-  // Seed items representing existing app data
-  final List<DocumentItem> _mockDatabase = [
-    const DocumentItem(
-      id: 'doc-1',
-      title: 'Last Will and Testament.pdf',
-      subtitle: 'Legal · Added 2 days ago',
-      category: 'Legal',
-      icon: Icons.description_outlined,
-      isVerified: true,
-    ),
-    const DocumentItem(
-      id: 'doc-2',
-      title: 'Medical Power of Attorney.pdf',
-      subtitle: 'Medical · Added 1 week ago',
-      category: 'Medical',
-      icon: Icons.description_outlined,
-      isVerified: false,
-    ),
-    const DocumentItem(
-      id: 'doc-3',
-      title: 'Property Deed.jpg',
-      subtitle: 'Legal · Added 2 weeks ago',
-      category: 'Legal',
-      icon: Icons.description_outlined,
-      isVerified: true,
-    ),
-    const DocumentItem(
-      id: 'doc-4',
-      title: 'Bank Statements Q3.xlsx',
-      subtitle: 'Financial · Added 1 month ago',
-      category: 'Financial',
-      icon: Icons.description_outlined,
-      isVerified: true,
-    ),
-  ];
+  static const String _bucket = 'documents';
+  static const int _downloadUrlSeconds = 300;
 
-  // TODO: Connect to real cloud document storage (e.g. S3 / Firebase Storage)
+  final SupabaseClient _client;
+
+  DocumentServiceImpl({SupabaseClient? client})
+      : _client = client ?? AppSupabase.client;
 
   @override
-  Future<List<DocumentItem>> fetchDocuments() async {
-    await Future.delayed(const Duration(milliseconds: 250));
-    return List.from(_mockDatabase);
+  Future<List<DocumentItem>> fetchDocuments() {
+    return guardBackend(() async {
+      final rows = await _client
+          .from('documents')
+          .select()
+          .order('created_at', ascending: false);
+      return rows.map(DocumentItem.fromRow).toList();
+    });
   }
 
   @override
-  Future<DocumentItem> addDocument(DocumentItem document) async {
-    await Future.delayed(const Duration(milliseconds: 300));
-    _mockDatabase.insert(0, document);
-    return document;
+  Future<DocumentItem> addDocument(
+    DocumentItem document, {
+    DocumentUpload? upload,
+  }) {
+    return guardBackend(() async {
+      final row = document.toInsertRow();
+      String? uploadedPath;
+
+      if (upload != null) {
+        // <user id>/documents/... — the folder Storage policies key on.
+        uploadedPath =
+            '${_client.requireUser.id}/documents/'
+            '${DateTime.now().microsecondsSinceEpoch}-${_safeFileName(upload.fileName)}';
+        await _client.storage
+            .from(_bucket)
+            .uploadBinary(
+              uploadedPath,
+              upload.bytes,
+              fileOptions: FileOptions(
+                contentType: upload.mimeType,
+                upsert: false,
+              ),
+            );
+        row['file_path'] = uploadedPath;
+        row['file_size'] = upload.bytes.length;
+        row['mime_type'] = upload.mimeType;
+      }
+
+      try {
+        final inserted =
+            await _client.from('documents').insert(row).select().single();
+        return DocumentItem.fromRow(inserted);
+      } catch (_) {
+        // Don't leave a file behind that no document points at.
+        if (uploadedPath != null) {
+          try {
+            await _client.storage.from(_bucket).remove([uploadedPath]);
+          } catch (_) {
+            // Best effort; the original failure is what the caller needs.
+          }
+        }
+        rethrow;
+      }
+    });
   }
 
   @override
-  Future<void> deleteDocument(String id) async {
-    await Future.delayed(const Duration(milliseconds: 300));
-    _mockDatabase.removeWhere((doc) => doc.id == id);
+  Future<void> deleteDocument(String id) {
+    return guardBackend(() async {
+      final row = await _client
+          .from('documents')
+          .select('file_path')
+          .eq('id', id)
+          .maybeSingle();
+
+      // Remove the file first. If that fails the row is kept and the delete
+      // can be retried; the reverse order could leave a "deleted" document's
+      // file behind in Storage.
+      final filePath = row?['file_path'] as String?;
+      if (filePath != null) {
+        await _client.storage.from(_bucket).remove([filePath]);
+      }
+
+      // Already gone (or not the caller's) means the end state is the one
+      // asked for, so this is not treated as a failure.
+      await _client.from('documents').delete().eq('id', id);
+    });
+  }
+
+  @override
+  Future<String> createDownloadUrl(String filePath) {
+    return guardBackend(() {
+      return _client.storage
+          .from(_bucket)
+          .createSignedUrl(filePath, _downloadUrlSeconds);
+    });
+  }
+
+  /// A file name that is safe inside a Storage object key: no folders, and
+  /// only letters, digits, dot, dash and underscore.
+  static String _safeFileName(String name) {
+    final base = name.split(RegExp(r'[\\/]')).last.trim();
+    final cleaned = base.replaceAll(RegExp(r'[^A-Za-z0-9._-]'), '_');
+    if (cleaned.isEmpty || cleaned.replaceAll('_', '').replaceAll('.', '').isEmpty) {
+      return 'file';
+    }
+    return cleaned.length > 120 ? cleaned.substring(cleaned.length - 120) : cleaned;
   }
 }

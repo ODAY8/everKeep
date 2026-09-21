@@ -1,4 +1,7 @@
-import '../core/config/app_image_urls.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+import '../core/supabase/app_supabase.dart';
+import '../core/supabase/supabase_errors.dart';
 import '../models/trusted_contact_item.dart';
 
 abstract class TrustedContactService {
@@ -7,58 +10,41 @@ abstract class TrustedContactService {
   Future<void> removeContact(String id);
 }
 
+/// [TrustedContactService] backed by the `trusted_contacts` table. Row Level
+/// Security limits every query to the signed-in user's own rows.
 class TrustedContactServiceImpl implements TrustedContactService {
-  // A growable list (not `const`) so add/remove actually persist across
-  // refetches, like the document and account services.
-  final List<TrustedContactItem> _mockDatabase = [
-    const TrustedContactItem(
-      id: 'tc-1',
-      name: 'Sarah Johnson',
-      relationship: 'Spouse',
-      accessLevel: 'Full Access',
-      avatarUrl: AppImageUrls.trustedContact1,
-    ),
-    const TrustedContactItem(
-      id: 'tc-2',
-      name: 'Michael Chen',
-      relationship: 'Attorney',
-      accessLevel: 'On Release',
-      avatarUrl: AppImageUrls.trustedContact2,
-    ),
-    const TrustedContactItem(
-      id: 'tc-3',
-      name: 'Emily Davis',
-      relationship: 'Financial Advisor',
-      accessLevel: 'View Only',
-      avatarUrl: AppImageUrls.trustedContact3,
-    ),
-    const TrustedContactItem(
-      id: 'tc-4',
-      name: 'Robert Wilson',
-      relationship: 'Family Friend',
-      accessLevel: 'Verification Role',
-      avatarUrl: AppImageUrls.trustedContact4,
-    ),
-  ];
+  final SupabaseClient _client;
 
-  // TODO: Connect to backend for managing trusted contacts & invitations
+  TrustedContactServiceImpl({SupabaseClient? client})
+      : _client = client ?? AppSupabase.client;
 
   @override
-  Future<List<TrustedContactItem>> fetchContacts() async {
-    await Future.delayed(const Duration(milliseconds: 250));
-    return List.from(_mockDatabase);
+  Future<List<TrustedContactItem>> fetchContacts() {
+    return guardBackend(() async {
+      final rows = await _client
+          .from('trusted_contacts')
+          .select()
+          .order('created_at', ascending: true);
+      return rows.map(TrustedContactItem.fromRow).toList();
+    });
   }
 
   @override
-  Future<TrustedContactItem> addContact(TrustedContactItem contact) async {
-    await Future.delayed(const Duration(milliseconds: 300));
-    _mockDatabase.add(contact);
-    return contact;
+  Future<TrustedContactItem> addContact(TrustedContactItem contact) {
+    return guardBackend(() async {
+      final row = await _client
+          .from('trusted_contacts')
+          .insert(contact.toInsertRow())
+          .select()
+          .single();
+      return TrustedContactItem.fromRow(row);
+    });
   }
 
   @override
-  Future<void> removeContact(String id) async {
-    await Future.delayed(const Duration(milliseconds: 300));
-    _mockDatabase.removeWhere((contact) => contact.id == id);
+  Future<void> removeContact(String id) {
+    return guardBackend(() async {
+      await _client.from('trusted_contacts').delete().eq('id', id);
+    });
   }
 }

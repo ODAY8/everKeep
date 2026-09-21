@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import '../models/document_item.dart';
+import '../models/document_upload.dart';
 import '../repositories/document_repository.dart';
 import 'session_scoped.dart';
 
@@ -52,14 +53,22 @@ class DocumentProvider extends ChangeNotifier with SessionScoped {
     }
   }
 
-  Future<bool> addDocument(DocumentItem document) async {
+  /// Saves a document. If [upload] is given its file goes to private Storage
+  /// and the document points at it.
+  Future<bool> addDocument(
+    DocumentItem document, {
+    DocumentUpload? upload,
+  }) async {
     final epoch = sessionEpoch;
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
-      final added = await _documentRepository.addDocument(document);
+      final added = await _documentRepository.addDocument(
+        document,
+        upload: upload,
+      );
       if (isStale(epoch)) return false;
       _documents.insert(0, added);
       return true;

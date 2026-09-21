@@ -11,6 +11,7 @@ abstract class AuthRepository {
   Future<void> signOut();
   Future<bool> sendPasswordReset({required String email});
   Future<User?> restoreSession();
+  Stream<void> get sessionEnded;
 }
 
 class AuthRepositoryImpl implements AuthRepository {
@@ -47,4 +48,7 @@ class AuthRepositoryImpl implements AuthRepository {
   Future<User?> restoreSession() {
     return _authService.restoreSession();
   }
+
+  @override
+  Stream<void> get sessionEnded => _authService.sessionEnded;
 }

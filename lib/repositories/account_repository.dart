@@ -4,7 +4,8 @@ import '../services/account_service.dart';
 abstract class AccountRepository {
   Future<List<AccountItem>> fetchAccounts();
   Future<AccountItem> addAccount(AccountItem item);
-  Future<void> toggleFavorite(String id);
+  Future<AccountItem> updateAccount(AccountItem item);
+  Future<void> setFavorite(String id, bool isFavorite);
   Future<void> deleteAccount(String id);
 }
 
@@ -25,8 +26,13 @@ class AccountRepositoryImpl implements AccountRepository {
   }
 
   @override
-  Future<void> toggleFavorite(String id) {
-    return _accountService.toggleFavorite(id);
+  Future<AccountItem> updateAccount(AccountItem item) {
+    return _accountService.updateAccount(item);
+  }
+
+  @override
+  Future<void> setFavorite(String id, bool isFavorite) {
+    return _accountService.setFavorite(id, isFavorite);
   }
 
   @override

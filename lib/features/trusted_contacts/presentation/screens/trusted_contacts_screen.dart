@@ -4,7 +4,6 @@ import 'package:everkeep/core/routing/app_router.dart';
 import 'package:everkeep/core/theme/app_colors.dart';
 import 'package:everkeep/core/theme/app_radius.dart';
 import 'package:everkeep/core/theme/app_text_styles.dart';
-import 'package:everkeep/core/utils/id.dart';
 import 'package:everkeep/models/trusted_contact_item.dart';
 import 'package:everkeep/providers/trusted_contact_provider.dart';
 import 'package:everkeep/widgets/fade_slide_in.dart';
@@ -73,7 +72,7 @@ class _TrustedContactsScreenState extends State<TrustedContactsScreen> {
       onSubmit: (values) async {
         final added = await contactProv.addContact(
           TrustedContactItem(
-            id: newId('tc'),
+            id: '', // assigned by the backend; the saved contact comes back with it
             name: values['name']!,
             relationship: values['relationship']!,
             accessLevel: values['accessLevel']!,

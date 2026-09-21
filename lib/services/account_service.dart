@@ -1,82 +1,80 @@
-import 'package:flutter/material.dart';
-import '../core/theme/app_colors.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+import '../core/supabase/app_supabase.dart';
+import '../core/supabase/supabase_errors.dart';
 import '../models/account_item.dart';
 
 abstract class AccountService {
   Future<List<AccountItem>> fetchAccounts();
   Future<AccountItem> addAccount(AccountItem item);
-  Future<void> toggleFavorite(String id);
+  Future<AccountItem> updateAccount(AccountItem item);
+
+  /// Sets (not toggles) the favorite flag, so retrying or double-tapping can
+  /// never leave the server and the screen disagreeing.
+  Future<void> setFavorite(String id, bool isFavorite);
   Future<void> deleteAccount(String id);
 }
 
+/// [AccountService] backed by the `accounts` table. Row Level Security limits
+/// every query to the signed-in user's own rows.
+///
+/// Only descriptive fields are stored (name, username, category, favorite).
+/// There is no password column: see the note in the migration.
 class AccountServiceImpl implements AccountService {
-  final List<AccountItem> _mockDatabase = [
-    const AccountItem(
-      id: 'acc-1',
-      title: 'Bank of America - Checking',
-      subtitle: 'Updated yesterday · •••• 1234',
-      category: 'Banking',
-      icon: Icons.account_balance_rounded,
-      color: AppColors.glassAccentGreen,
-      isFavorite: true,
-    ),
-    const AccountItem(
-      id: 'acc-2',
-      title: 'Amazon.com',
-      subtitle: 'Updated 3 days ago · •••• 5678',
-      category: 'Social',
-      icon: Icons.shopping_cart_rounded,
-      color: AppColors.glassAccentPink,
-      isFavorite: false,
-    ),
-    const AccountItem(
-      id: 'acc-3',
-      title: 'GitHub',
-      subtitle: 'Updated 1 week ago',
-      category: 'Work',
-      icon: Icons.code_rounded,
-      color: AppColors.glassOnSurfaceMuted,
-      isFavorite: true,
-    ),
-    const AccountItem(
-      id: 'acc-4',
-      title: 'Wi-Fi Home Network',
-      subtitle: 'Updated 2 weeks ago',
-      category: 'Other',
-      icon: Icons.wifi_rounded,
-      color: AppColors.glassAccentBlue,
-      isFavorite: false,
-    ),
-  ];
+  final SupabaseClient _client;
 
-  // TODO: Connect to encrypted password/credentials vault backend
+  AccountServiceImpl({SupabaseClient? client})
+      : _client = client ?? AppSupabase.client;
 
   @override
-  Future<List<AccountItem>> fetchAccounts() async {
-    await Future.delayed(const Duration(milliseconds: 250));
-    return List.from(_mockDatabase);
+  Future<List<AccountItem>> fetchAccounts() {
+    return guardBackend(() async {
+      final rows = await _client
+          .from('accounts')
+          .select()
+          .order('created_at', ascending: false);
+      return rows.map(AccountItem.fromRow).toList();
+    });
   }
 
   @override
-  Future<AccountItem> addAccount(AccountItem item) async {
-    await Future.delayed(const Duration(milliseconds: 300));
-    _mockDatabase.insert(0, item);
-    return item;
+  Future<AccountItem> addAccount(AccountItem item) {
+    return guardBackend(() async {
+      final row =
+          await _client.from('accounts').insert(item.toInsertRow()).select().single();
+      return AccountItem.fromRow(row);
+    });
   }
 
   @override
-  Future<void> toggleFavorite(String id) async {
-    await Future.delayed(const Duration(milliseconds: 150));
-    final index = _mockDatabase.indexWhere((item) => item.id == id);
-    if (index != -1) {
-      final current = _mockDatabase[index];
-      _mockDatabase[index] = current.copyWith(isFavorite: !current.isFavorite);
-    }
+  Future<AccountItem> updateAccount(AccountItem item) {
+    return guardBackend(() async {
+      final rows = await _client
+          .from('accounts')
+          .update(item.toUpdateRow())
+          .eq('id', item.id)
+          .select();
+      requireAffected(rows);
+      return AccountItem.fromRow(rows.first);
+    });
   }
 
   @override
-  Future<void> deleteAccount(String id) async {
-    await Future.delayed(const Duration(milliseconds: 300));
-    _mockDatabase.removeWhere((item) => item.id == id);
+  Future<void> setFavorite(String id, bool isFavorite) {
+    return guardBackend(() async {
+      final rows = await _client
+          .from('accounts')
+          .update({'is_favorite': isFavorite})
+          .eq('id', id)
+          .select('id');
+      requireAffected(rows);
+    });
+  }
+
+  @override
+  Future<void> deleteAccount(String id) {
+    return guardBackend(() async {
+      await _client.from('accounts').delete().eq('id', id);
+    });
   }
 }

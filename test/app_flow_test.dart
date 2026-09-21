@@ -13,8 +13,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 
-/// The whole app tree — real mock services, the SessionSync coordinator, the
-/// router and its guard — exercised together, the way `main()` assembles it.
+import 'fakes.dart';
+
+/// The whole app tree — the SessionSync coordinator, the router and its guard,
+/// with fake repositories standing in for Supabase — exercised together, the
+/// way `main()` assembles it.
 void main() {
   Future<void> pumpFor(WidgetTester tester, Duration total) async {
     // Step in small increments so fake-async timers (service delays,
@@ -26,41 +29,44 @@ void main() {
     }
   }
 
-  Widget buildApp() => MultiProvider(
-    providers: [
-      ChangeNotifierProvider<AuthProvider>(create: (_) => AuthProvider()),
-      ChangeNotifierProvider<UserProvider>(create: (_) => UserProvider()),
-      ChangeNotifierProvider<VaultProvider>(create: (_) => VaultProvider()),
-      ChangeNotifierProvider<DocumentProvider>(
-        create: (_) => DocumentProvider(),
-      ),
-      ChangeNotifierProvider<AccountProvider>(create: (_) => AccountProvider()),
-      ChangeNotifierProvider<TrustedContactProvider>(
-        create: (_) => TrustedContactProvider(),
-      ),
-      ChangeNotifierProvider<SettingsProvider>(
-        create: (_) => SettingsProvider(),
-      ),
-    ],
-    child: const SessionSync(child: EverkeepApp()),
-  );
+  Widget buildApp() {
+    final authRepo = FakeAuthRepository();
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider<AuthProvider>(
+          create: (_) => AuthProvider(authRepository: authRepo),
+        ),
+        ChangeNotifierProvider<UserProvider>(
+          create: (_) => UserProvider(userRepository: FakeUserRepository(authRepo)),
+        ),
+        ChangeNotifierProvider<VaultProvider>(
+          create: (_) => VaultProvider(vaultRepository: FakeVaultRepository()),
+        ),
+        ChangeNotifierProvider<DocumentProvider>(
+          create: (_) =>
+              DocumentProvider(documentRepository: FakeDocumentRepository()),
+        ),
+        ChangeNotifierProvider<AccountProvider>(
+          create: (_) =>
+              AccountProvider(accountRepository: FakeAccountRepository()),
+        ),
+        ChangeNotifierProvider<TrustedContactProvider>(
+          create: (_) => TrustedContactProvider(
+            trustedContactRepository: FakeTrustedContactRepository(),
+          ),
+        ),
+        ChangeNotifierProvider<SettingsProvider>(
+          create: (_) =>
+              SettingsProvider(settingsRepository: FakeSettingsRepository()),
+        ),
+      ],
+      child: const SessionSync(child: EverkeepApp()),
+    );
+  }
 
   testWidgets(
     'signed-out deep link is bounced; sign-up personalises Home; sign-out wipes it',
     (tester) async {
-      // `flutter test` renders text in the fixed-width Ahem font, which is far
-      // wider than the real one, so labels in fixed-size boxes (the bottom
-      // nav's "Memories") wrap and report overflows that don't occur on a
-      // device. Layout isn't what this test checks, so ignore just those.
-      final defaultOnError = FlutterError.onError;
-      FlutterError.onError = (details) {
-        if (details.exceptionAsString().contains('RenderFlex overflowed')) {
-          return;
-        }
-        defaultOnError?.call(details);
-      };
-      addTearDown(() => FlutterError.onError = defaultOnError);
-
       await tester.pumpWidget(buildApp());
 
       // Cold start with no session: splash -> onboarding.

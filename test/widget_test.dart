@@ -19,6 +19,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:provider/provider.dart';
 import 'package:everkeep/models/user.dart';
+import 'fakes.dart';
 import 'package:everkeep/providers/account_provider.dart';
 import 'package:everkeep/providers/auth_provider.dart';
 import 'package:everkeep/providers/document_provider.dart';
@@ -40,13 +41,33 @@ void main() {
     await tester.pumpWidget(
       MultiProvider(
         providers: [
-          ChangeNotifierProvider(create: (_) => AuthProvider()),
-          ChangeNotifierProvider(create: (_) => UserProvider()..setUser(user)),
-          ChangeNotifierProvider(create: (_) => VaultProvider()),
-          ChangeNotifierProvider(create: (_) => DocumentProvider()),
-          ChangeNotifierProvider(create: (_) => AccountProvider()),
-          ChangeNotifierProvider(create: (_) => TrustedContactProvider()),
-          ChangeNotifierProvider(create: (_) => SettingsProvider()),
+          ChangeNotifierProvider(
+            create: (_) => AuthProvider(authRepository: FakeAuthRepository()),
+          ),
+          ChangeNotifierProvider(
+            create: (_) => UserProvider(userRepository: FakeUserRepository())
+              ..setUser(user),
+          ),
+          ChangeNotifierProvider(
+            create: (_) => VaultProvider(vaultRepository: FakeVaultRepository()),
+          ),
+          ChangeNotifierProvider(
+            create: (_) =>
+                DocumentProvider(documentRepository: FakeDocumentRepository()),
+          ),
+          ChangeNotifierProvider(
+            create: (_) =>
+                AccountProvider(accountRepository: FakeAccountRepository()),
+          ),
+          ChangeNotifierProvider(
+            create: (_) => TrustedContactProvider(
+              trustedContactRepository: FakeTrustedContactRepository(),
+            ),
+          ),
+          ChangeNotifierProvider(
+            create: (_) =>
+                SettingsProvider(settingsRepository: FakeSettingsRepository()),
+          ),
         ],
         child: MaterialApp(
           onGenerateRoute: AppRouter.generateRoute,
@@ -132,7 +153,7 @@ void main() {
   });
 
   testWidgets('ProfileScreen builds without throwing', (tester) async {
-    await pumpScreen(tester, const ProfileScreen(), user: User.defaultUser);
+    await pumpScreen(tester, const ProfileScreen(), user: testUser);
     expect(tester.takeException(), isNull);
     expect(find.text('Sarah Mitchell'), findsWidgets);
   });

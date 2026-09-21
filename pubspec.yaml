@@ -1,5 +1,5 @@
 name: everkeep
-description: "A new Flutter project."
+description: "Everkeep, a digital legacy vault for documents, accounts, memories and trusted people."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
@@ -36,6 +36,8 @@ dependencies:
   cupertino_icons: ^1.0.8
   provider: ^6.1.5+1
   google_fonts: ^8.2.1
+  supabase_flutter: ^2.17.2
+  http: ^1.6.0
 
 dev_dependencies:
   flutter_test:

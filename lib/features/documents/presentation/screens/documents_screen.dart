@@ -3,7 +3,6 @@ import 'package:provider/provider.dart';
 import 'package:everkeep/core/theme/app_colors.dart';
 import 'package:everkeep/core/theme/app_radius.dart';
 import 'package:everkeep/core/theme/app_text_styles.dart';
-import 'package:everkeep/core/utils/id.dart';
 import 'package:everkeep/models/document_item.dart';
 import 'package:everkeep/models/vault_summary.dart';
 import 'package:everkeep/providers/document_provider.dart';
@@ -69,12 +68,13 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
       onSubmit: (values) async {
         final category = values['category']!;
         final added = await docProv.addDocument(
+          // The id and the "Added ..." subtitle are assigned by the backend;
+          // the saved document comes back with both.
           DocumentItem(
-            id: newId('doc'),
+            id: '',
             title: values['title']!,
-            subtitle: '$category · Added just now',
+            subtitle: '',
             category: category,
-            dateAdded: DateTime.now(),
           ),
         );
         return added ? null : docProv.error ?? 'Could not add the document.';

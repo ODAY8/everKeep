@@ -1,4 +1,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Needed in release builds: google_fonts downloads Figtree and Young Serif
+         at runtime, and the backend calls will need it too. Flutter only adds
+         this permission to the debug/profile manifests by default. -->
+    <uses-permission android:name="android.permission.INTERNET"/>
     <application
         android:label="everkeep"
         android:name="${applicationName}"

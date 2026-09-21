@@ -67,12 +67,14 @@ class SessionCoordinator {
   }
 
   void _onSignedIn() {
-    // The auth response already carries the profile, so use it directly
-    // rather than refetching (which would only round-trip the same user).
+    // Show the signed-in identity straight away (id, email and the name given
+    // at sign-up come with the session), then load the real profile row, which
+    // may hold a newer name, phone and avatar.
     user.setUser(auth.currentUser);
 
     // Each provider catches its own errors, so these are safe to fire and
     // forget; screens show a retry if one fails.
+    unawaited(user.fetchUserProfile());
     unawaited(vault.fetchVaultSummary());
     unawaited(settings.fetchSecuritySettings());
     unawaited(documents.fetchDocuments());

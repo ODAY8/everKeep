@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:everkeep/models/account_item.dart';
 import 'package:everkeep/models/document_item.dart';
+import 'package:everkeep/models/document_upload.dart';
 import 'package:everkeep/models/security_settings.dart';
 import 'package:everkeep/models/trusted_contact_item.dart';
 import 'package:everkeep/models/user.dart';
@@ -15,8 +16,18 @@ import 'package:everkeep/repositories/user_repository.dart';
 import 'package:everkeep/repositories/vault_repository.dart';
 import 'package:flutter/material.dart';
 
+/// A signed-in user for tests. (The app has no built-in persona: real users
+/// come from Supabase.)
+const User testUser = User(
+  id: 'user-001',
+  name: 'Sarah Mitchell',
+  email: 'sarah.mitchell@example.com',
+  phone: '+1 (555) 123-4567',
+  isAuthenticated: true,
+);
+
 /// Fake repositories that resolve instantly and can be told to fail, so tests
-/// can exercise the error paths the real mock services never hit.
+/// can exercise the error paths without a backend.
 mixin Failable {
   /// While non-null, every call throws `Exception(failWith)`.
   String? failWith;
@@ -31,10 +42,26 @@ class FakeAuthRepository with Failable implements AuthRepository {
   bool failSignOut = false;
   bool failRestore = false;
 
+  /// When true, sign-up creates the account but returns no session (the
+  /// "confirm your email first" case).
+  bool signUpNeedsConfirmation = false;
+
+  final StreamController<void> _sessionEnded = StreamController<void>.broadcast();
+
+  /// Simulates the backend ending the session (expiry, revocation, sign-out
+  /// on another device).
+  void endSession() {
+    sessionUser = null;
+    _sessionEnded.add(null);
+  }
+
+  @override
+  Stream<void> get sessionEnded => _sessionEnded.stream;
+
   @override
   Future<User?> signIn({required String email, required String password}) async {
     throwIfFailing();
-    return sessionUser = User.defaultUser.copyWith(email: email);
+    return sessionUser = testUser.copyWith(email: email);
   }
 
   @override
@@ -44,7 +71,8 @@ class FakeAuthRepository with Failable implements AuthRepository {
     required String password,
   }) async {
     throwIfFailing();
-    return sessionUser = User.defaultUser.copyWith(name: name, email: email);
+    if (signUpNeedsConfirmation) return null;
+    return sessionUser = testUser.copyWith(name: name, email: email);
   }
 
   @override
@@ -69,6 +97,11 @@ class FakeDocumentRepository with Failable implements DocumentRepository {
   /// When set, the next fetch waits on this instead of resolving.
   Completer<List<DocumentItem>>? pendingFetch;
 
+  /// The upload passed to the most recent [addDocument], if any.
+  DocumentUpload? lastUpload;
+
+  int _nextId = 100;
+
   FakeDocumentRepository([List<DocumentItem>? seed])
       : items = seed ?? [doc('d1', 'Will.pdf'), doc('d2', 'Deed.pdf'), doc('d3', 'Tax.pdf')];
 
@@ -88,10 +121,21 @@ class FakeDocumentRepository with Failable implements DocumentRepository {
   }
 
   @override
-  Future<DocumentItem> addDocument(DocumentItem document) async {
+  Future<DocumentItem> addDocument(
+    DocumentItem document, {
+    DocumentUpload? upload,
+  }) async {
     throwIfFailing();
-    items.insert(0, document);
-    return document;
+    lastUpload = upload;
+    // Like the backend, assign the id (a caller's id is ignored) and subtitle.
+    final saved = document.copyWith(
+      id: document.id.isEmpty ? 'gen-${_nextId++}' : document.id,
+      subtitle: document.subtitle.isEmpty
+          ? '${document.category} · Added just now'
+          : document.subtitle,
+    );
+    items.insert(0, saved);
+    return saved;
   }
 
   @override
@@ -99,13 +143,24 @@ class FakeDocumentRepository with Failable implements DocumentRepository {
     throwIfFailing();
     items.removeWhere((d) => d.id == id);
   }
+
+  @override
+  Future<String> createDownloadUrl(String filePath) async {
+    throwIfFailing();
+    return 'https://example.test/signed/$filePath';
+  }
 }
 
 class FakeAccountRepository with Failable implements AccountRepository {
   final List<AccountItem> items;
 
-  /// When set, the next toggle waits on this instead of resolving.
+  /// When set, the next favorite change waits on this instead of resolving.
   Completer<void>? pendingToggle;
+
+  /// The (id, value) of the most recent [setFavorite] call.
+  (String, bool)? lastFavorite;
+
+  int _nextId = 100;
 
   FakeAccountRepository([List<AccountItem>? seed])
       : items = seed ?? [account('a1', 'Bank'), account('a2', 'GitHub')];
@@ -114,7 +169,7 @@ class FakeAccountRepository with Failable implements AccountRepository {
       AccountItem(
         id: id,
         title: title,
-        subtitle: 'Updated today',
+        subtitle: 'Added today',
         icon: Icons.key_rounded,
         color: Colors.blue,
         isFavorite: favorite,
@@ -129,12 +184,25 @@ class FakeAccountRepository with Failable implements AccountRepository {
   @override
   Future<AccountItem> addAccount(AccountItem item) async {
     throwIfFailing();
-    items.insert(0, item);
-    return item;
+    final saved = item.copyWith(
+      id: item.id.isEmpty ? 'gen-${_nextId++}' : item.id,
+      subtitle: item.subtitle.isEmpty ? 'Added just now' : item.subtitle,
+    );
+    items.insert(0, saved);
+    return saved;
   }
 
   @override
-  Future<void> toggleFavorite(String id) {
+  Future<AccountItem> updateAccount(AccountItem item) async {
+    throwIfFailing();
+    final index = items.indexWhere((a) => a.id == item.id);
+    if (index == -1) throw Exception('That item couldn\'t be found.');
+    return items[index] = item;
+  }
+
+  @override
+  Future<void> setFavorite(String id, bool isFavorite) {
+    lastFavorite = (id, isFavorite);
     final pending = pendingToggle;
     if (pending != null) {
       pendingToggle = null;
@@ -155,6 +223,8 @@ class FakeTrustedContactRepository
     with Failable
     implements TrustedContactRepository {
   final List<TrustedContactItem> items;
+
+  int _nextId = 100;
 
   FakeTrustedContactRepository([List<TrustedContactItem>? seed])
       : items = seed ??
@@ -184,8 +254,11 @@ class FakeTrustedContactRepository
   @override
   Future<TrustedContactItem> addContact(TrustedContactItem contact) async {
     throwIfFailing();
-    items.add(contact);
-    return contact;
+    final saved = contact.id.isEmpty
+        ? contact.copyWith(id: 'gen-${_nextId++}')
+        : contact;
+    items.add(saved);
+    return saved;
   }
 
   @override
@@ -221,18 +294,39 @@ class FakeSettingsRepository with Failable implements SettingsRepository {
 }
 
 class FakeVaultRepository with Failable implements VaultRepository {
+  /// Explicit numbers (the model's own defaults describe an empty vault), so
+  /// tests can check how live counts are layered on top.
+  static const VaultSummary sample = VaultSummary(
+    totalItems: 92,
+    passwordsCount: 24,
+    documentsCount: 11,
+    financialsCount: 6,
+    messagesCount: 8,
+    memoriesCount: 43,
+    securityScore: 94,
+    securityScoreLabel: 'Excellent — 94/100',
+    legacyProgress: 0.73,
+    storageUsedMb: 24.5,
+  );
+
   @override
   Future<VaultSummary> fetchVaultSummary() async {
     throwIfFailing();
-    return const VaultSummary();
+    return sample;
   }
 }
 
 class FakeUserRepository with Failable implements UserRepository {
+  /// When given, the profile is that of whoever is signed in there (as the
+  /// real backend derives it from the session); otherwise [testUser].
+  final FakeAuthRepository? auth;
+
+  FakeUserRepository([this.auth]);
+
   @override
   Future<User> fetchUserProfile() async {
     throwIfFailing();
-    return User.defaultUser;
+    return auth?.sessionUser ?? testUser;
   }
 
   @override

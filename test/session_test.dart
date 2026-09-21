@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:everkeep/core/routing/auth_guard.dart';
 import 'package:everkeep/core/session/session_sync.dart';
 import 'package:everkeep/models/document_item.dart';
+import 'package:everkeep/models/security_settings.dart';
 import 'package:everkeep/providers/account_provider.dart';
 import 'package:everkeep/providers/auth_provider.dart';
 import 'package:everkeep/providers/document_provider.dart';
@@ -10,8 +11,6 @@ import 'package:everkeep/providers/settings_provider.dart';
 import 'package:everkeep/providers/trusted_contact_provider.dart';
 import 'package:everkeep/providers/user_provider.dart';
 import 'package:everkeep/providers/vault_provider.dart';
-import 'package:everkeep/services/trusted_contact_service.dart';
-import 'package:everkeep/models/trusted_contact_item.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
@@ -28,7 +27,7 @@ class Harness {
   final vaultRepo = FakeVaultRepository();
 
   late final auth = AuthProvider(authRepository: authRepo);
-  late final user = UserProvider(userRepository: FakeUserRepository());
+  late final user = UserProvider(userRepository: FakeUserRepository(authRepo));
   late final vault = VaultProvider(vaultRepository: vaultRepo);
   late final documents = DocumentProvider(documentRepository: docRepo);
   late final accounts = AccountProvider(accountRepository: accRepo);
@@ -107,8 +106,8 @@ void main() {
       expect(h.accounts.hasFetched, isFalse);
       expect(h.contacts.contacts, isEmpty);
       expect(h.contacts.hasFetched, isFalse);
-      expect(h.vault.vaultSummary.documentsCount, 11); // back to defaults
-      expect(h.settings.settings.twoFactorEnabled, isTrue);
+      expect(h.vault.vaultSummary.documentsCount, 0); // back to an empty vault
+      expect(h.settings.settings.twoFactorEnabled, isFalse); // default: off
     });
 
     test('a failed sign-out keeps the session and its data', () async {
@@ -234,8 +233,15 @@ void main() {
     });
 
     test('a failed settings save reverts only the flag that changed', () async {
-      final repo = FakeSettingsRepository();
+      // Start with every protection on (they default to off).
+      final repo = FakeSettingsRepository()
+        ..stored = const SecuritySettings(
+          twoFactorEnabled: true,
+          biometricEnabled: true,
+          loginAlertsEnabled: true,
+        );
       final settings = SettingsProvider(settingsRepository: repo);
+      await settings.fetchSecuritySettings();
 
       final hold = Completer<void>();
       repo.holdNextUpdate = hold;
@@ -252,8 +258,11 @@ void main() {
     });
 
     test('a failed no-op toggle does not flip the setting', () async {
-      final repo = FakeSettingsRepository()..failWith = 'Save failed';
+      final repo = FakeSettingsRepository()
+        ..stored = const SecuritySettings(twoFactorEnabled: true);
       final settings = SettingsProvider(settingsRepository: repo);
+      await settings.fetchSecuritySettings();
+      repo.failWith = 'Save failed';
 
       // Already enabled; "turning it on" and failing must leave it enabled.
       expect(await settings.toggleTwoFactor(true), isFalse);
@@ -304,24 +313,97 @@ void main() {
     });
   });
 
-  group('TrustedContactService', () {
-    test('added and removed contacts persist across refetches', () async {
-      final service = TrustedContactServiceImpl();
-      const added = TrustedContactItem(
-        id: 'tc-new',
-        name: 'New Person',
-        relationship: 'Friend',
-        accessLevel: 'View Only',
-        avatarUrl: '',
+  group('Real session lifecycle', () {
+    test('the backend ending the session signs the app out and wipes data',
+        () async {
+      final h = Harness();
+      addTearDown(h.dispose);
+      await h.signIn();
+      expect(h.auth.isAuthenticated, isTrue);
+      expect(h.documents.count, 3);
+
+      // Expiry, revocation, or sign-out from another device.
+      h.authRepo.endSession();
+      await pumpEventQueue();
+
+      expect(h.auth.isAuthenticated, isFalse);
+      expect(h.auth.currentUser, isNull);
+      expect(h.user.user, isNull);
+      expect(h.documents.documents, isEmpty);
+      expect(h.accounts.accounts, isEmpty);
+      expect(h.contacts.contacts, isEmpty);
+    });
+
+    test('an ended session while signed out changes nothing', () async {
+      final h = Harness();
+      addTearDown(h.dispose);
+      var notifications = 0;
+      h.auth.addListener(() => notifications++);
+
+      h.authRepo.endSession();
+      await pumpEventQueue();
+
+      expect(notifications, 0);
+      expect(h.auth.status, AuthStatus.initial);
+    });
+
+    test('sign-up that needs email confirmation is not treated as signed in',
+        () async {
+      final h = Harness();
+      addTearDown(h.dispose);
+      h.authRepo.signUpNeedsConfirmation = true;
+
+      final signedIn = await h.auth.signUp(
+        name: 'Alex Rivera',
+        email: 'alex@example.com',
+        password: 'secret1',
       );
+      await pumpEventQueue();
 
-      await service.addContact(added);
-      expect((await service.fetchContacts()).map((c) => c.id), contains('tc-new'));
+      expect(signedIn, isFalse);
+      expect(h.auth.isAuthenticated, isFalse);
+      expect(h.auth.currentUser, isNull);
+      expect(h.auth.notice, contains('confirm'));
+      expect(h.auth.error, isNull);
+      expect(h.user.user, isNull);
+      expect(h.documents.hasFetched, isFalse); // nothing was loaded
 
-      await service.removeContact('tc-1');
-      final ids = (await service.fetchContacts()).map((c) => c.id);
-      expect(ids, isNot(contains('tc-1')));
-      expect(ids, contains('tc-new'));
+      h.auth.clearError(); // e.g. the sign-in screen opening
+      expect(h.auth.notice, isNull);
+    });
+
+    test('the profile row is loaded after sign-in', () async {
+      final h = Harness();
+      addTearDown(h.dispose);
+
+      await h.signIn(email: 'alex@example.com');
+
+      // setUser gave the identity at once; fetchUserProfile then loaded it.
+      expect(h.user.displayEmail, 'alex@example.com');
+      expect(h.user.isLoading, isFalse);
+      expect(h.user.error, isNull);
+    });
+
+    test('a failed profile load keeps the signed-in identity', () async {
+      final h = Harness();
+      addTearDown(h.dispose);
+      final userRepo = FakeUserRepository(h.authRepo)..failWith = 'Offline';
+      final coordinatorHarness = SessionCoordinator(
+        auth: h.auth,
+        user: UserProvider(userRepository: userRepo),
+        vault: h.vault,
+        documents: h.documents,
+        accounts: h.accounts,
+        contacts: h.contacts,
+        settings: h.settings,
+      );
+      addTearDown(coordinatorHarness.dispose);
+
+      await h.auth.signIn(email: 'alex@example.com', password: 'secret1');
+      await pumpEventQueue();
+
+      expect(coordinatorHarness.user.displayEmail, 'alex@example.com');
+      expect(coordinatorHarness.user.error, 'Offline');
     });
   });
 

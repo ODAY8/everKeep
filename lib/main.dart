@@ -6,6 +6,7 @@ import 'core/config/supabase_config.dart';
 import 'core/routing/app_router.dart';
 import 'core/session/session_sync.dart';
 import 'core/supabase/app_supabase.dart';
+import 'core/theme/app_fonts.dart';
 import 'core/theme/app_theme.dart';
 import 'providers/account_provider.dart';
 import 'providers/auth_provider.dart';
@@ -17,6 +18,7 @@ import 'providers/vault_provider.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  configureFonts();
 
   // The backend is required: with no (or a bad) Supabase configuration there
   // is nothing real to show, so say so instead of running on fake data.
@@ -71,6 +73,7 @@ class EverkeepApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Everkeep',
+      navigatorKey: AppRouter.navigatorKey,
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,

@@ -1,0 +1,9 @@
+# Copy to android/key.properties (git-ignored) and fill in YOUR upload key.
+# Create a key once with:
+#   keytool -genkey -v -keystore %USERPROFILE%\everkeep-upload.jks -keyalg RSA -keysize 2048 -validity 10000 -alias upload
+# Keep the .jks file and these passwords somewhere safe and OUT of the repo — if you
+# lose the key you can't update the app on Google Play.
+storePassword=<the keystore password>
+keyPassword=<the key password>
+keyAlias=upload
+storeFile=C:\\Users\\<you>\\everkeep-upload.jks

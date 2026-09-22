@@ -49,6 +49,27 @@
 	</dict>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<!-- Links in Supabase's emails (confirm your email, reset your password) open
+	     the app. The scheme must match AuthRedirect in
+	     lib/core/config/auth_redirect.dart and the Redirect URLs in the Supabase
+	     dashboard. If you change the bundle id, change it here too. -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>com.example.everkeep.auth</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.example.everkeep</string>
+			</array>
+		</dict>
+	</array>
+	<!-- supabase_flutter handles those links itself; Flutter's own deep-link
+	     routing would otherwise also react and navigate to a bogus route. -->
+	<key>FlutterDeepLinkingEnabled</key>
+	<false/>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>

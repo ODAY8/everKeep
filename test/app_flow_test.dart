@@ -1,3 +1,4 @@
+import 'package:everkeep/core/utils/greeting.dart';
 import 'package:everkeep/core/routing/app_router.dart';
 import 'package:everkeep/core/session/session_sync.dart';
 import 'package:everkeep/core/session/sign_out.dart';
@@ -37,7 +38,8 @@ void main() {
           create: (_) => AuthProvider(authRepository: authRepo),
         ),
         ChangeNotifierProvider<UserProvider>(
-          create: (_) => UserProvider(userRepository: FakeUserRepository(authRepo)),
+          create: (_) =>
+              UserProvider(userRepository: FakeUserRepository(authRepo)),
         ),
         ChangeNotifierProvider<VaultProvider>(
           create: (_) => VaultProvider(vaultRepository: FakeVaultRepository()),
@@ -78,7 +80,7 @@ void main() {
       // A protected route while signed out must not render; it redirects.
       navigator.pushNamed(AppRouter.home);
       await pumpFor(tester, const Duration(seconds: 1));
-      expect(find.text('Good morning,'), findsNothing);
+      expect(find.textContaining('Good '), findsNothing);
       expect(find.text('Create Your Legacy'), findsOneWidget); // welcome
 
       // Sign up as a new user, then go home.
@@ -96,7 +98,10 @@ void main() {
       await pumpFor(tester, const Duration(seconds: 2));
 
       // Home greets the person who signed up, not a stock persona...
-      expect(find.text('Good morning,'), findsOneWidget);
+      expect(
+        find.textContaining(RegExp(r'Good (morning|afternoon|evening),')),
+        findsOneWidget,
+      );
       expect(find.text('Alex'), findsOneWidget);
       expect(find.text('Sarah'), findsNothing);
       // ...and its counts reflect the loaded data rather than fixed strings.
@@ -104,19 +109,28 @@ void main() {
       final contacts = context.read<TrustedContactProvider>();
       expect(documents.hasFetched, isTrue);
       expect(contacts.hasFetched, isTrue);
-      expect(find.text('${documents.count} vital files'), findsOneWidget);
-      expect(find.text('${contacts.count} secure trustees'), findsOneWidget);
+      expect(
+        find.text('${countLabel(documents.count, 'file', 'files')} stored'),
+        findsOneWidget,
+      );
+      expect(
+        find.text(countLabel(contacts.count, 'trustee', 'trustees')),
+        findsOneWidget,
+      );
       expect(find.text('12 vital files'), findsNothing);
 
       // Sign out: land on welcome and leave nothing behind.
-      final homeContext = tester.element(find.text('Good morning,'));
+      final greetingText = find.textContaining(
+        RegExp(r'Good (morning|afternoon|evening),'),
+      );
+      final homeContext = tester.element(greetingText);
       final signOut = signOutAndReturnToWelcome(homeContext);
       await pumpFor(tester, const Duration(seconds: 1));
       await signOut;
       await pumpFor(tester, const Duration(seconds: 1));
 
       expect(find.text('Create Your Legacy'), findsOneWidget);
-      expect(find.text('Good morning,'), findsNothing);
+      expect(greetingText, findsNothing);
       expect(auth.isAuthenticated, isFalse);
       expect(context.read<UserProvider>().user, isNull);
       expect(documents.documents, isEmpty);

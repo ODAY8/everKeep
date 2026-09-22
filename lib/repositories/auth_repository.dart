@@ -9,9 +9,12 @@ abstract class AuthRepository {
     required String password,
   });
   Future<void> signOut();
+  Future<void> signOutEverywhere();
   Future<bool> sendPasswordReset({required String email});
+  Future<void> updatePassword(String newPassword);
+  Future<void> updateEmail(String newEmail);
   Future<User?> restoreSession();
-  Stream<void> get sessionEnded;
+  Stream<AuthSessionEvent> get events;
 }
 
 class AuthRepositoryImpl implements AuthRepository {
@@ -50,5 +53,16 @@ class AuthRepositoryImpl implements AuthRepository {
   }
 
   @override
-  Stream<void> get sessionEnded => _authService.sessionEnded;
+  Future<void> signOutEverywhere() => _authService.signOutEverywhere();
+
+  @override
+  Future<void> updatePassword(String newPassword) =>
+      _authService.updatePassword(newPassword);
+
+  @override
+  Future<void> updateEmail(String newEmail) =>
+      _authService.updateEmail(newEmail);
+
+  @override
+  Stream<AuthSessionEvent> get events => _authService.events;
 }

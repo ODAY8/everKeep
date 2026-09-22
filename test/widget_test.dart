@@ -45,11 +45,13 @@ void main() {
             create: (_) => AuthProvider(authRepository: FakeAuthRepository()),
           ),
           ChangeNotifierProvider(
-            create: (_) => UserProvider(userRepository: FakeUserRepository())
-              ..setUser(user),
+            create: (_) =>
+                UserProvider(userRepository: FakeUserRepository())
+                  ..setUser(user),
           ),
           ChangeNotifierProvider(
-            create: (_) => VaultProvider(vaultRepository: FakeVaultRepository()),
+            create: (_) =>
+                VaultProvider(vaultRepository: FakeVaultRepository()),
           ),
           ChangeNotifierProvider(
             create: (_) =>

@@ -7,6 +7,9 @@ class User {
   final bool isAuthenticated;
   final DateTime? lastLogin;
 
+  /// Whether the email address has been confirmed (from Supabase Auth).
+  final bool emailVerified;
+
   const User({
     required this.id,
     required this.name,
@@ -15,6 +18,7 @@ class User {
     this.avatarUrl,
     this.isAuthenticated = false,
     this.lastLogin,
+    this.emailVerified = false,
   });
 
   /// Builds the app's user from a signed-in Supabase Auth user and (when it
@@ -29,6 +33,7 @@ class User {
     Map<String, dynamic>? profile,
     String metadataName = '',
     DateTime? lastLogin,
+    bool emailVerified = false,
   }) {
     final profileName = (profile?['full_name'] as String?)?.trim() ?? '';
     return User(
@@ -39,6 +44,7 @@ class User {
       avatarUrl: profile?['avatar_url'] as String?,
       isAuthenticated: true,
       lastLogin: lastLogin,
+      emailVerified: emailVerified,
     );
   }
 
@@ -61,6 +67,7 @@ class User {
     String? avatarUrl,
     bool? isAuthenticated,
     DateTime? lastLogin,
+    bool? emailVerified,
   }) {
     return User(
       id: id ?? this.id,
@@ -70,6 +77,7 @@ class User {
       avatarUrl: avatarUrl ?? this.avatarUrl,
       isAuthenticated: isAuthenticated ?? this.isAuthenticated,
       lastLogin: lastLogin ?? this.lastLogin,
+      emailVerified: emailVerified ?? this.emailVerified,
     );
   }
 }

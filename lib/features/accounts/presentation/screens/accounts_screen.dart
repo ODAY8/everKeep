@@ -24,6 +24,7 @@ class _AccountsScreenState extends State<AccountsScreen> {
   static const List<String> _categories = ['Banking', 'Social', 'Work', 'Other'];
 
   int _selectedFilter = 0;
+  String _query = '';
   final List<String> _filters = const ['All', ..._categories];
 
   @override
@@ -169,7 +170,7 @@ class _AccountsScreenState extends State<AccountsScreen> {
           const SizedBox(height: 18),
           GlassSearchBar(
             hintText: 'Search accounts...',
-            onChanged: (_) {},
+            onChanged: (value) => setState(() => _query = value),
           ),
           const SizedBox(height: 14),
           GlassFilterChips(
@@ -194,8 +195,10 @@ class _AccountsScreenState extends State<AccountsScreen> {
                 return const LoadingView();
               }
 
-              final displayedAccounts =
-                  accProv.filterByCategory(activeFilter);
+              final displayedAccounts = accProv.filterByCategory(
+                activeFilter,
+                query: _query,
+              );
               final favorites =
                   displayedAccounts.where((a) => a.isFavorite).toList();
 
@@ -204,7 +207,10 @@ class _AccountsScreenState extends State<AccountsScreen> {
                   child: Padding(
                     padding: const EdgeInsets.symmetric(vertical: 32),
                     child: Text(
-                      'No accounts found.',
+                      _query.trim().isNotEmpty
+                          ? 'No accounts match "${_query.trim()}".'
+                          : 'No accounts yet. Tap Add Account to save one.',
+                      textAlign: TextAlign.center,
                       style: AppTextStyles.bodyMedium.copyWith(
                         color: AppColors.glassOnSurfaceMuted,
                       ),
@@ -266,27 +272,12 @@ class _AccountsScreenState extends State<AccountsScreen> {
   }
 
   Widget _buildSectionHeader(String title) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(
-          title,
-          style: AppTextStyles.titleLarge.copyWith(
-            fontWeight: FontWeight.w700,
-            color: AppColors.glassOnSurface,
-          ),
-        ),
-        GestureDetector(
-          onTap: () {},
-          child: Text(
-            'See All',
-            style: AppTextStyles.labelMedium.copyWith(
-              color: AppColors.glassAccentPink,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ),
-      ],
+    return Text(
+      title,
+      style: AppTextStyles.titleLarge.copyWith(
+        fontWeight: FontWeight.w700,
+        color: AppColors.glassOnSurface,
+      ),
     );
   }
 }

@@ -27,7 +27,10 @@ void main() {
 
   group('signIn', () {
     test('signs in with email and password and maps the user', () async {
-      final user = await auth.signIn(email: '  alex@example.com ', password: 'secret1');
+      final user = await auth.signIn(
+        email: '  alex@example.com ',
+        password: 'secret1',
+      );
 
       final request = supabase.single('POST', '/auth/v1/token');
       expect(request.query['grant_type'], 'password');
@@ -68,7 +71,8 @@ void main() {
     });
 
     test('being offline is reported as such, not as bad credentials', () async {
-      supabase.authRoute = (_) => throw http.ClientException('no route to host');
+      supabase.authRoute = (_) =>
+          throw http.ClientException('no route to host');
 
       final error = await failureOf(
         () => auth.signIn(email: 'alex@example.com', password: 'secret1'),
@@ -96,31 +100,41 @@ void main() {
       expect(user!.name, 'Alex Rivera');
     });
 
-    test('with email confirmation on there is no session, so no user', () async {
-      // Supabase's default: the account exists but nobody is signed in yet.
-      supabase.authRoute = (_) => jsonResponse(authUserJson());
+    test(
+      'with email confirmation on there is no session, so no user',
+      () async {
+        // Supabase's default: the account exists but nobody is signed in yet.
+        supabase.authRoute = (_) => jsonResponse(authUserJson());
 
-      final user = await auth.signUp(
-        name: 'Alex',
-        email: 'alex@example.com',
-        password: 'secret1',
-      );
+        final user = await auth.signUp(
+          name: 'Alex',
+          email: 'alex@example.com',
+          password: 'secret1',
+        );
 
-      expect(user, isNull);
-      expect(supabase.client.auth.currentSession, isNull);
-    });
+        expect(user, isNull);
+        expect(supabase.client.auth.currentSession, isNull);
+      },
+    );
 
-    test('an already-registered email is reported, not silently accepted',
-        () async {
-      // With confirmation on, Supabase answers with a user that has no
-      // identities instead of an error (to avoid revealing which emails exist).
-      supabase.authRoute = (_) => jsonResponse(authUserJson(identities: false));
+    test(
+      'an already-registered email is reported, not silently accepted',
+      () async {
+        // With confirmation on, Supabase answers with a user that has no
+        // identities instead of an error (to avoid revealing which emails exist).
+        supabase.authRoute = (_) =>
+            jsonResponse(authUserJson(identities: false));
 
-      final error = await failureOf(
-        () => auth.signUp(name: 'Alex', email: 'alex@example.com', password: 'secret1'),
-      );
-      expect(error.toString(), 'An account with this email already exists.');
-    });
+        final error = await failureOf(
+          () => auth.signUp(
+            name: 'Alex',
+            email: 'alex@example.com',
+            password: 'secret1',
+          ),
+        );
+        expect(error.toString(), 'An account with this email already exists.');
+      },
+    );
 
     test('a weak password shows the server\'s rule', () async {
       supabase.authRoute = (_) => authError(
@@ -130,7 +144,11 @@ void main() {
       );
 
       final error = await failureOf(
-        () => auth.signUp(name: 'Alex', email: 'alex@example.com', password: '123'),
+        () => auth.signUp(
+          name: 'Alex',
+          email: 'alex@example.com',
+          password: '123',
+        ),
       );
       expect(error.toString(), 'Password should be at least 6 characters.');
     });
@@ -143,7 +161,11 @@ void main() {
       );
 
       final error = await failureOf(
-        () => auth.signUp(name: 'Alex', email: 'alex@example.com', password: 'secret1'),
+        () => auth.signUp(
+          name: 'Alex',
+          email: 'alex@example.com',
+          password: 'secret1',
+        ),
       );
       expect(error.toString(), contains('Too many attempts'));
     });
@@ -159,25 +181,29 @@ void main() {
       expect(supabase.where('POST', '/auth/v1/logout'), hasLength(1));
     });
 
-    test('if only the server-side revoke fails, the device is still signed out',
-        () async {
-      await supabase.signIn();
-      supabase.authRoute = (request) {
-        if (request.path.endsWith('/logout')) {
-          throw http.ClientException('network down');
-        }
-        return jsonResponse({});
-      };
+    test(
+      'if only the server-side revoke fails, the device is still signed out',
+      () async {
+        await supabase.signIn();
+        supabase.authRoute = (request) {
+          if (request.path.endsWith('/logout')) {
+            throw http.ClientException('network down');
+          }
+          return jsonResponse({});
+        };
 
-      // No error: this device's session is gone, which is what the user asked.
-      await auth.signOut();
+        // No error: this device's session is gone, which is what the user asked.
+        await auth.signOut();
 
-      expect(supabase.client.auth.currentSession, isNull);
-    });
+        expect(supabase.client.auth.currentSession, isNull);
+      },
+    );
 
     test('announces the end of the session', () async {
       await supabase.signIn();
-      final ended = auth.sessionEnded.first;
+      final ended = auth.events.firstWhere(
+        (event) => event == AuthSessionEvent.signedOut,
+      );
 
       await auth.signOut();
 
@@ -191,18 +217,20 @@ void main() {
       expect(supabase.requests, isEmpty); // no pointless network call
     });
 
-    test('a stored session is verified with the server before it is trusted',
-        () async {
-      await supabase.signIn();
-      supabase.authRoute = (request) => request.path.endsWith('/user')
-          ? jsonResponse(authUserJson(name: 'Alex Rivera'))
-          : jsonResponse({});
+    test(
+      'a stored session is verified with the server before it is trusted',
+      () async {
+        await supabase.signIn();
+        supabase.authRoute = (request) => request.path.endsWith('/user')
+            ? jsonResponse(authUserJson(name: 'Alex Rivera'))
+            : jsonResponse({});
 
-      final user = await auth.restoreSession();
+        final user = await auth.restoreSession();
 
-      expect(supabase.where('GET', '/auth/v1/user'), hasLength(1));
-      expect(user?.id, testUserId);
-    });
+        expect(supabase.where('GET', '/auth/v1/user'), hasLength(1));
+        expect(user?.id, testUserId);
+      },
+    );
 
     test('a session the server rejects is dropped', () async {
       await supabase.signIn();
@@ -214,21 +242,23 @@ void main() {
       expect(supabase.client.auth.currentSession, isNull);
     });
 
-    test('offline at startup keeps the stored session instead of signing out',
-        () async {
-      await supabase.signIn();
-      supabase.authRoute = (request) {
-        if (request.path.endsWith('/user')) {
-          throw http.ClientException('offline');
-        }
-        return jsonResponse({});
-      };
+    test(
+      'offline at startup keeps the stored session instead of signing out',
+      () async {
+        await supabase.signIn();
+        supabase.authRoute = (request) {
+          if (request.path.endsWith('/user')) {
+            throw http.ClientException('offline');
+          }
+          return jsonResponse({});
+        };
 
-      final user = await auth.restoreSession();
+        final user = await auth.restoreSession();
 
-      expect(user?.id, testUserId);
-      expect(supabase.client.auth.currentSession, isNotNull);
-    });
+        expect(user?.id, testUserId);
+        expect(supabase.client.auth.currentSession, isNotNull);
+      },
+    );
   });
 
   test('password reset asks Supabase to email a recovery link', () async {

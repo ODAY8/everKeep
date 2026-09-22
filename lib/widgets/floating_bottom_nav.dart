@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
-import '../core/config/app_image_urls.dart';
+import 'package:provider/provider.dart';
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_shadows.dart';
 import '../core/theme/app_text_styles.dart';
+import '../providers/user_provider.dart';
 import 'profile_avatar.dart';
 
 /// The bottom navigation bar shared by every authenticated screen: Home,
@@ -137,11 +138,19 @@ class _ProfileNavItem extends StatelessWidget {
     return GestureDetector(
       onTap: () => onTap(index),
       behavior: HitTestBehavior.opaque,
-      child: ProfileAvatar(
-        url: AppImageUrls.mockUserAvatar,
-        size: 36,
-        borderColor: isActive ? AppColors.glassAccentPink : Colors.transparent,
-        borderWidth: isActive ? 2 : 0,
+      // The signed-in user's real photo (an icon until they add one).
+      child: Selector<UserProvider, String?>(
+        selector: (_, userProv) => userProv.user?.avatarUrl,
+        builder: (context, avatarUrl, _) => ProfileAvatar(
+          url: avatarUrl,
+          size: 36,
+          // Also the colour of the placeholder icon, so it stays visible when
+          // there is no photo and no ring.
+          borderColor: isActive
+              ? AppColors.glassAccentPink
+              : AppColors.glassOnSurfaceFaint,
+          borderWidth: isActive ? 2 : 0,
+        ),
       ),
     );
   }

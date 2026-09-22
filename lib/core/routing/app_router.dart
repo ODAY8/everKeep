@@ -1,6 +1,7 @@
 import 'package:everkeep/core/routing/auth_guard.dart';
 import 'package:everkeep/features/accounts/presentation/screens/accounts_screen.dart';
 import 'package:everkeep/features/auth/presentation/screens/forgot_password_screen.dart';
+import 'package:everkeep/features/auth/presentation/screens/reset_password_screen.dart';
 import 'package:everkeep/features/auth/presentation/screens/sign_in_screen.dart';
 import 'package:everkeep/features/auth/presentation/screens/sign_up_screen.dart';
 import 'package:everkeep/features/auth/presentation/screens/welcome_screen.dart';
@@ -18,12 +19,17 @@ import 'package:everkeep/features/wishes/presentation/screens/wishes_screen.dart
 import 'package:flutter/material.dart';
 
 class AppRouter {
+  /// Lets code outside the widget tree (a deep link, a session event) navigate.
+  static final GlobalKey<NavigatorState> navigatorKey =
+      GlobalKey<NavigatorState>();
+
   static const String splash = '/';
   static const String onboarding = '/onboarding';
   static const String welcome = '/welcome';
   static const String signIn = '/sign-in';
   static const String signUp = '/sign-up';
   static const String forgotPassword = '/forgot-password';
+  static const String resetPassword = '/reset-password';
   static const String home = '/home';
   static const String vault = '/vault';
   static const String documents = '/documents';
@@ -45,6 +51,7 @@ class AppRouter {
       AppRouter.signIn => const SignInScreen(),
       AppRouter.signUp => const SignUpScreen(),
       AppRouter.forgotPassword => const ForgotPasswordScreen(),
+      AppRouter.resetPassword => const ResetPasswordScreen(),
       AppRouter.home => _guarded(const MainShell()),
       AppRouter.vault => _guarded(const VaultScreen()),
       AppRouter.documents => _guarded(const DocumentsScreen()),

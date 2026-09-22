@@ -22,7 +22,8 @@ class Recorded {
   dynamic get json => body.isEmpty ? null : jsonDecode(body);
 
   @override
-  String toString() => '$method ${url.path}${url.hasQuery ? '?${url.query}' : ''}';
+  String toString() =>
+      '$method ${url.path}${url.hasQuery ? '?${url.query}' : ''}';
 }
 
 typedef Route = FutureOr<http.Response> Function(Recorded request);
@@ -40,7 +41,11 @@ http.Response errorResponse(int status, Map<String, Object?> body) =>
 /// A GoTrue (Auth) error, in the shape the real server uses:
 /// `{"code": <http status>, "error_code": "...", "msg": "..."}`.
 http.Response authError(int status, String errorCode, String message) =>
-    jsonResponse({'code': status, 'error_code': errorCode, 'msg': message}, status: status);
+    jsonResponse({
+      'code': status,
+      'error_code': errorCode,
+      'msg': message,
+    }, status: status);
 
 /// In-memory stand-in for the storage supabase_flutter provides in the real
 /// app (SharedPreferences) so the PKCE sign-in flow can run in tests.
@@ -126,9 +131,8 @@ class FakeSupabase {
     requests.clear();
   }
 
-  Iterable<Recorded> where(String method, String pathContains) => requests.where(
-    (r) => r.method == method && r.path.contains(pathContains),
-  );
+  Iterable<Recorded> where(String method, String pathContains) => requests
+      .where((r) => r.method == method && r.path.contains(pathContains));
 
   Recorded single(String method, String pathContains) {
     final matches = where(method, pathContains).toList();
@@ -151,15 +155,23 @@ http.Response sessionResponse({
   String userId = testUserId,
   String email = 'alex@example.com',
   String name = 'Alex Rivera',
+  bool emailConfirmed = true,
 }) {
-  final exp = DateTime.now().add(const Duration(hours: 1)).millisecondsSinceEpoch ~/ 1000;
+  final exp =
+      DateTime.now().add(const Duration(hours: 1)).millisecondsSinceEpoch ~/
+      1000;
   return jsonResponse({
     'access_token': fakeJwt(userId: userId, exp: exp),
     'token_type': 'bearer',
     'expires_in': 3600,
     'expires_at': exp,
     'refresh_token': 'refresh-token',
-    'user': authUserJson(userId: userId, email: email, name: name),
+    'user': authUserJson(
+      userId: userId,
+      email: email,
+      name: name,
+      emailConfirmed: emailConfirmed,
+    ),
   });
 }
 
@@ -168,11 +180,13 @@ Map<String, Object?> authUserJson({
   String email = 'alex@example.com',
   String name = 'Alex Rivera',
   bool identities = true,
+  bool emailConfirmed = true,
 }) => {
   'id': userId,
   'aud': 'authenticated',
   'role': 'authenticated',
   'email': email,
+  if (emailConfirmed) 'email_confirmed_at': '2026-01-01T00:00:00Z',
   'app_metadata': {'provider': 'email'},
   'user_metadata': {'full_name': name},
   'identities': identities

@@ -38,6 +38,8 @@ dependencies:
   google_fonts: ^8.2.1
   supabase_flutter: ^2.17.2
   http: ^1.6.0
+  file_picker: ^13.1.0
+  url_launcher: ^6.3.2
 
 dev_dependencies:
   flutter_test:
@@ -64,6 +66,10 @@ flutter:
   # To add assets to your application, add an assets section, like this:
   assets:
     - assets/images/
+    # Figtree and Young Serif, bundled so text never waits on (or fails without)
+    # a font download. google_fonts finds these by name (e.g. Figtree-Bold.ttf).
+    # Both are SIL Open Font License; the license files sit alongside.
+    - google_fonts/
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

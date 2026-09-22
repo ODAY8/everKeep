@@ -1,10 +1,9 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- Needed in release builds: google_fonts downloads Figtree and Young Serif
-         at runtime, and the backend calls will need it too. Flutter only adds
+    <!-- Needed in release builds to reach the Supabase backend. Flutter only adds
          this permission to the debug/profile manifests by default. -->
     <uses-permission android:name="android.permission.INTERNET"/>
     <application
-        android:label="everkeep"
+        android:label="Everkeep"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity
@@ -28,12 +27,27 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
+            <!-- Links in Supabase's emails (confirm your email, reset your password)
+                 open the app here. The scheme/host must match AuthRedirect in
+                 lib/core/config/auth_redirect.dart and be listed under Redirect URLs
+                 in the Supabase dashboard. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="com.example.everkeep" android:host="login-callback"/>
+            </intent-filter>
         </activity>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+        <!-- supabase_flutter handles the email links itself. Flutter's own deep-link
+             routing would otherwise also react to them and navigate to a bogus route. -->
+        <meta-data
+            android:name="flutter_deeplinking_enabled"
+            android:value="false" />
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and

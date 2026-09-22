@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/widgets.dart';
 import 'package:provider/provider.dart';
 
+import '../routing/app_router.dart';
 import '../../providers/account_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/document_provider.dart';
@@ -31,7 +32,12 @@ class SessionCoordinator {
   final TrustedContactProvider contacts;
   final SettingsProvider settings;
 
+  /// Called once when the user arrives from a password-reset email link, so the
+  /// app can show the "choose a new password" screen.
+  final VoidCallback? onPasswordRecovery;
+
   bool _wasAuthenticated;
+  bool _recoveryHandled = false;
 
   SessionCoordinator({
     required this.auth,
@@ -41,10 +47,12 @@ class SessionCoordinator {
     required this.accounts,
     required this.contacts,
     required this.settings,
+    this.onPasswordRecovery,
   }) : _wasAuthenticated = auth.isAuthenticated {
     auth.addListener(_onAuthChanged);
     documents.addListener(_syncVaultCounts);
     accounts.addListener(_syncVaultCounts);
+    contacts.addListener(_syncVaultCounts);
     if (_wasAuthenticated) _onSignedIn();
   }
 
@@ -52,9 +60,19 @@ class SessionCoordinator {
     auth.removeListener(_onAuthChanged);
     documents.removeListener(_syncVaultCounts);
     accounts.removeListener(_syncVaultCounts);
+    contacts.removeListener(_syncVaultCounts);
   }
 
   void _onAuthChanged() {
+    if (auth.recoveryPending) {
+      if (!_recoveryHandled) {
+        _recoveryHandled = true;
+        onPasswordRecovery?.call();
+      }
+    } else {
+      _recoveryHandled = false;
+    }
+
     final isAuthenticated = auth.isAuthenticated;
     if (isAuthenticated == _wasAuthenticated) return;
     _wasAuthenticated = isAuthenticated;
@@ -94,7 +112,9 @@ class SessionCoordinator {
   void _syncVaultCounts() {
     vault.updateLiveCounts(
       documents: documents.hasFetched ? documents.count : null,
-      passwords: accounts.hasFetched ? accounts.count : null,
+      accounts: accounts.hasFetched ? accounts.count : null,
+      banking: accounts.hasFetched ? accounts.bankingCount : null,
+      contacts: contacts.hasFetched ? contacts.count : null,
     );
   }
 }
@@ -124,6 +144,9 @@ class _SessionSyncState extends State<SessionSync> {
       accounts: context.read<AccountProvider>(),
       contacts: context.read<TrustedContactProvider>(),
       settings: context.read<SettingsProvider>(),
+      onPasswordRecovery: () => AppRouter.navigatorKey.currentState?.pushNamed(
+        AppRouter.resetPassword,
+      ),
     );
   }
 

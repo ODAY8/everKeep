@@ -32,7 +32,8 @@ void main() {
     });
 
     test('SignIn fails when the backend rejects the credentials', () async {
-      final repo = FakeAuthRepository()..failWith = 'Incorrect email or password.';
+      final repo = FakeAuthRepository()
+        ..failWith = 'Incorrect email or password.';
       final auth = AuthProvider(authRepository: repo);
       final success = await auth.signIn(
         email: 'test@example.com',
@@ -156,7 +157,11 @@ void main() {
       final vaultProv = VaultProvider(vaultRepository: FakeVaultRepository());
       await vaultProv.fetchVaultSummary();
       expect(vaultProv.vaultSummary.totalItems, 92);
-      expect(vaultProv.vaultSummary.securityScore, 94);
+      // Derived from what the summary holds: email confirmed + a trusted
+      // person is 2 of 3 safeguards.
+      expect(vaultProv.vaultSummary.securityScore, 67);
+      expect(vaultProv.vaultSummary.securityScoreLabel, 'Good — 67/100');
+      expect(vaultProv.vaultSummary.legacyProgress, 1.0);
     });
   });
 

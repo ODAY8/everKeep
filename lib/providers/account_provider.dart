@@ -18,18 +18,27 @@ class AccountProvider extends ChangeNotifier with SessionScoped {
   List<AccountItem> get favoriteAccounts =>
       List.unmodifiable(_accounts.where((a) => a.isFavorite));
   int get count => _accounts.length;
+
+  /// Accounts in the Banking category (the vault's "Financials").
+  int get bankingCount => _accounts.where((a) => a.category == 'Banking').length;
   bool get isLoading => _isLoading;
   String? get error => _error;
   bool get hasFetched => _hasFetched;
   bool get isEmpty => _accounts.isEmpty;
 
-  List<AccountItem> filterByCategory(String category) {
-    if (category.isEmpty || category == 'All') {
-      return accounts;
-    }
-    return _accounts
-        .where((acc) => acc.category.toLowerCase() == category.toLowerCase())
-        .toList();
+  /// Accounts in [category] ("All" or empty for every category) whose name or
+  /// username contains [query] (ignoring case).
+  List<AccountItem> filterByCategory(String category, {String query = ''}) {
+    final needle = query.trim().toLowerCase();
+    final anyCategory = category.isEmpty || category == 'All';
+    return _accounts.where((acc) {
+      if (!anyCategory && acc.category.toLowerCase() != category.toLowerCase()) {
+        return false;
+      }
+      if (needle.isEmpty) return true;
+      return acc.title.toLowerCase().contains(needle) ||
+          (acc.username?.toLowerCase().contains(needle) ?? false);
+    }).toList();
   }
 
   Future<void> fetchAccounts() async {

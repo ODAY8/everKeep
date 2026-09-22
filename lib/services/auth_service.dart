@@ -3,9 +3,22 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' as supa;
 
+import '../core/config/auth_redirect.dart';
 import '../core/supabase/app_supabase.dart';
 import '../core/supabase/supabase_errors.dart';
 import '../models/user.dart';
+
+/// Things that happen to the session outside a screen's own request.
+enum AuthSessionEvent {
+  /// A session began — including via the link in a confirmation email.
+  signedIn,
+
+  /// The session ended: sign-out, expiry, or revoked elsewhere.
+  signedOut,
+
+  /// The user followed a password-reset link and must choose a new password.
+  passwordRecovery,
+}
 
 /// Contract for the authentication backend.
 abstract class AuthService {
@@ -20,15 +33,23 @@ abstract class AuthService {
     required String password,
   });
   Future<void> signOut();
+
+  /// Ends this session and every other session of the same account.
+  Future<void> signOutEverywhere();
   Future<bool> sendPasswordReset({required String email});
+
+  /// Sets a new password for the signed-in user.
+  Future<void> updatePassword(String newPassword);
+
+  /// Starts an email change. Supabase emails a confirmation link; the address
+  /// only changes once it is followed.
+  Future<void> updateEmail(String newEmail);
 
   /// The user of an existing, still-valid session, or null if there isn't one.
   Future<User?> restoreSession();
 
-  /// Fires when the session ends for any reason: the user signed out, the
-  /// session expired, or it was revoked (for example after a password change
-  /// elsewhere).
-  Stream<void> get sessionEnded;
+  /// Session changes the app should react to. See [AuthSessionEvent].
+  Stream<AuthSessionEvent> get events;
 }
 
 /// [AuthService] backed by Supabase Auth (email + password).
@@ -68,6 +89,8 @@ class AuthServiceImpl implements AuthService {
         password: password,
         // Read by the database trigger that creates the `profiles` row.
         data: {'full_name': name.trim()},
+        // Where the "confirm your email" link sends the user: back into the app.
+        emailRedirectTo: AuthRedirect.url,
       );
       final user = response.user;
       if (user == null) {
@@ -75,8 +98,8 @@ class AuthServiceImpl implements AuthService {
       }
 
       // With email confirmation on, signing up an address that is already
-      // registered doesn't error (that would reveal which emails have
-      // accounts); it returns a user with no identities instead.
+      // registered doesn't error (that would reveal which emails exist); it
+      // returns a user with no identities instead.
       if (user.identities != null && user.identities!.isEmpty) {
         throw const BackendException(
           'An account with this email already exists.',
@@ -105,11 +128,47 @@ class AuthServiceImpl implements AuthService {
   }
 
   @override
+  Future<void> signOutEverywhere() async {
+    try {
+      await _client.auth.signOut(scope: supa.SignOutScope.global);
+    } on Exception catch (error) {
+      if (kDebugMode) debugPrint('Global sign-out failed: $error');
+      // Unlike a normal sign-out, the *other* devices are the whole point, so
+      // a failed server call must be reported, not swallowed. This device is
+      // already signed out at this point.
+      throw const BackendException(
+        'You\'re signed out here, but we couldn\'t reach the server to sign '
+        'out your other devices. Sign in and try again when you\'re online.',
+      );
+    }
+  }
+
+  @override
   Future<bool> sendPasswordReset({required String email}) {
     return guardBackend(() async {
-      await _client.auth.resetPasswordForEmail(email.trim());
+      await _client.auth.resetPasswordForEmail(
+        email.trim(),
+        redirectTo: AuthRedirect.url,
+      );
       // Supabase answers the same whether or not the address has an account.
       return true;
+    });
+  }
+
+  @override
+  Future<void> updatePassword(String newPassword) {
+    return guardBackend(() async {
+      await _client.auth.updateUser(supa.UserAttributes(password: newPassword));
+    });
+  }
+
+  @override
+  Future<void> updateEmail(String newEmail) {
+    return guardBackend(() async {
+      await _client.auth.updateUser(
+        supa.UserAttributes(email: newEmail.trim()),
+        emailRedirectTo: AuthRedirect.url,
+      );
     });
   }
 
@@ -143,9 +202,21 @@ class AuthServiceImpl implements AuthService {
   }
 
   @override
-  Stream<void> get sessionEnded => _client.auth.onAuthStateChange
-      .where((state) => state.event == supa.AuthChangeEvent.signedOut)
-      .map((_) {});
+  Stream<AuthSessionEvent> get events => _client.auth.onAuthStateChange
+      .map((state) {
+        switch (state.event) {
+          case supa.AuthChangeEvent.signedIn:
+            return AuthSessionEvent.signedIn;
+          case supa.AuthChangeEvent.signedOut:
+            return AuthSessionEvent.signedOut;
+          case supa.AuthChangeEvent.passwordRecovery:
+            return AuthSessionEvent.passwordRecovery;
+          default:
+            return null; // token refreshes, initial session, user updates
+        }
+      })
+      .where((event) => event != null)
+      .cast<AuthSessionEvent>();
 
   User _toAppUser(supa.User user) {
     return User.fromAuth(
@@ -153,6 +224,7 @@ class AuthServiceImpl implements AuthService {
       email: user.email,
       metadataName: (user.userMetadata?['full_name'] as String?)?.trim() ?? '',
       lastLogin: DateTime.tryParse(user.lastSignInAt ?? '')?.toLocal(),
+      emailVerified: user.emailConfirmedAt != null,
     );
   }
 }

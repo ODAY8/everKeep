@@ -1,32 +1,175 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:everkeep/core/config/app_info.dart';
+import 'package:everkeep/core/config/app_links.dart';
 import 'package:everkeep/core/routing/app_router.dart';
+import 'package:everkeep/core/session/sign_out.dart';
 import 'package:everkeep/core/theme/app_colors.dart';
 import 'package:everkeep/core/theme/app_text_styles.dart';
-import 'package:everkeep/core/session/sign_out.dart';
+import 'package:everkeep/core/utils/external_link.dart';
+import 'package:everkeep/core/utils/validators.dart';
+import 'package:everkeep/providers/auth_provider.dart';
 import 'package:everkeep/providers/user_provider.dart';
+import 'package:everkeep/features/settings/presentation/widgets/change_password_sheet.dart';
+import 'package:everkeep/widgets/feedback.dart';
 import 'package:everkeep/widgets/glass/glass_list_row.dart';
 import 'package:everkeep/widgets/glass/glass_page_header.dart';
 import 'package:everkeep/widgets/glass/glass_primary_button.dart';
 import 'package:everkeep/widgets/glass/glass_scaffold.dart';
+import 'package:everkeep/widgets/glass/glass_sheet.dart';
 
-class SettingsScreen extends StatefulWidget {
+/// Account, data and support settings. Every row does something: the account
+/// rows change real account data, and the support/legal rows only appear when
+/// their link has been configured (see `AppLinks`).
+class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
 
-  @override
-  State<SettingsScreen> createState() => _SettingsScreenState();
-}
+  // ── Account ─────────────────────────────────────────────────────────────────
 
-class _SettingsScreenState extends State<SettingsScreen> {
+  Future<void> _changeEmail(BuildContext context) async {
+    final auth = context.read<AuthProvider>();
+    final saved = await showGlassFormSheet(
+      context,
+      title: 'Change Email',
+      subtitle: 'We\'ll send a confirmation link to the new address. Your email '
+          'changes once you open it.',
+      submitLabel: 'Send Link',
+      fields: [
+        GlassFormField(
+          key: 'email',
+          label: 'New email address',
+          hint: 'you@example.com',
+          keyboardType: TextInputType.emailAddress,
+          validator: (v) => isValidEmail(v) ? null : 'Enter a valid email address',
+        ),
+      ],
+      onSubmit: (values) async {
+        final ok = await auth.updateEmail(values['email']!);
+        return ok ? null : auth.error ?? 'Could not change your email.';
+      },
+    );
+    if (saved && context.mounted) {
+      showAppSnackBar(context, auth.notice ?? 'Check your new email to confirm.');
+    }
+  }
+
+  Future<void> _editPhone(BuildContext context) async {
+    final userProv = context.read<UserProvider>();
+    final current = userProv.user;
+    if (current == null) return;
+
+    final saved = await showGlassFormSheet(
+      context,
+      title: 'Phone Number',
+      subtitle: 'Saved to your profile. It isn\'t verified by text message.',
+      submitLabel: 'Save',
+      fields: [
+        GlassFormField(
+          key: 'phone',
+          label: 'Phone',
+          hint: 'Leave empty to remove',
+          required: false,
+          keyboardType: TextInputType.phone,
+          initialValue: current.phone ?? '',
+        ),
+      ],
+      onSubmit: (values) async {
+        final ok = await userProv.updateUserProfile(
+          current.copyWith(phone: values['phone']),
+        );
+        return ok ? null : userProv.error ?? 'Could not save your number.';
+      },
+    );
+    if (saved && context.mounted) showAppSnackBar(context, 'Phone number saved');
+  }
+
+  // ── Data ────────────────────────────────────────────────────────────────────
+
+  Future<void> _exportData(BuildContext context) async {
+    final userProv = context.read<UserProvider>();
+    showAppSnackBar(context, 'Gathering your data…');
+
+    final json = await userProv.exportData();
+    if (!context.mounted) return;
+    if (json == null) {
+      showAppSnackBar(
+        context,
+        userProv.error ?? 'Could not gather your data.',
+        isError: true,
+      );
+      return;
+    }
+
+    await Clipboard.setData(ClipboardData(text: json));
+    if (!context.mounted) return;
+    showAppSnackBar(
+      context,
+      'Copied to your clipboard. Paste it into a note or file to keep it safe.',
+    );
+  }
+
+  Future<void> _deleteAccount(BuildContext context) async {
+    final userProv = context.read<UserProvider>();
+    final navigator = Navigator.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+
+    final deleted = await showGlassFormSheet(
+      context,
+      title: 'Delete Account',
+      subtitle: 'This permanently deletes your account and everything in it: '
+          'documents, saved accounts, trusted people and your photo. It '
+          'cannot be undone.',
+      submitLabel: 'Delete Everything',
+      fields: [
+        GlassFormField(
+          key: 'confirm',
+          label: 'Type DELETE to confirm',
+          hint: 'DELETE',
+          validator: (v) => v.trim() == 'DELETE' ? null : 'Type DELETE exactly',
+        ),
+      ],
+      onSubmit: (values) async {
+        final ok = await userProv.deleteAccount();
+        return ok ? null : userProv.error ?? 'Could not delete your account.';
+      },
+    );
+
+    if (deleted) {
+      navigator.pushNamedAndRemoveUntil(AppRouter.welcome, (route) => false);
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Your account has been deleted.')),
+      );
+    }
+  }
+
+  // ── Support / About ─────────────────────────────────────────────────────────
+
+  Future<void> _open(BuildContext context, Uri? uri) async {
+    if (uri == null) return;
+    final opened = await openExternal(uri);
+    if (!opened && context.mounted) {
+      showAppSnackBar(context, 'Couldn\'t open that link.', isError: true);
+    }
+  }
+
+  void _about(BuildContext context) {
+    showAboutDialog(
+      context: context,
+      applicationName: appName,
+      applicationVersion: appVersion,
+      applicationLegalese: 'A digital legacy vault.',
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final userProv = context.watch<UserProvider>();
+    final user = userProv.user;
     final email = userProv.displayEmail.isNotEmpty
         ? userProv.displayEmail
         : 'Not set';
-    final phone = (userProv.user?.phone?.isNotEmpty ?? false)
-        ? userProv.user!.phone!
-        : 'Not set';
+    final phone = (user?.phone?.isNotEmpty ?? false) ? user!.phone! : 'Not set';
 
     return GlassScaffold(
       child: Column(
@@ -37,78 +180,61 @@ class _SettingsScreenState extends State<SettingsScreen> {
           _buildSection('ACCOUNT', [
             GlassListRow(
               label: 'Email',
-              subtitle: email,
-              onTap: () {},
+              subtitle: (user?.emailVerified ?? true) ? email : '$email · Not confirmed',
+              onTap: () => _changeEmail(context),
             ),
             GlassListRow(
               label: 'Password',
-              subtitle: 'Last changed 3 months ago',
-              onTap: () => Navigator.of(context).pushNamed(AppRouter.security),
+              subtitle: 'Change your password',
+              onTap: () => showChangePasswordSheet(context),
             ),
             GlassListRow(
-              label: 'Phone Verification',
+              label: 'Phone',
               subtitle: phone,
-              onTap: () {},
+              onTap: () => _editPhone(context),
             ),
           ]),
           const SizedBox(height: 20),
-          _buildSection('PRIVACY', [
-            GlassListRow(
-              label: 'Data Sharing',
-              subtitle: 'Manage third-party sharing',
-              onTap: () {},
-            ),
-            GlassListRow(
-              label: 'Visibility',
-              subtitle: 'Who can find your profile',
-              onTap: () {},
-            ),
+          _buildSection('YOUR DATA', [
             GlassListRow(
               label: 'Download My Data',
-              subtitle: 'Export a copy of your data',
-              onTap: () {},
+              subtitle: 'Copy everything in your account as JSON',
+              onTap: () => _exportData(context),
             ),
           ]),
-          const SizedBox(height: 20),
-          _buildSection('NOTIFICATIONS', [
-            GlassListRow(
-              label: 'Email Alerts',
-              subtitle: 'Security and activity emails',
-              onTap: () {},
-            ),
-            GlassListRow(
-              label: 'Push Notifications',
-              subtitle: 'On this device',
-              onTap: () {},
-            ),
-            GlassListRow(
-              label: 'Message Reminders',
-              subtitle: 'Scheduled letter reminders',
-              onTap: () {},
-            ),
-          ]),
-          const SizedBox(height: 20),
-          _buildSection('SUPPORT', [
-            GlassListRow(
-              label: 'Help Center',
-              subtitle: 'Guides and FAQs',
-              onTap: () {},
-            ),
-            GlassListRow(
-              label: 'Contact Us',
-              subtitle: 'Get in touch with our team',
-              onTap: () {},
-            ),
-            GlassListRow(label: 'FAQ', onTap: () {}),
-          ]),
+          if (AppLinks.hasSupport) ...[
+            const SizedBox(height: 20),
+            _buildSection('SUPPORT', [
+              if (AppLinks.hasHelp)
+                GlassListRow(
+                  label: 'Help Center',
+                  subtitle: 'Guides and FAQs',
+                  onTap: () => _open(context, AppLinks.webUri(AppLinks.helpUrl)),
+                ),
+              if (AppLinks.hasContact)
+                GlassListRow(
+                  label: 'Contact Us',
+                  subtitle: AppLinks.supportEmail,
+                  onTap: () => _open(context, AppLinks.contactUri),
+                ),
+            ]),
+          ],
           const SizedBox(height: 20),
           _buildSection('ABOUT', [
-            GlassListRow(label: 'Terms of Service', onTap: () {}),
-            GlassListRow(label: 'Privacy Policy', onTap: () {}),
+            if (AppLinks.termsUrl.isNotEmpty)
+              GlassListRow(
+                label: 'Terms of Service',
+                onTap: () => _open(context, AppLinks.webUri(AppLinks.termsUrl)),
+              ),
+            if (AppLinks.privacyUrl.isNotEmpty)
+              GlassListRow(
+                label: 'Privacy Policy',
+                onTap: () => _open(context, AppLinks.webUri(AppLinks.privacyUrl)),
+              ),
             GlassListRow(
-              label: 'About Everkeep',
-              subtitle: 'Version 1.0.0',
-              onTap: () {},
+              label: 'About $appName',
+              subtitle: 'Version $appVersion',
+              onTap: () => _about(context),
             ),
           ]),
           const SizedBox(height: 24),
@@ -119,7 +245,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           const SizedBox(height: 16),
           Center(
             child: GestureDetector(
-              onTap: () {},
+              onTap: () => _deleteAccount(context),
               child: Text(
                 'Delete Account',
                 style: AppTextStyles.labelMedium.copyWith(

@@ -53,7 +53,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
   }
 
   bool _isValidEmail(String email) =>
-      RegExp(r'^[\w.+\-]+@[a-zA-Z0-9\-]+\.[a-zA-Z]{2,}$').hasMatch(email);
+      RegExp(r'^[\w.+\-]+@([a-zA-Z0-9\-]+\.)+[a-zA-Z]{2,}$').hasMatch(email);
 
   Future<void> _submit() async {
     final name = _nameController.text.trim();

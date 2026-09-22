@@ -38,7 +38,7 @@ class _SignInScreenState extends State<SignInScreen> {
   }
 
   bool _isValidEmail(String email) {
-    return RegExp(r'^[\w.+\-]+@[a-zA-Z0-9\-]+\.[a-zA-Z]{2,}$').hasMatch(email);
+    return RegExp(r'^[\w.+\-]+@([a-zA-Z0-9\-]+\.)+[a-zA-Z]{2,}$').hasMatch(email);
   }
 
   Future<void> _submit() async {

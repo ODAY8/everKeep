@@ -9,7 +9,16 @@ class GlassSearchBar extends StatelessWidget {
   final String hintText;
   final ValueChanged<String>? onChanged;
 
-  const GlassSearchBar({super.key, required this.hintText, this.onChanged});
+  /// Open the keyboard as soon as the bar appears (for a search that was just
+  /// asked for).
+  final bool autofocus;
+
+  const GlassSearchBar({
+    super.key,
+    required this.hintText,
+    this.onChanged,
+    this.autofocus = false,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -27,6 +36,8 @@ class GlassSearchBar extends StatelessWidget {
           const SizedBox(width: 10),
           Expanded(
             child: TextField(
+              autofocus: autofocus,
+              textInputAction: TextInputAction.search,
               onChanged: onChanged,
               style: AppTextStyles.bodyMedium.copyWith(
                 color: AppColors.glassOnSurface,

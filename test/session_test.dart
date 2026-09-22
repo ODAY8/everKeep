@@ -64,19 +64,21 @@ void main() {
     setUp(() => h = Harness());
     tearDown(() => h.dispose());
 
-    test('sign-up hands the new user to UserProvider (not a stock persona)',
-        () async {
-      await h.auth.signUp(
-        name: 'Alex Rivera',
-        email: 'alex@example.com',
-        password: 'secret1',
-      );
-      await pumpEventQueue();
+    test(
+      'sign-up hands the new user to UserProvider (not a stock persona)',
+      () async {
+        await h.auth.signUp(
+          name: 'Alex Rivera',
+          email: 'alex@example.com',
+          password: 'secret1',
+        );
+        await pumpEventQueue();
 
-      expect(h.user.displayName, 'Alex Rivera');
-      expect(h.user.firstName, 'Alex');
-      expect(h.user.displayEmail, 'alex@example.com');
-    });
+        expect(h.user.displayName, 'Alex Rivera');
+        expect(h.user.firstName, 'Alex');
+        expect(h.user.displayEmail, 'alex@example.com');
+      },
+    );
 
     test('sign-in loads the data the dashboard shows', () async {
       await h.signIn();
@@ -92,7 +94,9 @@ void main() {
 
     test('sign-out resets every user-scoped provider', () async {
       await h.signIn();
-      await h.documents.addDocument(FakeDocumentRepository.doc('x', 'Mine.pdf'));
+      await h.documents.addDocument(
+        FakeDocumentRepository.doc('x', 'Mine.pdf'),
+      );
       expect(h.documents.count, 4);
 
       final signedOut = await h.auth.signOut();
@@ -155,14 +159,18 @@ void main() {
 
     test('vault counts follow the real document and account lists', () async {
       await h.signIn();
-      // Defaults are 92 total / 11 documents / 24 passwords.
+      // The backend's figures (FakeVaultRepository.sample) are 92 total, 11
+      // documents and 30 accounts (24 passwords + 6 financials). The live
+      // lists hold 3 documents and 2 accounts, neither in Banking.
       expect(h.vault.vaultSummary.documentsCount, 3);
       expect(h.vault.vaultSummary.passwordsCount, 2);
-      expect(h.vault.vaultSummary.totalItems, 92 - 11 - 24 + 3 + 2);
+      expect(h.vault.vaultSummary.financialsCount, 0);
+      expect(h.vault.vaultSummary.trustedContactsCount, 2);
+      expect(h.vault.vaultSummary.totalItems, 92 + (3 - 11) + (2 - 30));
 
       await h.documents.addDocument(FakeDocumentRepository.doc('n', 'New.pdf'));
       expect(h.vault.vaultSummary.documentsCount, 4);
-      expect(h.vault.vaultSummary.totalItems, 92 - 11 - 24 + 4 + 2);
+      expect(h.vault.vaultSummary.totalItems, 92 + (4 - 11) + (2 - 30));
 
       await h.documents.deleteDocument('n');
       expect(h.vault.vaultSummary.documentsCount, 3);
@@ -209,28 +217,32 @@ void main() {
       expect(docs.count, 3);
     });
 
-    test('a failed favorite rolls back the right item after the list shifts',
-        () async {
-      final repo = FakeAccountRepository();
-      final accounts = AccountProvider(accountRepository: repo);
-      await accounts.fetchAccounts(); // [a1, a2]
+    test(
+      'a failed favorite rolls back the right item after the list shifts',
+      () async {
+        final repo = FakeAccountRepository();
+        final accounts = AccountProvider(accountRepository: repo);
+        await accounts.fetchAccounts(); // [a1, a2]
 
-      final hold = Completer<void>();
-      repo.pendingToggle = hold;
-      final toggle = accounts.toggleFavorite('a2');
-      expect(accounts.accounts.last.isFavorite, isTrue); // optimistic
+        final hold = Completer<void>();
+        repo.pendingToggle = hold;
+        final toggle = accounts.toggleFavorite('a2');
+        expect(accounts.accounts.last.isFavorite, isTrue); // optimistic
 
-      // Something is inserted at the top while the request is in flight, so
-      // a2 is no longer at the index it had when the toggle started.
-      await accounts.addAccount(FakeAccountRepository.account('new', 'Netflix'));
-      hold.completeError(Exception('Server error'));
+        // Something is inserted at the top while the request is in flight, so
+        // a2 is no longer at the index it had when the toggle started.
+        await accounts.addAccount(
+          FakeAccountRepository.account('new', 'Netflix'),
+        );
+        hold.completeError(Exception('Server error'));
 
-      expect(await toggle, isFalse);
-      expect(accounts.accounts.map((a) => a.id), ['new', 'a1', 'a2']);
-      expect(accounts.accounts[2].isFavorite, isFalse); // a2 reverted
-      expect(accounts.accounts[1].title, 'Bank'); // a1 untouched
-      expect(accounts.error, 'Server error');
-    });
+        expect(await toggle, isFalse);
+        expect(accounts.accounts.map((a) => a.id), ['new', 'a1', 'a2']);
+        expect(accounts.accounts[2].isFavorite, isFalse); // a2 reverted
+        expect(accounts.accounts[1].title, 'Bank'); // a1 untouched
+        expect(accounts.error, 'Server error');
+      },
+    );
 
     test('a failed settings save reverts only the flag that changed', () async {
       // Start with every protection on (they default to off).
@@ -269,19 +281,21 @@ void main() {
       expect(settings.twoFactorEnabled, isTrue);
     });
 
-    test('clearError also clears the error status a failed sign-in left',
-        () async {
-      final repo = FakeAuthRepository()..failWith = 'Invalid credentials';
-      final auth = AuthProvider(authRepository: repo);
+    test(
+      'clearError also clears the error status a failed sign-in left',
+      () async {
+        final repo = FakeAuthRepository()..failWith = 'Invalid credentials';
+        final auth = AuthProvider(authRepository: repo);
 
-      await auth.signIn(email: 'a@b.co', password: 'secret1');
-      expect(auth.status, AuthStatus.error);
-      expect(auth.error, 'Invalid credentials');
+        await auth.signIn(email: 'a@b.co', password: 'secret1');
+        expect(auth.status, AuthStatus.error);
+        expect(auth.error, 'Invalid credentials');
 
-      auth.clearError();
-      expect(auth.error, isNull);
-      expect(auth.status, AuthStatus.unauthenticated);
-    });
+        auth.clearError();
+        expect(auth.error, isNull);
+        expect(auth.status, AuthStatus.unauthenticated);
+      },
+    );
   });
 
   group('Session restore', () {
@@ -314,25 +328,27 @@ void main() {
   });
 
   group('Real session lifecycle', () {
-    test('the backend ending the session signs the app out and wipes data',
-        () async {
-      final h = Harness();
-      addTearDown(h.dispose);
-      await h.signIn();
-      expect(h.auth.isAuthenticated, isTrue);
-      expect(h.documents.count, 3);
+    test(
+      'the backend ending the session signs the app out and wipes data',
+      () async {
+        final h = Harness();
+        addTearDown(h.dispose);
+        await h.signIn();
+        expect(h.auth.isAuthenticated, isTrue);
+        expect(h.documents.count, 3);
 
-      // Expiry, revocation, or sign-out from another device.
-      h.authRepo.endSession();
-      await pumpEventQueue();
+        // Expiry, revocation, or sign-out from another device.
+        h.authRepo.endSession();
+        await pumpEventQueue();
 
-      expect(h.auth.isAuthenticated, isFalse);
-      expect(h.auth.currentUser, isNull);
-      expect(h.user.user, isNull);
-      expect(h.documents.documents, isEmpty);
-      expect(h.accounts.accounts, isEmpty);
-      expect(h.contacts.contacts, isEmpty);
-    });
+        expect(h.auth.isAuthenticated, isFalse);
+        expect(h.auth.currentUser, isNull);
+        expect(h.user.user, isNull);
+        expect(h.documents.documents, isEmpty);
+        expect(h.accounts.accounts, isEmpty);
+        expect(h.contacts.contacts, isEmpty);
+      },
+    );
 
     test('an ended session while signed out changes nothing', () async {
       final h = Harness();
@@ -347,30 +363,32 @@ void main() {
       expect(h.auth.status, AuthStatus.initial);
     });
 
-    test('sign-up that needs email confirmation is not treated as signed in',
-        () async {
-      final h = Harness();
-      addTearDown(h.dispose);
-      h.authRepo.signUpNeedsConfirmation = true;
+    test(
+      'sign-up that needs email confirmation is not treated as signed in',
+      () async {
+        final h = Harness();
+        addTearDown(h.dispose);
+        h.authRepo.signUpNeedsConfirmation = true;
 
-      final signedIn = await h.auth.signUp(
-        name: 'Alex Rivera',
-        email: 'alex@example.com',
-        password: 'secret1',
-      );
-      await pumpEventQueue();
+        final signedIn = await h.auth.signUp(
+          name: 'Alex Rivera',
+          email: 'alex@example.com',
+          password: 'secret1',
+        );
+        await pumpEventQueue();
 
-      expect(signedIn, isFalse);
-      expect(h.auth.isAuthenticated, isFalse);
-      expect(h.auth.currentUser, isNull);
-      expect(h.auth.notice, contains('confirm'));
-      expect(h.auth.error, isNull);
-      expect(h.user.user, isNull);
-      expect(h.documents.hasFetched, isFalse); // nothing was loaded
+        expect(signedIn, isFalse);
+        expect(h.auth.isAuthenticated, isFalse);
+        expect(h.auth.currentUser, isNull);
+        expect(h.auth.notice, contains('confirm'));
+        expect(h.auth.error, isNull);
+        expect(h.user.user, isNull);
+        expect(h.documents.hasFetched, isFalse); // nothing was loaded
 
-      h.auth.clearError(); // e.g. the sign-in screen opening
-      expect(h.auth.notice, isNull);
-    });
+        h.auth.clearError(); // e.g. the sign-in screen opening
+        expect(h.auth.notice, isNull);
+      },
+    );
 
     test('the profile row is loaded after sign-in', () async {
       final h = Harness();
@@ -437,15 +455,17 @@ void main() {
       expect(find.text('welcome screen'), findsNothing);
     });
 
-    testWidgets('redirects instead of showing its child when signed out',
-        (tester) async {
+    testWidgets('redirects instead of showing its child when signed out', (
+      tester,
+    ) async {
       await pumpGuarded(tester, signedIn: false);
       expect(find.text('private content'), findsNothing);
       expect(find.text('welcome screen'), findsOneWidget);
     });
 
-    testWidgets('redirects if the session ends while it is open',
-        (tester) async {
+    testWidgets('redirects if the session ends while it is open', (
+      tester,
+    ) async {
       final auth = await pumpGuarded(tester, signedIn: true);
       expect(find.text('private content'), findsOneWidget);
 

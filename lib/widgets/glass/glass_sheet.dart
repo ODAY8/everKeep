@@ -168,6 +168,9 @@ class GlassFormField {
   final bool required;
   final String initialValue;
 
+  /// Hide what is typed (passwords).
+  final bool obscure;
+
   /// Extra validation for a non-empty value; returns an error message or null.
   final String? Function(String value)? validator;
 
@@ -178,6 +181,7 @@ class GlassFormField {
     this.keyboardType,
     this.required = true,
     this.initialValue = '',
+    this.obscure = false,
     this.validator,
   });
 }
@@ -327,6 +331,7 @@ class _GlassFormSheetState extends State<_GlassFormSheet> {
               label: field.label,
               hintText: field.hint,
               keyboardType: field.keyboardType,
+              obscureText: field.obscure,
               errorText: _errors[field.key],
             ),
             const SizedBox(height: 16),

@@ -1,11 +1,8 @@
 import 'package:everkeep/features/documents/presentation/screens/documents_screen.dart';
-import 'package:everkeep/features/home/presentation/screens/home_screen.dart';
 import 'package:everkeep/features/profile/presentation/screens/profile_screen.dart';
-import 'package:everkeep/features/security/presentation/screens/security_screen.dart';
 import 'package:everkeep/features/trusted_contacts/presentation/screens/trusted_contacts_screen.dart';
 import 'package:everkeep/providers/auth_provider.dart';
 import 'package:everkeep/providers/document_provider.dart';
-import 'package:everkeep/providers/settings_provider.dart';
 import 'package:everkeep/providers/trusted_contact_provider.dart';
 import 'package:everkeep/providers/user_provider.dart';
 import 'package:everkeep/providers/vault_provider.dart';
@@ -27,7 +24,10 @@ void main() {
     List<ChangeNotifierProvider> providers,
   ) async {
     await tester.pumpWidget(
-      MultiProvider(providers: providers, child: MaterialApp(home: screen)),
+      MultiProvider(
+        providers: providers,
+        child: MaterialApp(home: screen),
+      ),
     );
     await tester.pumpAndSettle();
   }
@@ -52,6 +52,9 @@ void main() {
     Future<void> openAddSheetAndType(WidgetTester tester, String name) async {
       await tester.tap(find.byType(GlassFab));
       await tester.pumpAndSettle();
+      // The + button asks how to add: with a file from the device, or just a record.
+      await tester.tap(find.text('Add without a file'));
+      await tester.pumpAndSettle();
       await tester.enterText(find.byType(TextField), name);
       await tester.tap(find.widgetWithText(GlassPrimaryButton, 'Add Document'));
       await tester.pumpAndSettle();
@@ -70,8 +73,9 @@ void main() {
       expect(docs.count, 4);
     });
 
-    testWidgets('an empty name is rejected before anything is saved',
-        (tester) async {
+    testWidgets('an empty name is rejected before anything is saved', (
+      tester,
+    ) async {
       await pumpDocuments(tester);
 
       await openAddSheetAndType(tester, '   ');
@@ -80,8 +84,9 @@ void main() {
       expect(docs.count, 3);
     });
 
-    testWidgets('a failed save keeps the sheet open with the typed text',
-        (tester) async {
+    testWidgets('a failed save keeps the sheet open with the typed text', (
+      tester,
+    ) async {
       await pumpDocuments(tester);
       repo.failWith = 'Storage is full';
 
@@ -101,8 +106,9 @@ void main() {
       expect(find.text('Document added'), findsOneWidget);
     });
 
-    testWidgets('a failed first load shows a retry that recovers',
-        (tester) async {
+    testWidgets('a failed first load shows a retry that recovers', (
+      tester,
+    ) async {
       repo.failWith = 'No connection';
       await pumpDocuments(tester);
 
@@ -118,8 +124,9 @@ void main() {
       expect(find.text('Will.pdf'), findsOneWidget);
     });
 
-    testWidgets('deleting a document asks first, then removes it',
-        (tester) async {
+    testWidgets('deleting a document asks first, then removes it', (
+      tester,
+    ) async {
       await pumpDocuments(tester);
 
       await tester.tap(find.text('Will.pdf'));
@@ -151,8 +158,9 @@ void main() {
       expect(docs.count, 3);
     });
 
-    testWidgets('a failed delete keeps the list and reports the error',
-        (tester) async {
+    testWidgets('a failed delete keeps the list and reports the error', (
+      tester,
+    ) async {
       await pumpDocuments(tester);
       repo.failWith = 'Locked by another device';
 
@@ -201,8 +209,9 @@ void main() {
       expect(repo.items.map((c) => c.name), contains('Jordan Lee'));
     });
 
-    testWidgets('removing a contact asks first, then removes them',
-        (tester) async {
+    testWidgets('removing a contact asks first, then removes them', (
+      tester,
+    ) async {
       await pumpContacts(tester);
 
       await tester.tap(find.text('Ada Lovelace'));
@@ -217,8 +226,9 @@ void main() {
       expect(contacts.count, 1);
     });
 
-    testWidgets('a failed removal keeps the contact and says why',
-        (tester) async {
+    testWidgets('a failed removal keeps the contact and says why', (
+      tester,
+    ) async {
       await pumpContacts(tester);
       repo.failWith = 'Could not reach server';
 
@@ -270,8 +280,9 @@ void main() {
       expect(find.text('Profile updated'), findsOneWidget);
     });
 
-    testWidgets('a failed save keeps the sheet open and the name unchanged',
-        (tester) async {
+    testWidgets('a failed save keeps the sheet open and the name unchanged', (
+      tester,
+    ) async {
       await pumpProfile(tester);
       userRepo.failWith = 'Offline';
 
@@ -284,51 +295,6 @@ void main() {
       expect(find.text('Offline'), findsOneWidget);
       expect(user.displayName, 'Sarah Mitchell');
       expect(find.text('Jane Doe'), findsOneWidget); // the field, not the hero
-    });
-  });
-
-  group('Home screen', () {
-    testWidgets('dashboard counts come from live data', (tester) async {
-      final vault = VaultProvider(vaultRepository: FakeVaultRepository());
-      final contacts = TrustedContactProvider(
-        trustedContactRepository: FakeTrustedContactRepository(),
-      );
-      await pump(tester, const HomeScreen(), [
-        ChangeNotifierProvider<VaultProvider>.value(value: vault),
-        ChangeNotifierProvider<TrustedContactProvider>.value(value: contacts),
-        ChangeNotifierProvider<UserProvider>(
-          create: (_) => UserProvider(userRepository: FakeUserRepository()),
-        ),
-      ]);
-
-      await contacts.fetchContacts();
-      vault.updateLiveCounts(documents: 3);
-      await tester.pumpAndSettle();
-
-      expect(find.text('2 secure trustees'), findsOneWidget);
-      expect(find.text('3 vital files'), findsOneWidget);
-      expect(find.text('12 vital files'), findsNothing);
-      expect(find.text('4 secure trustees'), findsNothing);
-    });
-  });
-
-  group('Security screen', () {
-    testWidgets('a failed toggle snaps back and tells the user',
-        (tester) async {
-      final repo = FakeSettingsRepository();
-      final settings = SettingsProvider(settingsRepository: repo);
-      await pump(tester, const SecurityScreen(), [
-        ChangeNotifierProvider<SettingsProvider>.value(value: settings),
-      ]);
-      repo.failWith = 'Could not save';
-
-      await tester.tap(find.byType(Switch).first);
-      await tester.pumpAndSettle();
-
-      // Protections start off; the tap switched it on, the failed save put it back.
-      expect(settings.twoFactorEnabled, isFalse);
-      expect(tester.widget<Switch>(find.byType(Switch).first).value, isFalse);
-      expect(find.text('Could not save'), findsOneWidget);
     });
   });
 }

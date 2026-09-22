@@ -21,23 +21,23 @@ class VaultServiceImpl implements VaultService {
   @override
   Future<VaultSummary> fetchVaultSummary() {
     return guardBackend(() async {
-      final userId = _client.requireUser.id;
+      final user = _client.requireUser;
 
       // The builders only send their request when awaited, so gather them in
       // Future.wait to run the four queries at once.
       final results = await Future.wait<Object?>([
         _client.from('documents').select('file_size'),
-        _client.from('accounts').select('id'),
+        _client.from('accounts').select('category'),
         _client.from('trusted_contacts').select('id'),
         _client
             .from('security_settings')
             .select()
-            .eq('user_id', userId)
+            .eq('user_id', user.id)
             .maybeSingle(),
       ]);
 
       final documents = (results[0]! as List).cast<Map<String, dynamic>>();
-      final accounts = results[1]! as List;
+      final accounts = (results[1]! as List).cast<Map<String, dynamic>>();
       final contacts = results[2]! as List;
       final settingsRow = results[3] as Map<String, dynamic>?;
 
@@ -45,12 +45,15 @@ class VaultServiceImpl implements VaultService {
         0,
         (sum, row) => sum + ((row['file_size'] as num?)?.toInt() ?? 0),
       );
+      final banking = accounts.where((a) => a['category'] == 'Banking').length;
 
       return VaultSummary.fromData(
         documents: documents.length,
         accounts: accounts.length,
+        bankingAccounts: banking,
         trustedContacts: contacts.length,
         storageBytes: storageBytes,
+        emailVerified: user.emailConfirmedAt != null,
         settings: settingsRow == null
             ? const SecuritySettings()
             : SecuritySettings.fromRow(settingsRow),

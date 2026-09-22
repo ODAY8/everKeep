@@ -4,7 +4,10 @@ import 'package:everkeep/core/routing/app_router.dart';
 import 'package:everkeep/core/theme/app_colors.dart';
 import 'package:everkeep/core/theme/app_radius.dart';
 import 'package:everkeep/core/theme/app_text_styles.dart';
-import 'package:everkeep/providers/settings_provider.dart';
+import 'package:everkeep/features/settings/presentation/widgets/change_password_sheet.dart';
+import 'package:everkeep/models/vault_summary.dart';
+import 'package:everkeep/providers/auth_provider.dart';
+import 'package:everkeep/providers/vault_provider.dart';
 import 'package:everkeep/widgets/fade_slide_in.dart';
 import 'package:everkeep/widgets/feedback.dart';
 import 'package:everkeep/widgets/glass/glass_card.dart';
@@ -12,180 +15,187 @@ import 'package:everkeep/widgets/glass/glass_page_header.dart';
 import 'package:everkeep/widgets/glass/glass_scaffold.dart';
 import 'package:everkeep/widgets/glass/status_badge.dart';
 
-/// Vault-score hero plus the account's security controls — 2FA, biometric
-/// unlock, and login alerts (moved here from Settings), recovery key, and
-/// emergency access. Matches the Figma Security frame.
+/// What protects the account, stated truthfully: the safeguards that are in
+/// place, the ones still to do, and the ones that aren't available yet.
 class SecurityScreen extends StatelessWidget {
   const SecurityScreen({super.key});
 
-  /// Runs a toggle. The provider flips the switch immediately and reverts it
-  /// if saving fails; this just tells the user when that happened.
-  Future<void> _update(
-    BuildContext context,
-    Future<bool> Function(SettingsProvider settings) change,
-  ) async {
-    final settings = context.read<SettingsProvider>();
-    final saved = await change(settings);
-    if (saved || !context.mounted) return;
-    showAppSnackBar(
+  Future<void> _signOutEverywhere(BuildContext context) async {
+    final confirmed = await confirmDestructive(
       context,
-      settings.error ?? 'Could not update this setting.',
-      isError: true,
+      title: 'Sign out everywhere?',
+      message: 'You\'ll be signed out on this device and every other device '
+          'where you\'re signed in.',
+      confirmLabel: 'Sign Out Everywhere',
+    );
+    if (!confirmed || !context.mounted) return;
+
+    final auth = context.read<AuthProvider>();
+    final navigator = Navigator.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+
+    final ok = await auth.signOutEverywhere();
+    // This device is signed out whether or not the other devices could be
+    // reached, so always leave the signed-in area; explain if it half-worked.
+    navigator.pushNamedAndRemoveUntil(AppRouter.welcome, (route) => false);
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(
+          ok
+              ? 'Signed out of all devices.'
+              : auth.error ?? 'Signed out on this device.',
+        ),
+      ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final settingsProv = context.watch<SettingsProvider>();
-
     return GlassScaffold(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const GlassPageHeader(title: 'Security', showBackButton: true),
           const SizedBox(height: 22),
-          FadeSlideIn(index: 0, child: _buildScoreWidget()),
-          const SizedBox(height: 20),
-          FadeSlideIn(
-            index: 1,
-            child: _buildToggleRow(
-              title: 'Two-Factor Authentication',
-              description: 'Require a code from your phone at sign-in',
-              value: settingsProv.twoFactorEnabled,
-              onChanged: (v) => _update(context, (s) => s.toggleTwoFactor(v)),
-            ),
-          ),
-          const SizedBox(height: 12),
-          FadeSlideIn(
-            index: 2,
-            child: _buildToggleRow(
-              title: 'Biometric Lock',
-              description: 'Use Face ID or fingerprint to open the vault',
-              value: settingsProv.biometricEnabled,
-              onChanged: (v) => _update(context, (s) => s.toggleBiometric(v)),
-            ),
-          ),
-          const SizedBox(height: 12),
-          FadeSlideIn(
-            index: 3,
-            child: _buildToggleRow(
-              title: 'Login Alerts',
-              description: 'Get notified of new sign-ins',
-              value: settingsProv.loginAlertsEnabled,
-              onChanged: (v) => _update(context, (s) => s.toggleLoginAlerts(v)),
-            ),
-          ),
-          const SizedBox(height: 12),
-          FadeSlideIn(
-            index: 4,
-            child: _buildStatusRow(
-              title: 'Recovery Key',
-              description: 'A backup key to regain vault access',
-              badge: const StatusBadge.neutral('Set Up'),
-              onTap: () {},
-            ),
-          ),
-          const SizedBox(height: 12),
-          FadeSlideIn(
-            index: 5,
-            child: _buildStatusRow(
-              title: 'Emergency Access',
-              description: 'Trusted contacts can request access',
-              badge: const StatusBadge.pending('Configured'),
-              onTap: () => Navigator.of(context).pushNamed(AppRouter.emergencyAccess),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildScoreWidget() {
-    return GlassCard(
-      borderRadius: AppRadius.radiusXXXL,
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        children: [
-          Container(
-            width: 48,
-            height: 48,
-            decoration: const BoxDecoration(
-              color: AppColors.glassSuccessBg,
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(
-              Icons.shield_rounded,
-              color: AppColors.glassAccentGreen,
-              size: 24,
-            ),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'Vault Score: Strong',
-            style: AppTextStyles.serifTitleSmall.copyWith(
-              color: AppColors.glassOnSurface,
-              fontSize: 22,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Your credentials are secured with end-to-end zero-knowledge encryption.',
-            textAlign: TextAlign.center,
-            style: AppTextStyles.bodyMedium.copyWith(
-              color: AppColors.glassOnSurfaceMuted,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildToggleRow({
-    required String title,
-    required String description,
-    required bool value,
-    required ValueChanged<bool> onChanged,
-  }) {
-    return GlassCard(
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: AppTextStyles.titleSmall.copyWith(
-                    color: AppColors.glassOnSurface,
-                    fontWeight: FontWeight.w600,
+          FadeSlideIn(index: 0, child: _buildScoreCard()),
+          const SizedBox(height: 22),
+          _sectionLabel('SAFEGUARDS'),
+          const SizedBox(height: 10),
+          Selector<VaultProvider, VaultSummary>(
+            selector: (_, vault) => vault.vaultSummary,
+            builder: (context, summary, _) {
+              return Column(
+                children: [
+                  _buildStatusRow(
+                    title: 'Confirmed email',
+                    description: 'Proves the address on your account is yours',
+                    badge: summary.emailVerified
+                        ? const StatusBadge.success('Done')
+                        : const StatusBadge.pending('To do'),
+                    onTap: summary.emailVerified
+                        ? null
+                        : () => Navigator.of(
+                            context,
+                          ).pushNamed(AppRouter.settings),
                   ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  description,
-                  style: AppTextStyles.bodySmall.copyWith(
-                    color: AppColors.glassOnSurfaceMuted,
+                  const SizedBox(height: 12),
+                  _buildStatusRow(
+                    title: 'A trusted person',
+                    description: 'Someone you\'ve chosen to carry out your wishes',
+                    badge: summary.trustedContactsCount > 0
+                        ? const StatusBadge.success('Done')
+                        : const StatusBadge.pending('To do'),
+                    onTap: summary.trustedContactsCount > 0
+                        ? null
+                        : () => Navigator.of(
+                            context,
+                          ).pushNamed(AppRouter.trustedContacts),
                   ),
-                ),
-              ],
-            ),
+                ],
+              );
+            },
           ),
-          Switch(
-            value: value,
-            onChanged: onChanged,
-            activeThumbColor: Colors.white,
-            activeTrackColor: AppColors.glassAccentPink,
-            inactiveTrackColor: AppColors.glassSurfaceRaised,
+          const SizedBox(height: 12),
+          _buildStatusRow(
+            title: 'Two-Factor Authentication',
+            description: 'A code from your phone at sign-in',
+            badge: const StatusBadge.neutral('Coming soon'),
+          ),
+          const SizedBox(height: 12),
+          _buildStatusRow(
+            title: 'Biometric Lock',
+            description: 'Face ID or fingerprint to open the app',
+            badge: const StatusBadge.neutral('Coming soon'),
+          ),
+          const SizedBox(height: 26),
+          _sectionLabel('ACCOUNT'),
+          const SizedBox(height: 10),
+          _buildStatusRow(
+            title: 'Change password',
+            description: 'Choose a new password for this account',
+            onTap: () => showChangePasswordSheet(context),
+          ),
+          const SizedBox(height: 12),
+          _buildStatusRow(
+            title: 'Sign out of all devices',
+            description: 'Ends every session, including this one',
+            onTap: () => _signOutEverywhere(context),
+          ),
+          const SizedBox(height: 12),
+          _buildStatusRow(
+            title: 'Emergency Access',
+            description: 'How trusted contacts will reach your vault',
+            onTap: () =>
+                Navigator.of(context).pushNamed(AppRouter.emergencyAccess),
           ),
         ],
       ),
     );
   }
 
+  Widget _sectionLabel(String text) {
+    return Text(
+      text,
+      style: AppTextStyles.overline.copyWith(
+        color: AppColors.glassOnSurfaceFaint,
+      ),
+    );
+  }
+
+  Widget _buildScoreCard() {
+    return Selector<VaultProvider, VaultSummary>(
+      selector: (_, vault) => vault.vaultSummary,
+      builder: (context, summary, _) {
+        return GlassCard(
+          borderRadius: AppRadius.radiusXXXL,
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: const BoxDecoration(
+                  color: AppColors.glassSuccessBg,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.shield_rounded,
+                  color: AppColors.glassAccentGreen,
+                  size: 24,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Security: ${summary.securityScoreLabel}',
+                textAlign: TextAlign.center,
+                style: AppTextStyles.serifTitleSmall.copyWith(
+                  color: AppColors.glassOnSurface,
+                  fontSize: 22,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Your data is kept separate from every other user, and the '
+                'database itself blocks anyone else from reading it. The score '
+                'counts the safeguards below that you have in place.',
+                textAlign: TextAlign.center,
+                style: AppTextStyles.bodyMedium.copyWith(
+                  color: AppColors.glassOnSurfaceMuted,
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  /// A card with a title and description. With [onTap] it shows a chevron (or a
+  /// [badge] if one is given); without it, it is informational only.
   Widget _buildStatusRow({
     required String title,
     required String description,
-    required Widget badge,
+    Widget? badge,
     VoidCallback? onTap,
   }) {
     return GlassCard(
@@ -213,8 +223,14 @@ class SecurityScreen extends StatelessWidget {
               ],
             ),
           ),
-          const SizedBox(width: 8),
-          badge,
+          if (badge != null) ...[const SizedBox(width: 8), badge],
+          if (badge == null && onTap != null) ...[
+            const SizedBox(width: 8),
+            const Icon(
+              Icons.chevron_right_rounded,
+              color: AppColors.glassOnSurfaceFaint,
+            ),
+          ],
         ],
       ),
     );

@@ -2,7 +2,9 @@ import 'package:everkeep/core/config/startup_error_app.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  testWidgets('a missing backend configuration is shown, not hidden', (tester) async {
+  testWidgets('a missing backend configuration is shown, not hidden', (
+    tester,
+  ) async {
     await tester.pumpWidget(
       const StartupErrorApp(
         title: 'Everkeep isn\'t connected yet',

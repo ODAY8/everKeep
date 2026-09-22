@@ -5,12 +5,16 @@ class TrustedContactItem {
   final String accessLevel;
   final String avatarUrl;
 
+  /// When the person was added.
+  final DateTime? createdAt;
+
   const TrustedContactItem({
     required this.id,
     required this.name,
     required this.relationship,
     required this.accessLevel,
     required this.avatarUrl,
+    this.createdAt,
   });
 
   /// Builds a contact from a `trusted_contacts` row. A missing avatar is an
@@ -22,6 +26,7 @@ class TrustedContactItem {
       relationship: row['relationship'] as String,
       accessLevel: row['access_level'] as String,
       avatarUrl: row['avatar_url'] as String? ?? '',
+      createdAt: DateTime.tryParse(row['created_at'] as String? ?? '')?.toLocal(),
     );
   }
 
@@ -40,6 +45,7 @@ class TrustedContactItem {
     String? relationship,
     String? accessLevel,
     String? avatarUrl,
+    DateTime? createdAt,
   }) {
     return TrustedContactItem(
       id: id ?? this.id,
@@ -47,6 +53,7 @@ class TrustedContactItem {
       relationship: relationship ?? this.relationship,
       accessLevel: accessLevel ?? this.accessLevel,
       avatarUrl: avatarUrl ?? this.avatarUrl,
+      createdAt: createdAt ?? this.createdAt,
     );
   }
 }

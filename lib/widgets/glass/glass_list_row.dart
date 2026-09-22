@@ -90,7 +90,7 @@ class _GlassListRowTile extends StatelessWidget {
               ),
               if (row.trailing != null)
                 row.trailing!
-              else if (row.showChevron)
+              else if (row.showChevron && row.onTap != null)
                 Icon(
                   Icons.chevron_right_rounded,
                   color: AppColors.glassOnSurfaceFaint,

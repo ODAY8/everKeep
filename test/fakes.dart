@@ -14,6 +14,7 @@ import 'package:everkeep/repositories/settings_repository.dart';
 import 'package:everkeep/repositories/trusted_contact_repository.dart';
 import 'package:everkeep/repositories/user_repository.dart';
 import 'package:everkeep/repositories/vault_repository.dart';
+import 'package:everkeep/services/auth_service.dart' show AuthSessionEvent;
 import 'package:flutter/material.dart';
 
 /// A signed-in user for tests. (The app has no built-in persona: real users
@@ -46,20 +47,58 @@ class FakeAuthRepository with Failable implements AuthRepository {
   /// "confirm your email first" case).
   bool signUpNeedsConfirmation = false;
 
-  final StreamController<void> _sessionEnded = StreamController<void>.broadcast();
+  /// What the last calls were asked to do, for assertions.
+  String? lastPassword;
+  String? lastEmailChange;
+  int signOutEverywhereCalls = 0;
+
+  final StreamController<AuthSessionEvent> _events =
+      StreamController<AuthSessionEvent>.broadcast();
 
   /// Simulates the backend ending the session (expiry, revocation, sign-out
   /// on another device).
   void endSession() {
     sessionUser = null;
-    _sessionEnded.add(null);
+    _events.add(AuthSessionEvent.signedOut);
+  }
+
+  /// Simulates a session beginning on its own, e.g. via the link in a
+  /// confirmation email.
+  void startSessionFromLink(User user) {
+    sessionUser = user;
+    _events.add(AuthSessionEvent.signedIn);
+  }
+
+  /// Simulates opening a password-reset link.
+  void openRecoveryLink() => _events.add(AuthSessionEvent.passwordRecovery);
+
+  @override
+  Stream<AuthSessionEvent> get events => _events.stream;
+
+  @override
+  Future<void> updatePassword(String newPassword) async {
+    throwIfFailing();
+    lastPassword = newPassword;
   }
 
   @override
-  Stream<void> get sessionEnded => _sessionEnded.stream;
+  Future<void> updateEmail(String newEmail) async {
+    throwIfFailing();
+    lastEmailChange = newEmail;
+  }
 
   @override
-  Future<User?> signIn({required String email, required String password}) async {
+  Future<void> signOutEverywhere() async {
+    signOutEverywhereCalls++;
+    throwIfFailing();
+    sessionUser = null;
+  }
+
+  @override
+  Future<User?> signIn({
+    required String email,
+    required String password,
+  }) async {
     throwIfFailing();
     return sessionUser = testUser.copyWith(email: email);
   }
@@ -103,15 +142,20 @@ class FakeDocumentRepository with Failable implements DocumentRepository {
   int _nextId = 100;
 
   FakeDocumentRepository([List<DocumentItem>? seed])
-      : items = seed ?? [doc('d1', 'Will.pdf'), doc('d2', 'Deed.pdf'), doc('d3', 'Tax.pdf')];
+    : items =
+          seed ??
+          [doc('d1', 'Will.pdf'), doc('d2', 'Deed.pdf'), doc('d3', 'Tax.pdf')];
 
-  static DocumentItem doc(String id, String title, {String category = 'Legal'}) =>
-      DocumentItem(
-        id: id,
-        title: title,
-        subtitle: '$category · Added today',
-        category: category,
-      );
+  static DocumentItem doc(
+    String id,
+    String title, {
+    String category = 'Legal',
+  }) => DocumentItem(
+    id: id,
+    title: title,
+    subtitle: '$category · Added today',
+    category: category,
+  );
 
   @override
   Future<List<DocumentItem>> fetchDocuments() {
@@ -163,17 +207,20 @@ class FakeAccountRepository with Failable implements AccountRepository {
   int _nextId = 100;
 
   FakeAccountRepository([List<AccountItem>? seed])
-      : items = seed ?? [account('a1', 'Bank'), account('a2', 'GitHub')];
+    : items = seed ?? [account('a1', 'Bank'), account('a2', 'GitHub')];
 
-  static AccountItem account(String id, String title, {bool favorite = false}) =>
-      AccountItem(
-        id: id,
-        title: title,
-        subtitle: 'Added today',
-        icon: Icons.key_rounded,
-        color: Colors.blue,
-        isFavorite: favorite,
-      );
+  static AccountItem account(
+    String id,
+    String title, {
+    bool favorite = false,
+  }) => AccountItem(
+    id: id,
+    title: title,
+    subtitle: 'Added today',
+    icon: Icons.key_rounded,
+    color: Colors.blue,
+    isFavorite: favorite,
+  );
 
   @override
   Future<List<AccountItem>> fetchAccounts() async {
@@ -227,23 +274,24 @@ class FakeTrustedContactRepository
   int _nextId = 100;
 
   FakeTrustedContactRepository([List<TrustedContactItem>? seed])
-      : items = seed ??
-            [
-              const TrustedContactItem(
-                id: 'tc-a',
-                name: 'Ada Lovelace',
-                relationship: 'Sibling',
-                accessLevel: 'View Only',
-                avatarUrl: '',
-              ),
-              const TrustedContactItem(
-                id: 'tc-b',
-                name: 'Grace Hopper',
-                relationship: 'Attorney',
-                accessLevel: 'On Release',
-                avatarUrl: '',
-              ),
-            ];
+    : items =
+          seed ??
+          [
+            const TrustedContactItem(
+              id: 'tc-a',
+              name: 'Ada Lovelace',
+              relationship: 'Sibling',
+              accessLevel: 'View Only',
+              avatarUrl: '',
+            ),
+            const TrustedContactItem(
+              id: 'tc-b',
+              name: 'Grace Hopper',
+              relationship: 'Attorney',
+              accessLevel: 'On Release',
+              avatarUrl: '',
+            ),
+          ];
 
   @override
   Future<List<TrustedContactItem>> fetchContacts() async {
@@ -296,18 +344,17 @@ class FakeSettingsRepository with Failable implements SettingsRepository {
 class FakeVaultRepository with Failable implements VaultRepository {
   /// Explicit numbers (the model's own defaults describe an empty vault), so
   /// tests can check how live counts are layered on top.
-  static const VaultSummary sample = VaultSummary(
+  static final VaultSummary sample = VaultSummary(
     totalItems: 92,
     passwordsCount: 24,
     documentsCount: 11,
     financialsCount: 6,
     messagesCount: 8,
     memoriesCount: 43,
-    securityScore: 94,
-    securityScoreLabel: 'Excellent — 94/100',
-    legacyProgress: 0.73,
+    trustedContactsCount: 2,
+    emailVerified: true,
     storageUsedMb: 24.5,
-  );
+  ).withDerived();
 
   @override
   Future<VaultSummary> fetchVaultSummary() async {
@@ -333,5 +380,46 @@ class FakeUserRepository with Failable implements UserRepository {
   Future<User> updateUserProfile(User user) async {
     throwIfFailing();
     return user;
+  }
+
+  DocumentUpload? lastAvatar;
+  bool avatarRemoved = false;
+  bool accountDeleted = false;
+  Map<String, dynamic> exportPayload = {
+    'account': {'email': 'sarah.mitchell@example.com'},
+    'documents': [],
+  };
+
+  @override
+  Future<User> uploadAvatar(User user, DocumentUpload photo) async {
+    throwIfFailing();
+    lastAvatar = photo;
+    return user.copyWith(avatarUrl: 'https://example.test/avatar.png?v=1');
+  }
+
+  @override
+  Future<User> removeAvatar(User user) async {
+    throwIfFailing();
+    avatarRemoved = true;
+    return User(
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      phone: user.phone,
+      isAuthenticated: user.isAuthenticated,
+      emailVerified: user.emailVerified,
+    );
+  }
+
+  @override
+  Future<Map<String, dynamic>> exportMyData() async {
+    throwIfFailing();
+    return exportPayload;
+  }
+
+  @override
+  Future<void> deleteAccount() async {
+    throwIfFailing();
+    accountDeleted = true;
   }
 }

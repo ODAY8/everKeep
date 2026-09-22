@@ -1,4 +1,7 @@
+import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
+import '../models/document_upload.dart';
 import '../models/user.dart';
 import '../repositories/user_repository.dart';
 import 'session_scoped.dart';
@@ -63,6 +66,79 @@ class UserProvider extends ChangeNotifier with SessionScoped {
         _isLoading = false;
         notifyListeners();
       }
+    }
+  }
+
+  /// Replaces the profile photo with [photo] (a PNG from `pickAvatar`).
+  Future<bool> uploadAvatar(DocumentUpload photo) async {
+    final current = _user;
+    if (current == null) return false;
+    return _saveUser(() => _userRepository.uploadAvatar(current, photo));
+  }
+
+  Future<bool> removeAvatar() async {
+    final current = _user;
+    if (current == null) return false;
+    return _saveUser(() => _userRepository.removeAvatar(current));
+  }
+
+  Future<bool> _saveUser(Future<User> Function() save) async {
+    final epoch = sessionEpoch;
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final saved = await save();
+      if (isStale(epoch)) return false;
+      _user = saved;
+      return true;
+    } catch (e) {
+      if (isStale(epoch)) return false;
+      _error = errorMessage(e);
+      return false;
+    } finally {
+      if (!isStale(epoch)) {
+        _isLoading = false;
+        notifyListeners();
+      }
+    }
+  }
+
+  /// Everything the account holds, formatted as JSON text — or null (with
+  /// [error] set) if it couldn't be gathered.
+  Future<String?> exportData() async {
+    final epoch = sessionEpoch;
+    _error = null;
+    try {
+      final data = await _userRepository.exportMyData();
+      if (isStale(epoch)) return null;
+      return const JsonEncoder.withIndent('  ').convert(data);
+    } catch (e) {
+      if (isStale(epoch)) return null;
+      _error = errorMessage(e);
+      notifyListeners();
+      return null;
+    }
+  }
+
+  /// Permanently deletes the account. On success the backend session is gone,
+  /// which signs the app out (see AuthProvider); nothing is reset here because
+  /// that follows from the sign-out.
+  Future<bool> deleteAccount() async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      await _userRepository.deleteAccount();
+      return true;
+    } catch (e) {
+      _error = errorMessage(e);
+      return false;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
     }
   }
 

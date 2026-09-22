@@ -36,6 +36,10 @@ class DocumentItem {
       title: row['title'] as String,
       subtitle: '$category · Added ${relativeTime(createdAt)}',
       category: category,
+      // A paperclip marks a document that has a stored file behind it.
+      icon: row['file_path'] == null
+          ? Icons.description_outlined
+          : Icons.attach_file_rounded,
       isVerified: row['is_verified'] as bool? ?? false,
       dateAdded: createdAt,
       filePath: row['file_path'] as String?,

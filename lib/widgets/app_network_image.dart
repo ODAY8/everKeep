@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import '../core/theme/app_colors.dart';
 
+/// Shows an image from either a bundled asset (`assets/...`) or the web
+/// (`https://...`), decoded at the size it is displayed rather than at its full
+/// resolution, with an icon shown if it can't be loaded.
 class AppNetworkImage extends StatelessWidget {
   final String url;
   final BoxFit fit;
@@ -17,10 +20,12 @@ class AppNetworkImage extends StatelessWidget {
     this.placeholderColor,
   });
 
+  bool get _isRemote => url.startsWith('http://') || url.startsWith('https://');
+
   @override
   Widget build(BuildContext context) {
     final radius = borderRadius ?? BorderRadius.zero;
-    final dpr = MediaQuery.of(context).devicePixelRatio;
+    final dpr = MediaQuery.devicePixelRatioOf(context);
 
     return ClipRRect(
       borderRadius: radius,
@@ -35,20 +40,42 @@ class AppNetworkImage extends StatelessWidget {
               ? rawCacheHeight
               : null;
 
+          Widget fallback(BuildContext context, Object error, StackTrace? stack) =>
+              Container(
+                color: placeholderColor ?? AppColors.glassSurface,
+                alignment: Alignment.center,
+                child: Icon(
+                  fallbackIcon,
+                  color: AppColors.glassOnSurfaceFaint,
+                  size: 32,
+                ),
+              );
+
+          if (_isRemote) {
+            return Image.network(
+              url,
+              fit: fit,
+              cacheWidth: cacheWidth,
+              cacheHeight: cacheHeight,
+              errorBuilder: fallback,
+              // Fade in once loaded instead of popping in.
+              frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
+                if (wasSynchronouslyLoaded) return child;
+                return AnimatedOpacity(
+                  opacity: frame == null ? 0 : 1,
+                  duration: const Duration(milliseconds: 200),
+                  child: child,
+                );
+              },
+            );
+          }
+
           return Image.asset(
             url,
             fit: fit,
             cacheWidth: cacheWidth,
             cacheHeight: cacheHeight,
-            errorBuilder: (context, error, stackTrace) => Container(
-              color: placeholderColor ?? AppColors.lightSurfaceVariant,
-              alignment: Alignment.center,
-              child: Icon(
-                fallbackIcon,
-                color: AppColors.lightOnSurface.withValues(alpha: 0.25),
-                size: 32,
-              ),
-            ),
+            errorBuilder: fallback,
           );
         },
       ),

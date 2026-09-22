@@ -11,6 +11,11 @@ class FadeSlideIn extends StatefulWidget {
   final Duration stagger;
   final Duration duration;
 
+  /// Only the first few items are staggered. Past this, items animate together:
+  /// otherwise item 100 would wait 4 seconds (100 x 40ms) before appearing, and
+  /// long lists would feel slow to fill in.
+  static const int maxStaggeredItems = 6;
+
   const FadeSlideIn({
     super.key,
     required this.child,
@@ -40,7 +45,8 @@ class _FadeSlideInState extends State<FadeSlideIn>
       end: Offset.zero,
     ).animate(curved);
 
-    final delay = widget.stagger * widget.index;
+    final delay =
+        widget.stagger * widget.index.clamp(0, FadeSlideIn.maxStaggeredItems);
     if (delay == Duration.zero) {
       _controller.forward();
     } else {

@@ -13,6 +13,9 @@ class AccountItem {
   final bool isFavorite;
   final DateTime? lastUpdated;
 
+  /// When the account was saved.
+  final DateTime? createdAt;
+
   /// The login name or email saved with the account. There is deliberately no
   /// password field: vault secrets must not be stored until client-side
   /// encryption and key management exist.
@@ -27,6 +30,7 @@ class AccountItem {
     required this.color,
     this.isFavorite = false,
     this.lastUpdated,
+    this.createdAt,
     this.username,
   });
 
@@ -58,6 +62,7 @@ class AccountItem {
       color: color,
       isFavorite: row['is_favorite'] as bool? ?? false,
       lastUpdated: DateTime.tryParse(row['updated_at'] as String? ?? '')?.toLocal(),
+      createdAt: createdAt,
       username: (username == null || username.isEmpty) ? null : username,
     );
   }
@@ -92,6 +97,7 @@ class AccountItem {
     Color? color,
     bool? isFavorite,
     DateTime? lastUpdated,
+    DateTime? createdAt,
     String? username,
   }) {
     return AccountItem(
@@ -103,6 +109,7 @@ class AccountItem {
       color: color ?? this.color,
       isFavorite: isFavorite ?? this.isFavorite,
       lastUpdated: lastUpdated ?? this.lastUpdated,
+      createdAt: createdAt ?? this.createdAt,
       username: username ?? this.username,
     );
   }

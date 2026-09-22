@@ -22,13 +22,34 @@ class DocumentProvider extends ChangeNotifier with SessionScoped {
   bool get hasFetched => _hasFetched;
   bool get isEmpty => _documents.isEmpty;
 
-  List<DocumentItem> filterByCategory(String category) {
-    if (category.isEmpty || category == 'All') {
-      return documents;
+  /// Documents in [category] ("All" or empty for every category) whose title
+  /// contains [query] (ignoring case).
+  List<DocumentItem> filterByCategory(String category, {String query = ''}) {
+    final needle = query.trim().toLowerCase();
+    final anyCategory = category.isEmpty || category == 'All';
+    return _documents.where((doc) {
+      if (!anyCategory && doc.category.toLowerCase() != category.toLowerCase()) {
+        return false;
+      }
+      return needle.isEmpty || doc.title.toLowerCase().contains(needle);
+    }).toList();
+  }
+
+  /// A short-lived link to view [document]'s stored file, or null (with
+  /// [error] set) if it has no file or the link couldn't be made.
+  Future<String?> downloadUrlFor(DocumentItem document) async {
+    final path = document.filePath;
+    if (path == null) return null;
+    final epoch = sessionEpoch;
+    try {
+      final url = await _documentRepository.createDownloadUrl(path);
+      return isStale(epoch) ? null : url;
+    } catch (e) {
+      if (isStale(epoch)) return null;
+      _error = errorMessage(e);
+      notifyListeners();
+      return null;
     }
-    return _documents
-        .where((doc) => doc.category.toLowerCase() == category.toLowerCase())
-        .toList();
   }
 
   Future<void> fetchDocuments() async {

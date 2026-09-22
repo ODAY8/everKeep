@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import '../models/user.dart';
 import '../repositories/auth_repository.dart';
+import '../services/auth_service.dart' show AuthSessionEvent;
 import 'session_scoped.dart';
 
 enum AuthStatus {
@@ -15,22 +16,21 @@ enum AuthStatus {
 
 class AuthProvider extends ChangeNotifier {
   final AuthRepository _authRepository;
-  StreamSubscription<void>? _sessionEndedSubscription;
+  StreamSubscription<AuthSessionEvent>? _eventsSubscription;
 
   AuthStatus _status = AuthStatus.initial;
   bool _isLoading = false;
   String? _error;
   String? _notice;
   User? _currentUser;
+  bool _recoveryPending = false;
 
   AuthProvider({AuthRepository? authRepository})
       : _authRepository = authRepository ?? AuthRepositoryImpl() {
-    // The backend can end the session on its own (expiry, revocation, sign-out
-    // from another device). Follow it, so the guard and the session
-    // coordinator react instead of the UI showing a stale signed-in state.
-    _sessionEndedSubscription = _authRepository.sessionEnded.listen(
-      (_) => _handleSessionEnded(),
-    );
+    // The backend can change the session on its own: it expires, is revoked, or
+    // starts from a link in an email. Follow it, so the guard and the session
+    // coordinator react instead of the UI showing a stale state.
+    _eventsSubscription = _authRepository.events.listen(_handleEvent);
   }
 
   AuthStatus get status => _status;
@@ -43,13 +43,33 @@ class AuthProvider extends ChangeNotifier {
   String? get notice => _notice;
   User? get currentUser => _currentUser;
 
+  /// True after the user opened a password-reset link: they must now choose a
+  /// new password. Cleared once they have.
+  bool get recoveryPending => _recoveryPending;
+
   @override
   void dispose() {
-    _sessionEndedSubscription?.cancel();
+    _eventsSubscription?.cancel();
     super.dispose();
   }
 
+  void _handleEvent(AuthSessionEvent event) {
+    switch (event) {
+      case AuthSessionEvent.signedOut:
+        _handleSessionEnded();
+      case AuthSessionEvent.passwordRecovery:
+        _recoveryPending = true;
+        notifyListeners();
+      case AuthSessionEvent.signedIn:
+        // A session began without us asking for one (the confirmation link in
+        // an email opened the app). Adopt it. Our own sign-in/sign-up calls set
+        // `_isLoading`, so they don't trigger this.
+        if (!isAuthenticated && !_isLoading) unawaited(checkSession());
+    }
+  }
+
   void _handleSessionEnded() {
+    _recoveryPending = false;
     if (_status != AuthStatus.authenticated) return;
     _currentUser = null;
     _status = AuthStatus.unauthenticated;
@@ -159,7 +179,26 @@ class AuthProvider extends ChangeNotifier {
       _currentUser = null;
       _status = AuthStatus.unauthenticated;
       _error = null;
+      _recoveryPending = false;
       notifyListeners();
+      return true;
+    } catch (e) {
+      _error = errorMessage(e);
+      notifyListeners();
+      return false;
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+  /// Signs out this device and every other one. Returns false with [error] set
+  /// if the other devices couldn't be reached (this device is signed out either
+  /// way, which the resulting session-ended event takes care of).
+  Future<bool> signOutEverywhere() async {
+    _setLoading(true);
+    _error = null;
+    try {
+      await _authRepository.signOutEverywhere();
       return true;
     } catch (e) {
       _error = errorMessage(e);
@@ -184,6 +223,52 @@ class AuthProvider extends ChangeNotifier {
     } finally {
       _setLoading(false);
     }
+  }
+
+  /// Sets a new password for the signed-in user (also used to finish a
+  /// password-reset link). Returns whether it was saved.
+  Future<bool> updatePassword(String newPassword) async {
+    _setLoading(true);
+    _error = null;
+    try {
+      await _authRepository.updatePassword(newPassword);
+      _recoveryPending = false;
+      return true;
+    } catch (e) {
+      _error = errorMessage(e);
+      notifyListeners();
+      return false;
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+  /// Starts changing the account's email. It only takes effect once the user
+  /// follows the link Supabase sends to the new address, which [notice] says.
+  Future<bool> updateEmail(String newEmail) async {
+    _setLoading(true);
+    _error = null;
+    _notice = null;
+    try {
+      await _authRepository.updateEmail(newEmail);
+      _notice = 'We sent a confirmation link to $newEmail. Your email changes '
+          'once you open it.';
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _error = errorMessage(e);
+      notifyListeners();
+      return false;
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+  /// Ends a password-reset flow that was started but abandoned.
+  void dismissRecovery() {
+    if (!_recoveryPending) return;
+    _recoveryPending = false;
+    notifyListeners();
   }
 
   /// Clears a stale error (and the error status it left behind). Auth

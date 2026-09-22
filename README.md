@@ -1,24 +1,52 @@
 # Everkeep
 
-A digital legacy vault: keep documents, account logins, memories and messages
-safe, and choose the trusted people who can carry out your wishes.
+A digital legacy vault: keep important documents and account logins in one private
+place, and name the trusted people who should be able to carry out your wishes.
 
-The backend is [Supabase](https://supabase.com): Auth, PostgreSQL with Row Level
-Security, and private Storage.
+Built with Flutter. The backend is [Supabase](https://supabase.com): Auth, PostgreSQL
+with Row Level Security, and Storage. There is no server of our own and no mock data —
+if the app isn't connected to Supabase it says so instead of pretending.
+
+## What works today
+
+| Area | What you can do |
+|---|---|
+| **Account** | Sign up, sign in, sign out, **sign out of all devices**, forgot password → emailed link → set a new password inside the app, change password, change email (confirmed by a link), **delete your account and all your data** |
+| **Profile** | Edit name and phone, **change or remove your profile photo**, see last sign-in and live counts |
+| **Documents** | Add with a file from your phone (PDF, images, Office, text — up to 25 MB) or as a record only, search, open (short-lived signed link), delete (removes the file too) |
+| **Accounts** | Save account logins by category (username only — see *Security notes*), search, favourite, edit, delete |
+| **Trusted people** | Invite / remove people, with a relationship and access level |
+| **Vault** | One search across documents and accounts, category totals from your real data |
+| **Home** | Time-based greeting, real counts, a setup checklist that points at your next step, recent activity from what you really added, and a security score that reflects what is actually set up |
+| **Settings** | Your details, **download my data** (JSON to the clipboard), about, log out, delete account |
+
+### Deliberately "Coming soon"
+
+These are labelled as such in the app rather than faked: **Memories**, **Future Messages**,
+**two-factor authentication**, **biometric lock**, **emergency-access requests**, and
+**push notifications**. Help/legal links appear only when you provide them (see below).
 
 ## Set up
 
 1. **Create a Supabase project** (dashboard → New project).
-2. **Apply the schema.** Run
-   [`supabase/migrations/20260921000000_initial_schema.sql`](supabase/migrations/20260921000000_initial_schema.sql)
-   in the dashboard's *SQL Editor* (or `supabase db push` with the Supabase CLI).
-   It creates the tables, Row Level Security policies, the sign-up trigger and the
-   private `documents` storage bucket.
-3. **Choose your email-confirmation behaviour** (Authentication → Sign In / Providers → Email).
-   With *Confirm email* **on** (the default), sign-up creates the account and the app tells the
-   user to confirm their address, then sign in. With it **off**, sign-up signs the user in
-   straight away. Both are handled.
-4. **Add your settings.** Copy the template and fill in the two values from
+2. **Apply both migrations** in the dashboard's *SQL Editor*, in this order (or
+   `supabase db push` with the Supabase CLI):
+   1. [`supabase/migrations/20260921000000_initial_schema.sql`](supabase/migrations/20260921000000_initial_schema.sql)
+      — tables, Row Level Security, the sign-up trigger, and the private `documents` bucket.
+   2. [`supabase/migrations/20260922000000_account_management.sql`](supabase/migrations/20260922000000_account_management.sql)
+      — the `delete_my_account()` function (used by *Delete Account*) and the public `avatars`
+      bucket (profile photos, 2 MB, images only, each user limited to their own folder).
+
+   Without the second one, deleting an account and profile photos will report an error.
+3. **Allow the email links to open the app.** Authentication → *URL Configuration* → *Redirect URLs* →
+   add `com.example.everkeep://login-callback/` (or your own value — see `AUTH_REDIRECT_URL`).
+   Confirmation and password-reset emails link back through this address.
+4. **Choose email-confirmation behaviour** (Authentication → *Sign In / Providers* → Email).
+   With *Confirm email* **on** (the default), sign-up creates the account and the app tells the user
+   to confirm their address, then sign in. With it **off**, sign-up signs the user in straight away.
+   Both are handled. (Supabase's built-in mailer is heavily rate-limited; configure custom SMTP before
+   real users arrive.)
+5. **Add your settings.** Copy the template and fill in the two values from
    *Project Settings → API Keys* (the **publishable** key, not a secret key):
 
    ```bash
@@ -30,30 +58,76 @@ Security, and private Storage.
    SUPABASE_PUBLISHABLE_KEY=<your publishable key>
    ```
 
-   `.env` is git-ignored. **Never** put a secret key, service-role key or database password in
-   the app — the app refuses to start if it is given one.
-5. **Run it:**
+   Optional: `SUPPORT_EMAIL`, `HELP_URL`, `TERMS_URL`, `PRIVACY_URL` (shown in Settings only when
+   set) and `AUTH_REDIRECT_URL`. `.env` is git-ignored. **Never** put a secret key, service-role key
+   or database password in the app — it refuses to start if it is given one.
+6. **Run it:**
 
    ```bash
    flutter pub get
-   flutter run --dart-define-from-file=.env
+   run.cmd                       # Windows: passes .env for you (run.cmd -d <device-id> to pick a phone)
+   flutter run --dart-define-from-file=.env     # anywhere else
    ```
 
-   (VS Code: the included launch configuration already passes the file.) Without valid
-   settings the app shows a "not connected" screen instead of running on fake data.
+   Without valid settings the app shows an "Everkeep isn't connected yet" screen instead of running
+   on fake data.
+
+### On a phone (wireless debugging)
+
+Settings → Developer options → *Wireless debugging* → pair, then `flutter devices` and
+`run.cmd -d <id>`. Prefer this to a cable for the first install: a large debug build can drop a USB link.
+
+### Smooth performance
+
+Flutter's **debug** build is deliberately slow (it compiles on the fly and checks everything), so it
+will stutter on a real phone. Judge speed from a release build:
+
+```bash
+run.cmd --release -d <device-id>
+```
+
+The app is built to stay light: fonts and images are bundled (no downloads while scrolling), photos are
+resized before upload, list animations are capped so long lists don't stagger, and the vault totals are
+fetched in parallel.
 
 ## Test
 
 ```bash
 flutter analyze
-flutter test                     # app, providers, and the Supabase services (HTTP faked)
+flutter test                     # app, providers, screens, and the Supabase services (HTTP faked)
 bash supabase/tests/run.sh       # schema + Row Level Security, on a throwaway Postgres in Docker
 ```
 
-`supabase/tests/run.sh` applies the migration and then acts as two different users (and an
-anonymous one), checking that nobody can read or change anyone else's rows or files. It uses a
-small stand-in for Supabase's `auth`/`storage` schemas, so it verifies the policy logic; it does not
-replace trying the app against your real project.
+`supabase/tests/run.sh` (needs Docker running) applies both migrations and then acts as two different users
+(and an anonymous one), checking that nobody can read or change anyone else's rows or files, that a client
+can't mark its own document "verified", and that account deletion only ever removes the caller's data. It uses a
+small stand-in for Supabase's `auth`/`storage` schemas, so it verifies the policy logic; it does not replace
+trying the app against your real project.
+
+## Deploy checklist
+
+Do these before publishing to a store:
+
+- [ ] **Change the application id.** It is still `com.example.everkeep` (`android/app/build.gradle.kts`,
+      `AndroidManifest.xml`, and the bundle id / URL scheme in `ios/Runner`). Google Play rejects
+      `com.example.*`. If you change it, update the email-link scheme too (`AUTH_REDIRECT_URL`, manifest,
+      Info.plist, and the Supabase Redirect URL).
+- [ ] **Sign the release build.** Create an upload key and `android/key.properties`
+      (template: [`android/key.properties.example`](android/key.properties.example)). Both are git-ignored.
+      Keep the key safe: if you lose it you can't update the app.
+- [ ] **App icon and name.** Replace the default launcher icon (e.g. with `flutter_launcher_icons`).
+- [ ] **Add your support and legal links** (`SUPPORT_EMAIL`, `TERMS_URL`, `PRIVACY_URL`). Stores require a
+      privacy policy, and one must explain that account deletion is in *Settings → Delete Account*.
+- [ ] **Custom SMTP** for Supabase auth emails, and consider CAPTCHA and leaked-password protection.
+- [ ] **Bump `version:`** in `pubspec.yaml` for each release.
+- [ ] Build:
+
+  ```bash
+  flutter build appbundle --release --dart-define-from-file=.env     # Google Play
+  flutter build apk --release --target-platform android-arm64 --dart-define-from-file=.env   # a file to sideload
+  ```
+
+  (The values in `.env` must be passed to every release build too.)
 
 ## Architecture
 
@@ -73,23 +147,29 @@ Screen  →  Provider (ChangeNotifier)  →  Repository  →  Service  →  Supa
   `supabase_errors.dart` turns every Auth / database / Storage / network failure into a safe,
   user-readable `BackendException` (raw errors can reveal schema details, so they never reach the UI).
 - **`lib/core/session/`** keeps providers consistent with who is signed in: on sign-in it loads the
-  profile and dashboard data; on sign-out — or when the backend ends the session (expiry,
-  revocation, sign-out elsewhere) — it resets every user-scoped provider so the next user never sees
-  the previous user's data. `AuthGuard` keeps signed-out users off protected screens.
+  profile and dashboard data; on sign-out — or when the backend ends the session (expiry, revocation,
+  sign-out elsewhere) — it resets every user-scoped provider so the next user never sees the previous
+  user's data. It also opens the "set a new password" screen when a reset link is followed.
+  `AuthGuard` keeps signed-out users off protected screens.
+- **`lib/core/config/`** — build-time settings (`SupabaseConfig`, `AppLinks`, `AuthRedirect`) and the
+  startup error screen.
 
 ### Data model
 
-| Table | Holds | Notes |
+| Table / bucket | Holds | Notes |
 |---|---|---|
-| `profiles` | name, phone, avatar | one row per user (`id` = auth user id); created by a trigger at sign-up. Email stays in Supabase Auth. |
-| `security_settings` | 2FA / biometric / login-alert preferences | one row per user; **default off** |
+| `profiles` | name, phone, avatar URL | one row per user (`id` = auth user id); created by a trigger at sign-up. Email stays in Supabase Auth. |
+| `security_settings` | 2FA / biometric / login-alert preferences | one row per user; **default off**. Not used by the UI yet (those features are "Coming soon"). |
 | `documents` | title, category, file path/size | file bytes live in Storage; `is_verified` can't be set by clients |
-| `accounts` | name, username, category, favorite | **no secret column** — see below |
+| `accounts` | name, username, category, favourite | **no secret column** — see below |
 | `trusted_contacts` | name, relationship, access level | |
+| `documents` bucket | your uploaded files | **private**; opened only through short-lived signed links |
+| `avatars` bucket | profile photos | public read (an avatar has to load in an `<Image>`); writes limited to your own `<user id>/` folder |
 
 Every table has Row Level Security with owner-only policies for each operation, keyed on `auth.uid()`.
-Documents' files are in the private `documents` bucket under `<user id>/documents/…`, with matching
-Storage policies; a document row can only point into its owner's folder.
+Document files live under `<user id>/documents/…` with matching Storage policies; a document row can only
+point into its owner's folder. Deleting a document removes its file too; deleting an account removes every
+file first and only then the account (if any file can't be removed, the account is kept and you're told).
 
 ### Conventions
 
@@ -98,37 +178,30 @@ Storage policies; a document row can only point into its owner's folder.
   with the user's input. An update that matched no row is reported as a failure, never as success.
 - Providers guard against late results with `SessionScoped`, so a request started before sign-out
   can't land in the next session.
+- **Honest UI:** every control does what it says, or it isn't there, or it says "Coming soon". Nothing
+  reports success unless Supabase did.
 
 ## Security notes — read before shipping
 
 - **Vault secrets are not stored.** `accounts` keeps a name, username and category only. Storing
   passwords needs client-side encryption (a key derived from a user-held passphrase, with per-item
   nonces and stored KDF parameters) so the server never sees plaintext. Do not add a plaintext
-  password column.
-- **The UI still says "end-to-end zero-knowledge encryption"** on the Security screen and "Vault
-  score: strong" on Profile. Neither is true of the current design (data is protected by RLS and
-  Supabase's encryption at rest, not client-side encryption). Change that copy before release.
-- **The security toggles are stored preferences, not enforcement.** Switching on "Two-Factor
-  Authentication" saves a flag; it does not enroll an authenticator (that needs Supabase MFA), and
-  "Biometric Lock" needs on-device support (`local_auth`). The dashboard's security score is just the
-  share of these preferences that are on.
+  password column. Until then, Everkeep is a place for *where things are*, not a password manager.
+- **Data is protected by Row Level Security and Supabase's encryption at rest**, not client-side
+  encryption; the app doesn't claim otherwise. Documents are private files, opened through signed links
+  that expire.
+- **The security score** on Home/Profile/Security counts safeguards that are really in place (confirmed
+  email, at least one trusted person, a protection switched on). It measures setup, not a guarantee.
+- **Two-factor and biometric lock are not built.** They need Supabase MFA and `local_auth`; the app labels them
+  "Coming soon".
 - **Session tokens are stored by `supabase_flutter` in `SharedPreferences`** (unencrypted). For a
   vault app, supply a `LocalStorage` backed by `flutter_secure_storage`.
-- **Sign-out:** the SDK clears the device's session first and then revokes it on the server. If
-  the device is offline at that moment, the server-side refresh token stays valid until it expires.
-- **Password reset:** the app requests the recovery email, but setting the new password needs a deep
-  link (or hosted page) configured under Authentication → URL Configuration. It is not wired up yet.
-- **File upload has no picker yet.** The service/repository/provider support uploading to private
-  Storage (and signed download links), but no screen offers file selection — that needs a file-picker
-  package and a UI change.
-- Consider allow-listing `allowed_mime_types` and lowering `file_size_limit` on the `documents`
-  bucket, and enabling Supabase's leaked-password protection and CAPTCHA for sign-up.
-
-## Still placeholders in the UI
-
-Some display text is still static: the Home "Recent activity" list, Profile's "Legacy Prefs",
-"Last login 2h ago" and "Premium" subscription rows, and the Home hero card's "3 tasks remaining".
-Financials, messages and memories aren't built and report zero in the vault totals.
-
-Fonts are downloaded at runtime by `google_fonts` (network access is declared for Android and macOS);
-bundle Figtree and Young Serif as assets for a fully offline first launch.
+- **Sign-out** clears the device's session first and then revokes it on the server. If the device is
+  offline at that moment, the server-side refresh token stays valid until it expires. *Sign out of all
+  devices* tells you plainly if the other devices couldn't be reached.
+- **Profile photos are public-by-URL** (a random-looking path under your user id, but not secret). Don't
+  treat an avatar as private.
+- **"Download my data"** copies your data as JSON to the clipboard; other apps can read the clipboard, so
+  clear it after pasting.
+- Consider lowering `file_size_limit` / adding `allowed_mime_types` on the `documents` bucket to what you
+  really accept.

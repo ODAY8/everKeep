@@ -92,6 +92,13 @@ String _authMessage(AuthException e) {
       return 'Enter a valid email address.';
     case 'signup_disabled':
       return 'Sign-ups are currently disabled.';
+    case 'same_password':
+      return 'Choose a password you haven\'t used before.';
+    case 'reauthentication_needed':
+    case 'reauthentication_not_valid':
+      return 'For your security, please sign out and sign back in, then try again.';
+    case 'email_address_not_authorized':
+      return 'That email address can\'t be used.';
     case 'user_banned':
       return 'This account has been disabled.';
     case 'over_request_rate_limit':
@@ -137,6 +144,10 @@ String _databaseMessage(PostgrestException e) {
     case 'PGRST301': // JWT expired / invalid
     case 'PGRST303':
       return _sessionExpiredMessage;
+    case 'PGRST202': // function not found: the server setup is behind the app
+    case '42883':
+      return 'This isn\'t set up on the server yet. Run the latest database '
+          'migration in your Supabase project, then try again.';
   }
   if (e.code == '401' || e.message.contains('JWT')) {
     return _sessionExpiredMessage;

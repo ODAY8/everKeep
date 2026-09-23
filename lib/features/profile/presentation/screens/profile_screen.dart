@@ -32,6 +32,9 @@ class ProfileScreen extends StatelessWidget {
     final current = userProv.user;
     if (current == null) return;
 
+    // Phone lives only in Settings (Account → Phone), where it's validated
+    // against a real country's numbering plan — one editor for it, not two
+    // that could disagree.
     final saved = await showGlassFormSheet(
       context,
       title: 'Personal Info',
@@ -43,18 +46,10 @@ class ProfileScreen extends StatelessWidget {
           hint: 'Your name',
           initialValue: current.name,
         ),
-        GlassFormField(
-          key: 'phone',
-          label: 'Phone',
-          hint: 'Optional',
-          required: false,
-          keyboardType: TextInputType.phone,
-          initialValue: current.phone ?? '',
-        ),
       ],
       onSubmit: (values) async {
         final updated = await userProv.updateUserProfile(
-          current.copyWith(name: values['name'], phone: values['phone']),
+          current.copyWith(name: values['name']),
         );
         return updated
             ? null
@@ -102,9 +97,19 @@ class ProfileScreen extends StatelessWidget {
       PageRouteBuilder<void>(
         opaque: false,
         barrierColor: Colors.black,
-        transitionDuration: const Duration(milliseconds: 200),
-        pageBuilder: (_, animation, _) =>
-            FadeTransition(opacity: animation, child: _PhotoViewer(url: url)),
+        transitionDuration: const Duration(milliseconds: 260),
+        reverseTransitionDuration: const Duration(milliseconds: 200),
+        pageBuilder: (_, _, _) => _PhotoViewer(url: url),
+        transitionsBuilder: (_, animation, _, child) {
+          final curved = CurvedAnimation(parent: animation, curve: Curves.easeOutCubic);
+          return FadeTransition(
+            opacity: curved,
+            child: ScaleTransition(
+              scale: Tween(begin: 0.92, end: 1.0).animate(curved),
+              child: child,
+            ),
+          );
+        },
       ),
     );
   }
@@ -471,6 +476,14 @@ class ProfileScreen extends StatelessWidget {
 
 /// The profile photo shown full-size over black, dismissed by the close
 /// button, the back gesture, or tapping the backdrop.
+/// The photo full-size over black: pinch (or spread) to zoom in and out — the
+/// same gesture as everywhere else on the platform, which `InteractiveViewer`
+/// handles on its own — tap the backdrop or the close button to dismiss.
+///
+/// Deliberately not also double-tap-to-zoom: a `GestureDetector` that
+/// recognises both `onTap` and `onDoubleTap` has to wait out the double-tap
+/// window before either can fire, so a single tap-to-dismiss would lag by a
+/// few hundred milliseconds — exactly the opposite of what this is for.
 class _PhotoViewer extends StatelessWidget {
   final String url;
 
@@ -479,17 +492,21 @@ class _PhotoViewer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: () => Navigator.of(context).pop(),
+      onTap: () => Navigator.of(context).maybePop(),
       child: Scaffold(
         backgroundColor: Colors.black,
         body: SafeArea(
           child: Stack(
             children: [
               Center(
-                child: AppNetworkImage(
-                  url: url,
-                  fit: BoxFit.contain,
-                  fallbackIcon: Icons.person_rounded,
+                child: InteractiveViewer(
+                  minScale: 1,
+                  maxScale: 4,
+                  child: AppNetworkImage(
+                    url: url,
+                    fit: BoxFit.contain,
+                    fallbackIcon: Icons.person_rounded,
+                  ),
                 ),
               ),
               Positioned(
@@ -500,7 +517,7 @@ class _PhotoViewer extends StatelessWidget {
                   background: Colors.white24,
                   foreground: Colors.white,
                   tooltip: 'Close',
-                  onPressed: () => Navigator.of(context).pop(),
+                  onPressed: () => Navigator.of(context).maybePop(),
                 ),
               ),
             ],

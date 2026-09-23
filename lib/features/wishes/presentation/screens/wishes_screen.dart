@@ -3,7 +3,6 @@ import 'package:provider/provider.dart';
 import 'package:everkeep/core/theme/app_colors.dart';
 import 'package:everkeep/core/theme/app_radius.dart';
 import 'package:everkeep/core/theme/app_text_styles.dart';
-import 'package:everkeep/core/utils/external_link.dart';
 import 'package:everkeep/core/utils/pick_upload.dart';
 import 'package:everkeep/models/document_upload.dart';
 import 'package:everkeep/models/memory_item.dart';
@@ -234,19 +233,13 @@ class _WishesScreenState extends State<WishesScreen> {
     );
   }
 
-  Future<void> _openAttachment(MemoryItem item) async {
+  Future<void> _openAttachment(MemoryItem item) {
     final memoryProv = context.read<MemoryProvider>();
-    final url = await memoryProv.downloadUrlFor(item);
-    if (!mounted) return;
-    if (url == null) {
-      showAppSnackBar(context, memoryProv.error ?? 'Could not open the file.', isError: true);
-      return;
-    }
-
-    final opened = await openExternal(Uri.parse(url));
-    if (!opened && mounted) {
-      showAppSnackBar(context, 'No app on this device can open that file.', isError: true);
-    }
+    return openRemoteFile(
+      context,
+      fetchUrl: () => memoryProv.downloadUrlFor(item),
+      errorMessage: () => memoryProv.error,
+    );
   }
 
   // ── Deleting ────────────────────────────────────────────────────────────────

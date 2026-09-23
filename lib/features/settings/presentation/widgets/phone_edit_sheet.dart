@@ -40,7 +40,8 @@ class _PhoneEditSheet extends StatefulWidget {
 }
 
 class _PhoneEditSheetState extends State<_PhoneEditSheet> {
-  late Country _country;
+  Country? _parsedCountry;
+  Country? _country;
   late final TextEditingController _controller;
   String? _error;
   bool _submitting = false;
@@ -50,25 +51,31 @@ class _PhoneEditSheetState extends State<_PhoneEditSheet> {
     super.initState();
 
     final raw = widget.currentPhone?.trim() ?? '';
-    Country? parsedCountry;
     String initialText = raw;
 
     if (raw.isNotEmpty) {
       try {
         final parsed = PhoneNumber.parse(raw);
-        parsedCountry = kCountries.firstWhere((c) => c.isoCode == parsed.isoCode);
+        _parsedCountry = kCountries.firstWhere((c) => c.isoCode == parsed.isoCode);
         initialText = parsed.formatNsn();
       } catch (_) {
         // An older free-typed number that doesn't parse: keep it as-is in the
         // field (don't silently drop what the user had) and just pick a
-        // sensible default country below.
+        // sensible default country in didChangeDependencies below.
       }
     }
 
-    _country =
-        parsedCountry ??
-        defaultCountry(View.of(context).platformDispatcher.locale.countryCode);
     _controller = TextEditingController(text: initialText);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // View.of needs an inherited lookup, which isn't available yet in
+    // initState — this runs right after it, before the first build.
+    _country ??=
+        _parsedCountry ??
+        defaultCountry(View.of(context).platformDispatcher.locale.countryCode);
   }
 
   @override
@@ -90,15 +97,16 @@ class _PhoneEditSheetState extends State<_PhoneEditSheet> {
       return;
     }
 
+    final country = _country!;
     PhoneNumber parsed;
     try {
-      parsed = PhoneNumber.parse(typed, callerCountry: _country.isoCode);
+      parsed = PhoneNumber.parse(typed, callerCountry: country.isoCode);
     } catch (_) {
-      setState(() => _error = 'Enter a valid phone number for ${_country.name}.');
+      setState(() => _error = 'Enter a valid phone number for ${country.name}.');
       return;
     }
     if (!parsed.isValid()) {
-      setState(() => _error = 'Enter a valid phone number for ${_country.name}.');
+      setState(() => _error = 'Enter a valid phone number for ${country.name}.');
       return;
     }
 
@@ -130,6 +138,7 @@ class _PhoneEditSheetState extends State<_PhoneEditSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final country = _country!;
     return PopScope(
       canPop: !_submitting,
       child: Column(
@@ -162,6 +171,7 @@ class _PhoneEditSheetState extends State<_PhoneEditSheet> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               GestureDetector(
+                key: const Key('phone-country-button'),
                 onTap: _submitting ? null : _pickCountry,
                 child: Container(
                   height: 48,
@@ -174,10 +184,10 @@ class _PhoneEditSheetState extends State<_PhoneEditSheet> {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(_country.flag, style: const TextStyle(fontSize: 18)),
+                      Text(country.flag, style: const TextStyle(fontSize: 18)),
                       const SizedBox(width: 6),
                       Text(
-                        '+${_country.dialCode}',
+                        '+${country.dialCode}',
                         style: AppTextStyles.bodyMedium.copyWith(
                           fontSize: 15,
                           color: AppColors.glassOnSurface,

@@ -26,6 +26,7 @@ import 'package:everkeep/widgets/glass/security_score_card.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:phone_numbers_parser/phone_numbers_parser.dart';
 import 'package:provider/provider.dart';
 
 import 'fakes.dart';
@@ -491,24 +492,82 @@ void main() {
       expect(find.textContaining('Not confirmed'), findsOneWidget);
     });
 
-    testWidgets('the phone number can be changed and removed', (tester) async {
+    testWidgets(
+      'the phone number is validated against a real country and saved as E.164',
+      (tester) async {
+        await pump(tester, const SettingsScreen());
+
+        await tester.tap(find.text('Phone'));
+        await tester.pumpAndSettle();
+
+        // Choose the country for real, through the picker.
+        await tester.tap(find.byKey(const Key('phone-country-button')));
+        await tester.pumpAndSettle();
+        await tester.enterText(find.byType(TextField).last, 'United Kingdom');
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const Key('country-GB')));
+        await tester.pumpAndSettle();
+        expect(find.text('+44'), findsOneWidget);
+
+        await tester.enterText(find.byType(TextField), '20 7946 0000');
+        await tester.tap(find.widgetWithText(GlassPrimaryButton, 'Save'));
+        await tester.pumpAndSettle();
+
+        final expected = PhoneNumber.parse(
+          '20 7946 0000',
+          callerCountry: IsoCode.GB,
+        ).international;
+        expect(user.user?.phone, expected);
+        expect(find.text(expected), findsOneWidget);
+        expect(find.text('Phone number saved'), findsOneWidget);
+      },
+    );
+
+    testWidgets('an invalid phone number is rejected before saving', (tester) async {
+      user.setUser(testUser.copyWith(phone: ''));
       await pump(tester, const SettingsScreen());
 
       await tester.tap(find.text('Phone'));
       await tester.pumpAndSettle();
-      await tester.enterText(find.byType(TextField), '+44 20 7946 0000');
+      // The default country is whatever the device reports; too short for any
+      // real country's numbering plan.
+      await tester.enterText(find.byType(TextField), '123');
       await tester.tap(find.widgetWithText(GlassPrimaryButton, 'Save'));
       await tester.pumpAndSettle();
-      expect(user.user?.phone, '+44 20 7946 0000');
-      expect(find.text('+44 20 7946 0000'), findsOneWidget);
+
+      expect(find.textContaining('Enter a valid phone number'), findsOneWidget);
+      expect(user.user?.phone, isEmpty);
+    });
+
+    testWidgets('an empty phone number removes it', (tester) async {
+      user.setUser(testUser.copyWith(phone: '+442079460000'));
+      await pump(tester, const SettingsScreen());
 
       await tester.tap(find.text('Phone'));
       await tester.pumpAndSettle();
       await tester.enterText(find.byType(TextField), '');
       await tester.tap(find.widgetWithText(GlassPrimaryButton, 'Save'));
       await tester.pumpAndSettle();
+
       expect(user.user?.phone, isEmpty);
       expect(find.text('Not set'), findsOneWidget);
+    });
+
+    testWidgets('reopening the sheet on an existing number restores its country', (
+      tester,
+    ) async {
+      user.setUser(
+        testUser.copyWith(
+          phone: PhoneNumber.parse('20 7946 0000', callerCountry: IsoCode.GB).international,
+        ),
+      );
+      await pump(tester, const SettingsScreen());
+
+      await tester.tap(find.text('Phone'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('+44'), findsOneWidget);
+      expect(find.text('20 7946 0000'), findsOneWidget);
     });
 
     testWidgets(
@@ -702,8 +761,10 @@ void main() {
       await tester.tap(find.text('View photo'));
       await tester.pumpAndSettle();
 
-      // The full-size viewer shows the same photo again, over black.
+      // The full-size viewer shows the same photo again, over black, and can
+      // be pinch-zoomed.
       expect(find.byType(AppNetworkImage), findsNWidgets(2));
+      expect(find.byType(InteractiveViewer), findsOneWidget);
       expect(find.byIcon(Icons.close_rounded), findsOneWidget);
 
       await tester.tap(find.byIcon(Icons.close_rounded));

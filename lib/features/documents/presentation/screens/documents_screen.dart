@@ -3,7 +3,6 @@ import 'package:provider/provider.dart';
 import 'package:everkeep/core/theme/app_colors.dart';
 import 'package:everkeep/core/theme/app_radius.dart';
 import 'package:everkeep/core/theme/app_text_styles.dart';
-import 'package:everkeep/core/utils/external_link.dart';
 import 'package:everkeep/core/utils/pick_upload.dart';
 import 'package:everkeep/models/document_item.dart';
 import 'package:everkeep/models/document_upload.dart';
@@ -171,25 +170,15 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
     );
   }
 
-  Future<void> _openFile(DocumentItem document) async {
+  // A short-lived signed link: documents are private, so this is the only
+  // way to reach one outside the app.
+  Future<void> _openFile(DocumentItem document) {
     final docProv = context.read<DocumentProvider>();
-    final url = await docProv.downloadUrlFor(document);
-    if (!mounted) return;
-    if (url == null) {
-      showAppSnackBar(
-        context,
-        docProv.error ?? 'Could not open the file.',
-        isError: true,
-      );
-      return;
-    }
-
-    // A short-lived signed link: documents are private, so this is the only
-    // way to reach one outside the app.
-    final opened = await openExternal(Uri.parse(url));
-    if (!opened && mounted) {
-      showAppSnackBar(context, 'No app on this device can open that file.', isError: true);
-    }
+    return openRemoteFile(
+      context,
+      fetchUrl: () => docProv.downloadUrlFor(document),
+      errorMessage: () => docProv.error,
+    );
   }
 
   Future<void> _confirmDelete(DocumentItem document) async {

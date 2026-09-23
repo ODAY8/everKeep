@@ -412,6 +412,7 @@ void main() {
             '$testUserId/documents/a.pdf',
             '$testUserId/documents/b.pdf',
           },
+          'memories': {'$testUserId/memories/photo.jpg'},
           'avatars': {'$testUserId/avatar.png'},
         };
         supabase.route = storage(buckets);
@@ -419,6 +420,7 @@ void main() {
         await service.deleteAccount();
 
         expect(buckets['documents'], isEmpty);
+        expect(buckets['memories'], isEmpty);
         expect(buckets['avatars'], isEmpty);
 
         final order = supabase.requests
@@ -457,6 +459,10 @@ void main() {
           '$testUserId/documents/a.pdf',
           'someone-else/documents/x.pdf',
         },
+        'memories': {
+          '$testUserId/memories/a.jpg',
+          'someone-else/memories/x.jpg',
+        },
         'avatars': <String>{},
       };
       supabase.route = storage(buckets);
@@ -464,10 +470,46 @@ void main() {
       await service.deleteAccount();
 
       expect(buckets['documents'], {'someone-else/documents/x.pdf'});
+      expect(buckets['memories'], {'someone-else/memories/x.jpg'});
       for (final request in supabase.where('POST', '/object/list/')) {
         expect((request.json as Map)['prefix'], startsWith(testUserId));
       }
     });
+
+    test(
+      'if a memory\'s file can\'t be removed, the account is NOT deleted',
+      () async {
+        supabase.route = (request) {
+          if (request.path.contains('/object/list/memories')) {
+            return jsonResponse([
+              {'name': 'a.jpg', 'id': 'f1'},
+            ]);
+          }
+          if (request.method == 'DELETE' &&
+              request.path.startsWith('/storage/')) {
+            return errorResponse(500, {
+              'message': 'boom',
+              'statusCode': '500',
+              'error': 'x',
+            });
+          }
+          return jsonResponse([]);
+        };
+
+        final error = await failureOf(() => service.deleteAccount());
+
+        expect(error, isA<BackendException>());
+        expect(
+          supabase.where('POST', '/rest/v1/rpc/delete_my_account'),
+          isEmpty,
+        );
+        expect(
+          supabase.client.auth.currentSession,
+          isNotNull,
+          reason: 'still signed in',
+        );
+      },
+    );
 
     test(
       'the delete function is called with no arguments, so it can only act on the caller',

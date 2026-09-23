@@ -4,11 +4,13 @@ import 'package:everkeep/core/supabase/supabase_errors.dart';
 import 'package:everkeep/models/account_item.dart';
 import 'package:everkeep/models/document_item.dart';
 import 'package:everkeep/models/document_upload.dart';
+import 'package:everkeep/models/memory_item.dart';
 import 'package:everkeep/models/security_settings.dart';
 import 'package:everkeep/models/trusted_contact_item.dart';
 import 'package:everkeep/models/user.dart';
 import 'package:everkeep/services/account_service.dart';
 import 'package:everkeep/services/document_service.dart';
+import 'package:everkeep/services/memory_service.dart';
 import 'package:everkeep/services/settings_service.dart';
 import 'package:everkeep/services/trusted_contact_service.dart';
 import 'package:everkeep/services/user_service.dart';
@@ -53,6 +55,28 @@ void main() {
     'category': category,
     'file_path': filePath,
     'is_verified': verified,
+    'created_at': daysAgo(age),
+    'updated_at': daysAgo(age),
+  };
+
+  Map<String, Object?> memoryRow({
+    String id = 'mem-1',
+    String title = 'Summer at the lake',
+    String content = 'We spent the whole week there.',
+    String type = 'memory',
+    String? date,
+    String? filePath,
+    int age = 2,
+  }) => {
+    'id': id,
+    'user_id': testUserId,
+    'title': title,
+    'content': content,
+    'type': type,
+    'date': date,
+    'file_path': filePath,
+    'file_size': filePath == null ? null : 2048,
+    'mime_type': filePath == null ? null : 'image/jpeg',
     'created_at': daysAgo(age),
     'updated_at': daysAgo(age),
   };
@@ -321,6 +345,386 @@ void main() {
         expect(error.toString(), 'You don\'t have permission to do that.');
         expect(error.toString(), isNot(contains('row-level security')));
         expect(error.toString(), isNot(contains('documents')));
+      },
+    );
+  });
+
+  group('MemoryService', () {
+    late MemoryServiceImpl service;
+
+    setUp(() async {
+      await supabase.signIn();
+      service = MemoryServiceImpl(client: supabase.client);
+    });
+
+    test(
+      'fetch reads the memories_wishes table newest first and maps rows',
+      () async {
+        supabase.route = (_) => jsonResponse([
+          memoryRow(id: 'a', filePath: '$testUserId/memories/a.jpg'),
+          memoryRow(id: 'b', title: 'For my daughter', type: 'wish', age: 30),
+        ]);
+
+        final items = await service.fetchMemories();
+
+        final request = supabase.single('GET', '/rest/v1/memories_wishes');
+        expect(request.query['order'], startsWith('created_at.desc'));
+        expect(items.map((m) => m.id), ['a', 'b']);
+        expect(items.first.hasAttachment, isTrue);
+        expect(items.first.filePath, '$testUserId/memories/a.jpg');
+        expect(items.last.isWish, isTrue);
+        expect(items.last.subtitle, 'Wish · Added 1 month ago');
+      },
+    );
+
+    test('fetchMemory reads a single row by id', () async {
+      supabase.route = (_) => jsonResponse([memoryRow(id: 'mem-9')]);
+
+      final item = await service.fetchMemory('mem-9');
+
+      expect(supabase.single('GET', '/rest/v1/memories_wishes').query['id'], 'eq.mem-9');
+      expect(item.id, 'mem-9');
+    });
+
+    test('fetching an item that isn\'t there fails instead of pretending', () async {
+      supabase.route = (_) => jsonResponse([]); // RLS hides it, or it's gone
+
+      final error = await failureOf(() => service.fetchMemory('gone'));
+      expect(error.toString(), contains('couldn\'t be found'));
+    });
+
+    test(
+      'add sends only the writable columns — never an owner or the id',
+      () async {
+        supabase.route = (_) => jsonResponse(memoryRow(id: 'new', age: 0));
+
+        final saved = await service.createMemory(
+          const MemoryItem(
+            id: '',
+            title: '  Summer at the lake ',
+            content: ' We spent the whole week there. ',
+            type: 'memory',
+          ),
+        );
+
+        final request = supabase.single('POST', '/rest/v1/memories_wishes');
+        expect(request.json, {
+          'title': 'Summer at the lake',
+          'content': 'We spent the whole week there.',
+          'type': 'memory',
+        });
+        expect(request.headers['Prefer'], contains('return=representation'));
+        expect(saved.id, 'new');
+      },
+    );
+
+    test(
+      'add with a file uploads to the user\'s own private folder first',
+      () async {
+        supabase.route = (request) => request.path.startsWith('/storage/')
+            ? jsonResponse({'Key': 'memories/x'})
+            : jsonResponse(memoryRow(id: 'new', filePath: 'ignored'));
+
+        await service.createMemory(
+          const MemoryItem(id: '', title: 'A photo', content: '', type: 'memory'),
+          upload: DocumentUpload(
+            fileName: '../../evil?.jpg',
+            bytes: Uint8List.fromList([1, 2, 3, 4]),
+            mimeType: 'image/jpeg',
+          ),
+        );
+
+        expect(supabase.requests.map((r) => r.method), ['POST', 'POST']);
+        final upload = supabase.requests[0];
+        final insert = supabase.requests[1];
+
+        expect(
+          upload.path,
+          startsWith('/storage/v1/object/memories/$testUserId/memories/'),
+        );
+        final storedName = upload.path.split('/').last;
+        expect(storedName, isNot(contains('..')));
+        expect(storedName, isNot(contains('?')));
+        expect(storedName, endsWith('.jpg'));
+
+        final row = insert.json as Map<String, dynamic>;
+        expect(row['file_path'], startsWith('$testUserId/memories/'));
+        expect(row['file_size'], 4);
+        expect(row['mime_type'], 'image/jpeg');
+        expect(row.containsKey('user_id'), isFalse);
+      },
+    );
+
+    test(
+      'if saving the row fails, the uploaded file is removed again',
+      () async {
+        supabase.route = (request) {
+          if (request.method == 'POST' && request.path.startsWith('/storage/')) {
+            return jsonResponse({'Key': 'memories/x'});
+          }
+          if (request.method == 'DELETE' && request.path.startsWith('/storage/')) {
+            return jsonResponse([]);
+          }
+          return rlsViolation();
+        };
+
+        final error = await failureOf(
+          () => service.createMemory(
+            const MemoryItem(id: '', title: 'A photo', content: '', type: 'memory'),
+            upload: DocumentUpload(fileName: 'a.jpg', bytes: Uint8List(2)),
+          ),
+        );
+
+        expect(error, isA<BackendException>());
+        expect(supabase.where('DELETE', '/storage/v1/object/memories'), hasLength(1));
+      },
+    );
+
+    test('update targets the row by id and keeps the existing attachment', () async {
+      supabase.route = (_) =>
+          jsonResponse([memoryRow(title: 'Summer at the cabin', filePath: '$testUserId/memories/a.jpg')]);
+
+      final saved = await service.updateMemory(
+        MemoryItem(
+          id: 'mem-1',
+          title: 'Summer at the cabin',
+          content: 'Updated.',
+          type: 'memory',
+          filePath: '$testUserId/memories/a.jpg',
+        ),
+      );
+
+      final request = supabase.single('PATCH', '/rest/v1/memories_wishes');
+      expect(request.query['id'], 'eq.mem-1');
+      expect(request.json, {
+        'title': 'Summer at the cabin',
+        'content': 'Updated.',
+        'type': 'memory',
+        'date': null,
+        'file_path': '$testUserId/memories/a.jpg',
+        'file_size': null,
+        'mime_type': null,
+      });
+      expect(saved.title, 'Summer at the cabin');
+    });
+
+    test('updating an item that isn\'t there fails instead of pretending', () async {
+      supabase.route = (_) => jsonResponse([]);
+
+      final error = await failureOf(
+        () => service.updateMemory(
+          const MemoryItem(id: 'gone', title: 'x', content: '', type: 'memory'),
+        ),
+      );
+
+      expect(error.toString(), contains('couldn\'t be found'));
+    });
+
+    test('delete removes the stored file before the row', () async {
+      supabase.route = (request) {
+        if (request.method == 'GET') {
+          return jsonResponse([
+            {'file_path': '$testUserId/memories/a.jpg'},
+          ]);
+        }
+        return jsonResponse([]);
+      };
+
+      await service.deleteMemory('mem-1');
+
+      expect(
+        supabase.requests.map((r) => '${r.method} ${r.path.split('/')[1]}'),
+        ['GET rest', 'DELETE storage', 'DELETE rest'],
+      );
+    });
+
+    test(
+      'if the file can\'t be removed, the row is kept so delete can be retried',
+      () async {
+        supabase.route = (request) {
+          if (request.method == 'GET') {
+            return jsonResponse([
+              {'file_path': '$testUserId/memories/a.jpg'},
+            ]);
+          }
+          if (request.path.startsWith('/storage/')) {
+            return errorResponse(500, {'message': 'boom', 'statusCode': '500', 'error': 'x'});
+          }
+          return jsonResponse([]);
+        };
+
+        final error = await failureOf(() => service.deleteMemory('mem-1'));
+
+        expect(error, isA<BackendException>());
+        expect(supabase.where('DELETE', '/rest/v1/memories_wishes'), isEmpty);
+      },
+    );
+
+    test('deleting an item without a file never touches Storage', () async {
+      supabase.route = (request) => request.method == 'GET'
+          ? jsonResponse([
+              {'file_path': null},
+            ])
+          : jsonResponse([]);
+
+      await service.deleteMemory('mem-1');
+
+      expect(supabase.requests.where((r) => r.path.startsWith('/storage/')), isEmpty);
+      expect(supabase.where('DELETE', '/rest/v1/memories_wishes'), hasLength(1));
+    });
+
+    test(
+      'uploadAttachment replaces the file and only then removes the old one',
+      () async {
+        var getCount = 0;
+        supabase.route = (request) {
+          if (request.method == 'GET') {
+            getCount++;
+            return jsonResponse([
+              {'file_path': '$testUserId/memories/old.jpg'},
+            ]);
+          }
+          if (request.method == 'POST' && request.path.startsWith('/storage/')) {
+            return jsonResponse({'Key': 'memories/new'});
+          }
+          if (request.method == 'PATCH') {
+            return jsonResponse([memoryRow(filePath: '$testUserId/memories/new.jpg')]);
+          }
+          return jsonResponse([]); // the DELETE of the old file
+        };
+
+        final saved = await service.uploadAttachment(
+          'mem-1',
+          DocumentUpload(fileName: 'new.jpg', bytes: Uint8List.fromList([1, 2])),
+        );
+
+        expect(getCount, 1);
+        final methods = supabase.requests.map((r) => r.method).toList();
+        expect(methods, ['GET', 'POST', 'PATCH', 'DELETE']);
+        expect(supabase.requests[3].path, '/storage/v1/object/memories');
+        expect(
+          (supabase.requests[3].json as Map)['prefixes'],
+          contains('$testUserId/memories/old.jpg'),
+        );
+        expect(saved.filePath, '$testUserId/memories/new.jpg');
+      },
+    );
+
+    test(
+      'uploadAttachment on an item that isn\'t there fails before uploading anything',
+      () async {
+        supabase.route = (_) => jsonResponse([]);
+
+        final error = await failureOf(
+          () => service.uploadAttachment(
+            'gone',
+            DocumentUpload(fileName: 'a.jpg', bytes: Uint8List(2)),
+          ),
+        );
+
+        expect(error.toString(), contains('couldn\'t be found'));
+        expect(supabase.requests.where((r) => r.path.startsWith('/storage/')), isEmpty);
+      },
+    );
+
+    test(
+      'if saving the new attachment fails, the newly uploaded file is removed',
+      () async {
+        supabase.route = (request) {
+          if (request.method == 'GET') {
+            return jsonResponse([
+              {'file_path': null},
+            ]);
+          }
+          if (request.method == 'POST' && request.path.startsWith('/storage/')) {
+            return jsonResponse({'Key': 'memories/new'});
+          }
+          if (request.method == 'DELETE' && request.path.startsWith('/storage/')) {
+            return jsonResponse([]);
+          }
+          return rlsViolation(); // the PATCH
+        };
+
+        final error = await failureOf(
+          () => service.uploadAttachment(
+            'mem-1',
+            DocumentUpload(fileName: 'new.jpg', bytes: Uint8List(2)),
+          ),
+        );
+
+        expect(error, isA<BackendException>());
+        expect(supabase.where('DELETE', '/storage/v1/object/memories'), hasLength(1));
+      },
+    );
+
+    test('deleteAttachment clears the row and removes the stored file', () async {
+      supabase.route = (request) {
+        if (request.method == 'GET') {
+          return jsonResponse([
+            {'file_path': '$testUserId/memories/a.jpg'},
+          ]);
+        }
+        if (request.method == 'PATCH') {
+          return jsonResponse([memoryRow()]); // file_path back to null
+        }
+        return jsonResponse([]); // the DELETE
+      };
+
+      final saved = await service.deleteAttachment('mem-1');
+
+      final patch = supabase.single('PATCH', '/rest/v1/memories_wishes');
+      expect(patch.json, {'file_path': null, 'file_size': null, 'mime_type': null});
+      expect(
+        supabase.where('DELETE', '/storage/v1/object/memories'),
+        hasLength(1),
+      );
+      expect(saved.hasAttachment, isFalse);
+    });
+
+    test('deleteAttachment on an item with no file just leaves it as is', () async {
+      supabase.route = (request) {
+        if (request.method == 'GET') {
+          return jsonResponse([
+            {'file_path': null},
+          ]);
+        }
+        return jsonResponse([memoryRow()]);
+      };
+
+      await service.deleteAttachment('mem-1');
+
+      expect(supabase.requests.where((r) => r.path.startsWith('/storage/')), isEmpty);
+    });
+
+    test(
+      'download links are short-lived signed URLs, not public URLs',
+      () async {
+        supabase.route = (_) => jsonResponse({
+          'signedURL': '/object/sign/memories/a.jpg?token=abc',
+        });
+
+        final url = await service.createDownloadUrl('$testUserId/memories/a.jpg');
+
+        final request = supabase.single('POST', '/storage/v1/object/sign/memories/');
+        expect((request.json as Map)['expiresIn'], 300);
+        expect(url, contains('token=abc'));
+      },
+    );
+
+    test(
+      'a database rejection becomes a safe message that leaks nothing',
+      () async {
+        supabase.route = (_) => rlsViolation();
+
+        final error = await failureOf(
+          () => service.createMemory(
+            const MemoryItem(id: '', title: 'x', content: '', type: 'memory'),
+          ),
+        );
+
+        expect(error.toString(), 'You don\'t have permission to do that.');
+        expect(error.toString(), isNot(contains('row-level security')));
+        expect(error.toString(), isNot(contains('memories_wishes')));
       },
     );
   });

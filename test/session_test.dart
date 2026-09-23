@@ -7,6 +7,7 @@ import 'package:everkeep/models/security_settings.dart';
 import 'package:everkeep/providers/account_provider.dart';
 import 'package:everkeep/providers/auth_provider.dart';
 import 'package:everkeep/providers/document_provider.dart';
+import 'package:everkeep/providers/memory_provider.dart';
 import 'package:everkeep/providers/settings_provider.dart';
 import 'package:everkeep/providers/trusted_contact_provider.dart';
 import 'package:everkeep/providers/user_provider.dart';
@@ -21,6 +22,7 @@ import 'fakes.dart';
 class Harness {
   final authRepo = FakeAuthRepository();
   final docRepo = FakeDocumentRepository();
+  final memoryRepo = FakeMemoryRepository();
   final accRepo = FakeAccountRepository();
   final contactRepo = FakeTrustedContactRepository();
   final settingsRepo = FakeSettingsRepository();
@@ -30,6 +32,7 @@ class Harness {
   late final user = UserProvider(userRepository: FakeUserRepository(authRepo));
   late final vault = VaultProvider(vaultRepository: vaultRepo);
   late final documents = DocumentProvider(documentRepository: docRepo);
+  late final memories = MemoryProvider(memoryRepository: memoryRepo);
   late final accounts = AccountProvider(accountRepository: accRepo);
   late final contacts = TrustedContactProvider(
     trustedContactRepository: contactRepo,
@@ -41,6 +44,7 @@ class Harness {
     user: user,
     vault: vault,
     documents: documents,
+    memories: memories,
     accounts: accounts,
     contacts: contacts,
     settings: settings,
@@ -85,9 +89,11 @@ void main() {
 
       expect(h.user.displayEmail, 'alex@example.com');
       expect(h.documents.hasFetched, isTrue);
+      expect(h.memories.hasFetched, isTrue);
       expect(h.accounts.hasFetched, isTrue);
       expect(h.contacts.hasFetched, isTrue);
       expect(h.documents.count, 3);
+      expect(h.memories.count, 2);
       expect(h.accounts.count, 2);
       expect(h.contacts.count, 2);
     });
@@ -106,6 +112,8 @@ void main() {
       expect(h.user.user, isNull);
       expect(h.documents.documents, isEmpty);
       expect(h.documents.hasFetched, isFalse);
+      expect(h.memories.items, isEmpty);
+      expect(h.memories.hasFetched, isFalse);
       expect(h.accounts.accounts, isEmpty);
       expect(h.accounts.hasFetched, isFalse);
       expect(h.contacts.contacts, isEmpty);
@@ -345,6 +353,7 @@ void main() {
         expect(h.auth.currentUser, isNull);
         expect(h.user.user, isNull);
         expect(h.documents.documents, isEmpty);
+        expect(h.memories.items, isEmpty);
         expect(h.accounts.accounts, isEmpty);
         expect(h.contacts.contacts, isEmpty);
       },
@@ -411,6 +420,7 @@ void main() {
         user: UserProvider(userRepository: userRepo),
         vault: h.vault,
         documents: h.documents,
+        memories: h.memories,
         accounts: h.accounts,
         contacts: h.contacts,
         settings: h.settings,

@@ -23,44 +23,46 @@ class FloatingBottomNav extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: 84,
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
-      decoration: const BoxDecoration(
-        color: AppColors.glassNavBarBg,
-        border: Border(top: BorderSide(color: AppColors.glassBorder)),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          _NavItem(
-            icon: Icons.home_rounded,
-            label: 'Home',
-            index: 0,
-            currentIndex: currentIndex,
-            onTap: onTap,
-          ),
-          _NavItem(
-            icon: Icons.explore_outlined,
-            label: 'Vault',
-            index: 1,
-            currentIndex: currentIndex,
-            onTap: onTap,
-          ),
-          _CenterAddButton(onTap: () => onTap(2)),
-          _NavItem(
-            icon: Icons.favorite_rounded,
-            label: 'Memories',
-            index: 3,
-            currentIndex: currentIndex,
-            onTap: onTap,
-          ),
-          _ProfileNavItem(
-            index: 4,
-            currentIndex: currentIndex,
-            onTap: onTap,
-          ),
-        ],
+    return RepaintBoundary(
+      child: Container(
+        height: 84,
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
+        decoration: const BoxDecoration(
+          color: AppColors.glassNavBarBg,
+          border: Border(top: BorderSide(color: AppColors.glassBorder)),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            _NavItem(
+              icon: Icons.home_rounded,
+              label: 'Home',
+              index: 0,
+              currentIndex: currentIndex,
+              onTap: onTap,
+            ),
+            _NavItem(
+              icon: Icons.explore_outlined,
+              label: 'Vault',
+              index: 1,
+              currentIndex: currentIndex,
+              onTap: onTap,
+            ),
+            _CenterAddButton(onTap: () => onTap(2)),
+            _NavItem(
+              icon: Icons.favorite_rounded,
+              label: 'Memories',
+              index: 3,
+              currentIndex: currentIndex,
+              onTap: onTap,
+            ),
+            _ProfileNavItem(
+              index: 4,
+              currentIndex: currentIndex,
+              onTap: onTap,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -93,25 +95,21 @@ class _NavItem extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            AnimatedScale(
-              scale: isActive ? 1.12 : 1.0,
-              duration: const Duration(milliseconds: 180),
-              curve: Curves.easeOut,
-              child: Icon(icon, size: 22, color: color),
+            Icon(
+              icon,
+              size: 22,
+              color: color,
             ),
             const SizedBox(height: 4),
-            // Shrinks a long label (e.g. "Memories" at a large text scale)
-            // to fit the 60px slot instead of wrapping and overflowing.
-            FittedBox(
-              fit: BoxFit.scaleDown,
-              child: AnimatedDefaultTextStyle(
-                duration: const Duration(milliseconds: 180),
-                style: AppTextStyles.labelSmall.copyWith(
-                  color: color,
-                  fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
-                  fontSize: 11,
-                ),
-                child: Text(label, maxLines: 1, softWrap: false),
+            Text(
+              label,
+              maxLines: 1,
+              softWrap: false,
+              overflow: TextOverflow.ellipsis,
+              style: AppTextStyles.labelSmall.copyWith(
+                color: color,
+                fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
+                fontSize: 11,
               ),
             ),
           ],
@@ -138,14 +136,11 @@ class _ProfileNavItem extends StatelessWidget {
     return GestureDetector(
       onTap: () => onTap(index),
       behavior: HitTestBehavior.opaque,
-      // The signed-in user's real photo (an icon until they add one).
       child: Selector<UserProvider, String?>(
         selector: (_, userProv) => userProv.user?.avatarUrl,
         builder: (context, avatarUrl, _) => ProfileAvatar(
           url: avatarUrl,
           size: 36,
-          // Also the colour of the placeholder icon, so it stays visible when
-          // there is no photo and no ring.
           borderColor: isActive
               ? AppColors.glassAccentPink
               : AppColors.glassOnSurfaceFaint,
@@ -165,6 +160,7 @@ class _CenterAddButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
+      behavior: HitTestBehavior.opaque,
       child: Transform.translate(
         offset: const Offset(0, -14),
         child: Container(

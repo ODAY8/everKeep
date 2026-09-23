@@ -16,20 +16,28 @@ class MainShell extends StatefulWidget {
 
 class _MainShellState extends State<MainShell> {
   int _currentIndex = 0;
-
-  static const _screens = [
-    HomeScreen(),
-    VaultScreen(),
-    SizedBox.shrink(),
-    WishesScreen(),
-    ProfileScreen(),
-  ];
+  final Set<int> _loadedTabs = {0};
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.glassBackground,
-      body: IndexedStack(index: _currentIndex, children: _screens),
+      body: IndexedStack(
+        index: _currentIndex,
+        children: [
+          const RepaintBoundary(child: HomeScreen()),
+          _loadedTabs.contains(1)
+              ? const RepaintBoundary(child: VaultScreen())
+              : const SizedBox.shrink(),
+          const SizedBox.shrink(),
+          _loadedTabs.contains(3)
+              ? const RepaintBoundary(child: WishesScreen())
+              : const SizedBox.shrink(),
+          _loadedTabs.contains(4)
+              ? const RepaintBoundary(child: ProfileScreen())
+              : const SizedBox.shrink(),
+        ],
+      ),
       bottomNavigationBar: FloatingBottomNav(
         currentIndex: _currentIndex,
         onTap: (index) {
@@ -37,7 +45,10 @@ class _MainShellState extends State<MainShell> {
             Navigator.of(context).pushNamed(AppRouter.documents);
             return;
           }
-          setState(() => _currentIndex = index);
+          setState(() {
+            _currentIndex = index;
+            _loadedTabs.add(index);
+          });
         },
       ),
     );

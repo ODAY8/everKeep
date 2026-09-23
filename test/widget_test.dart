@@ -1,4 +1,5 @@
 import 'package:everkeep/core/routing/app_router.dart';
+import 'package:everkeep/core/utils/greeting.dart';
 import 'package:everkeep/features/accounts/presentation/screens/accounts_screen.dart';
 import 'package:everkeep/features/auth/presentation/screens/forgot_password_screen.dart';
 import 'package:everkeep/features/auth/presentation/screens/sign_in_screen.dart';
@@ -23,6 +24,7 @@ import 'fakes.dart';
 import 'package:everkeep/providers/account_provider.dart';
 import 'package:everkeep/providers/auth_provider.dart';
 import 'package:everkeep/providers/document_provider.dart';
+import 'package:everkeep/providers/memory_provider.dart';
 import 'package:everkeep/providers/settings_provider.dart';
 import 'package:everkeep/providers/trusted_contact_provider.dart';
 import 'package:everkeep/providers/user_provider.dart';
@@ -56,6 +58,10 @@ void main() {
           ChangeNotifierProvider(
             create: (_) =>
                 DocumentProvider(documentRepository: FakeDocumentRepository()),
+          ),
+          ChangeNotifierProvider(
+            create: (_) =>
+                MemoryProvider(memoryRepository: FakeMemoryRepository()),
           ),
           ChangeNotifierProvider(
             create: (_) =>
@@ -116,7 +122,7 @@ void main() {
   testWidgets('HomeScreen builds without throwing', (tester) async {
     await pumpScreen(tester, const HomeScreen());
     expect(tester.takeException(), isNull);
-    expect(find.text('Good morning,'), findsOneWidget);
+    expect(find.text('${greetingFor(DateTime.now())},'), findsOneWidget);
   });
 
   testWidgets('VaultScreen builds without throwing', (tester) async {

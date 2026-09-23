@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:everkeep/models/account_item.dart';
 import 'package:everkeep/models/document_item.dart';
 import 'package:everkeep/models/document_upload.dart';
+import 'package:everkeep/models/memory_item.dart';
 import 'package:everkeep/models/security_settings.dart';
 import 'package:everkeep/models/trusted_contact_item.dart';
 import 'package:everkeep/models/user.dart';
@@ -10,6 +11,7 @@ import 'package:everkeep/models/vault_summary.dart';
 import 'package:everkeep/repositories/account_repository.dart';
 import 'package:everkeep/repositories/auth_repository.dart';
 import 'package:everkeep/repositories/document_repository.dart';
+import 'package:everkeep/repositories/memory_repository.dart';
 import 'package:everkeep/repositories/settings_repository.dart';
 import 'package:everkeep/repositories/trusted_contact_repository.dart';
 import 'package:everkeep/repositories/user_repository.dart';
@@ -186,6 +188,126 @@ class FakeDocumentRepository with Failable implements DocumentRepository {
   Future<void> deleteDocument(String id) async {
     throwIfFailing();
     items.removeWhere((d) => d.id == id);
+  }
+
+  @override
+  Future<String> createDownloadUrl(String filePath) async {
+    throwIfFailing();
+    return 'https://example.test/signed/$filePath';
+  }
+}
+
+class FakeMemoryRepository with Failable implements MemoryRepository {
+  final List<MemoryItem> items;
+
+  /// The upload passed to the most recent [createMemory] or
+  /// [uploadAttachment], if any.
+  DocumentUpload? lastUpload;
+
+  int _nextId = 100;
+
+  FakeMemoryRepository([List<MemoryItem>? seed])
+    : items =
+          seed ??
+          [
+            memory('m1', 'Summer at the lake', type: 'memory'),
+            memory('m2', 'For my daughter', type: 'wish'),
+          ];
+
+  static MemoryItem memory(
+    String id,
+    String title, {
+    String type = 'memory',
+    String? filePath,
+  }) => MemoryItem(
+    id: id,
+    title: title,
+    content: 'Some notes about $title.',
+    type: type,
+    filePath: filePath,
+    createdAt: DateTime.now().subtract(const Duration(days: 1)),
+  );
+
+  @override
+  Future<List<MemoryItem>> fetchMemories() async {
+    throwIfFailing();
+    return List.of(items);
+  }
+
+  @override
+  Future<MemoryItem> fetchMemory(String id) async {
+    throwIfFailing();
+    return items.firstWhere(
+      (m) => m.id == id,
+      orElse: () => throw Exception('That item couldn\'t be found.'),
+    );
+  }
+
+  @override
+  Future<MemoryItem> createMemory(
+    MemoryItem item, {
+    DocumentUpload? upload,
+  }) async {
+    throwIfFailing();
+    lastUpload = upload;
+    // Like the backend, assign the id; a file upload fills in the storage
+    // columns.
+    final saved = item.copyWith(
+      id: item.id.isEmpty ? 'gen-${_nextId++}' : item.id,
+      filePath: upload != null ? 'user/memories/${upload.fileName}' : item.filePath,
+      fileSize: upload != null ? upload.bytes.length : item.fileSize,
+      mimeType: upload?.mimeType ?? item.mimeType,
+      createdAt: DateTime.now(),
+    );
+    items.insert(0, saved);
+    return saved;
+  }
+
+  @override
+  Future<MemoryItem> updateMemory(MemoryItem item) async {
+    throwIfFailing();
+    final index = items.indexWhere((m) => m.id == item.id);
+    if (index == -1) throw Exception('That item couldn\'t be found.');
+    return items[index] = item;
+  }
+
+  @override
+  Future<void> deleteMemory(String id) async {
+    throwIfFailing();
+    items.removeWhere((m) => m.id == id);
+  }
+
+  @override
+  Future<MemoryItem> uploadAttachment(String id, DocumentUpload upload) async {
+    throwIfFailing();
+    lastUpload = upload;
+    final index = items.indexWhere((m) => m.id == id);
+    if (index == -1) throw Exception('That item couldn\'t be found.');
+    final saved = items[index].copyWith(
+      filePath: 'user/memories/${upload.fileName}',
+      fileSize: upload.bytes.length,
+      mimeType: upload.mimeType,
+    );
+    return items[index] = saved;
+  }
+
+  @override
+  Future<MemoryItem> deleteAttachment(String id) async {
+    throwIfFailing();
+    final index = items.indexWhere((m) => m.id == id);
+    if (index == -1) throw Exception('That item couldn\'t be found.');
+    final current = items[index];
+    // copyWith can't null a field out, so rebuild without the attachment.
+    final saved = MemoryItem(
+      id: current.id,
+      title: current.title,
+      content: current.content,
+      type: current.type,
+      date: current.date,
+      createdAt: current.createdAt,
+      updatedAt: current.updatedAt,
+    );
+    return items[index] = saved;
   }
 
   @override

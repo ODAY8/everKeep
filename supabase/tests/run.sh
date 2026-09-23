@@ -32,5 +32,5 @@ run() {
 run supabase/tests/00_supabase_stub.sql
 for migration in supabase/migrations/*.sql; do run "$migration"; done
 run supabase/tests/05_test_helpers.sql
-for t in supabase/tests/10_rls_test.sql supabase/tests/20_account_management_test.sql; do run "$t" 2>&1 | grep -E "^(psql:.*)?(NOTICE|ERROR)|FAIL|ok - " | sed -E "s/^psql:[^ ]+ NOTICE:  //"; done
+for t in supabase/tests/10_rls_test.sql supabase/tests/20_account_management_test.sql supabase/tests/30_memories_wishes_test.sql; do run "$t" 2>&1 | grep -E "^(psql:.*)?(NOTICE|ERROR)|FAIL|ok - " | sed -E "s/^psql:[^ ]+ NOTICE:  //"; done
 echo "All database checks passed."

@@ -174,6 +174,11 @@ class GlassFormField {
   /// Extra validation for a non-empty value; returns an error message or null.
   final String? Function(String value)? validator;
 
+  /// For a field that should grow to fit longer text (a memory's content,
+  /// say) rather than stay a single line. Leave both at 1 for a normal field.
+  final int minLines;
+  final int maxLines;
+
   const GlassFormField({
     required this.key,
     required this.label,
@@ -183,6 +188,27 @@ class GlassFormField {
     this.initialValue = '',
     this.obscure = false,
     this.validator,
+    this.minLines = 1,
+    this.maxLines = 1,
+  });
+}
+
+/// An optional date in a [showGlassFormSheet]. Tapping it opens the platform
+/// date picker; the chosen date is returned to `onSubmit` under [key] as
+/// `yyyy-MM-dd`, or `''` if left unset.
+class GlassFormDateField {
+  final String key;
+  final String label;
+  final DateTime? initialValue;
+  final DateTime? firstDate;
+  final DateTime? lastDate;
+
+  const GlassFormDateField({
+    required this.key,
+    required this.label,
+    this.initialValue,
+    this.firstDate,
+    this.lastDate,
   });
 }
 
@@ -215,6 +241,7 @@ Future<bool> showGlassFormSheet(
   required String submitLabel,
   List<GlassFormField> fields = const [],
   List<GlassFormChoice> choices = const [],
+  List<GlassFormDateField> dateFields = const [],
   required Future<String?> Function(Map<String, String> values) onSubmit,
 }) async {
   final saved = await showGlassSheet<bool>(
@@ -227,6 +254,7 @@ Future<bool> showGlassFormSheet(
       submitLabel: submitLabel,
       fields: fields,
       choices: choices,
+      dateFields: dateFields,
       onSubmit: onSubmit,
     ),
   );
@@ -239,6 +267,7 @@ class _GlassFormSheet extends StatefulWidget {
   final String submitLabel;
   final List<GlassFormField> fields;
   final List<GlassFormChoice> choices;
+  final List<GlassFormDateField> dateFields;
   final Future<String?> Function(Map<String, String> values) onSubmit;
 
   const _GlassFormSheet({
@@ -247,6 +276,7 @@ class _GlassFormSheet extends StatefulWidget {
     required this.submitLabel,
     required this.fields,
     required this.choices,
+    required this.dateFields,
     required this.onSubmit,
   });
 
@@ -261,6 +291,9 @@ class _GlassFormSheetState extends State<_GlassFormSheet> {
   };
   late final Map<String, int> _selected = {
     for (final choice in widget.choices) choice.key: choice.initialIndex,
+  };
+  late final Map<String, DateTime?> _dates = {
+    for (final dateField in widget.dateFields) dateField.key: dateField.initialValue,
   };
 
   Map<String, String> _errors = {};
@@ -281,6 +314,8 @@ class _GlassFormSheetState extends State<_GlassFormSheet> {
         field.key: _controllers[field.key]!.text.trim(),
       for (final choice in widget.choices)
         choice.key: choice.options[_selected[choice.key]!],
+      for (final dateField in widget.dateFields)
+        dateField.key: _isoDate(_dates[dateField.key]),
     };
 
     final errors = <String, String>{};
@@ -314,6 +349,20 @@ class _GlassFormSheetState extends State<_GlassFormSheet> {
     }
   }
 
+  static String _isoDate(DateTime? date) =>
+      date == null ? '' : date.toIso8601String().substring(0, 10);
+
+  Future<void> _pickDate(GlassFormDateField dateField) async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _dates[dateField.key] ?? now,
+      firstDate: dateField.firstDate ?? DateTime(1900),
+      lastDate: dateField.lastDate ?? DateTime(now.year + 50),
+    );
+    if (picked != null) setState(() => _dates[dateField.key] = picked);
+  }
+
   @override
   Widget build(BuildContext context) {
     return PopScope(
@@ -333,6 +382,64 @@ class _GlassFormSheetState extends State<_GlassFormSheet> {
               keyboardType: field.keyboardType,
               obscureText: field.obscure,
               errorText: _errors[field.key],
+              minLines: field.minLines,
+              maxLines: field.maxLines,
+            ),
+            const SizedBox(height: 16),
+          ],
+          for (final dateField in widget.dateFields) ...[
+            Text(
+              dateField.label.toUpperCase(),
+              style: AppTextStyles.overline.copyWith(
+                color: AppColors.glassOnSurfaceMuted,
+              ),
+            ),
+            const SizedBox(height: 8),
+            GestureDetector(
+              onTap: _submitting ? null : () => _pickDate(dateField),
+              child: Container(
+                height: 48,
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                decoration: BoxDecoration(
+                  color: AppColors.glassBackground,
+                  borderRadius: AppRadius.radiusLG,
+                  border: Border.all(color: AppColors.glassBorder),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.calendar_today_rounded,
+                      color: AppColors.glassOnSurfaceFaint,
+                      size: 18,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        _dates[dateField.key] == null
+                            ? 'Not set'
+                            : _isoDate(_dates[dateField.key]),
+                        style: AppTextStyles.bodyMedium.copyWith(
+                          fontSize: 15,
+                          color: _dates[dateField.key] == null
+                              ? AppColors.glassOnSurfaceFaint
+                              : AppColors.glassOnSurface,
+                        ),
+                      ),
+                    ),
+                    if (_dates[dateField.key] != null)
+                      GestureDetector(
+                        onTap: _submitting
+                            ? null
+                            : () => setState(() => _dates[dateField.key] = null),
+                        child: const Icon(
+                          Icons.close_rounded,
+                          color: AppColors.glassOnSurfaceFaint,
+                          size: 18,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
             ),
             const SizedBox(height: 16),
           ],

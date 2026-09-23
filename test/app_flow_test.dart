@@ -6,6 +6,7 @@ import 'package:everkeep/main.dart';
 import 'package:everkeep/providers/account_provider.dart';
 import 'package:everkeep/providers/auth_provider.dart';
 import 'package:everkeep/providers/document_provider.dart';
+import 'package:everkeep/providers/memory_provider.dart';
 import 'package:everkeep/providers/settings_provider.dart';
 import 'package:everkeep/providers/trusted_contact_provider.dart';
 import 'package:everkeep/providers/user_provider.dart';
@@ -47,6 +48,10 @@ void main() {
         ChangeNotifierProvider<DocumentProvider>(
           create: (_) =>
               DocumentProvider(documentRepository: FakeDocumentRepository()),
+        ),
+        ChangeNotifierProvider<MemoryProvider>(
+          create: (_) =>
+              MemoryProvider(memoryRepository: FakeMemoryRepository()),
         ),
         ChangeNotifierProvider<AccountProvider>(
           create: (_) =>

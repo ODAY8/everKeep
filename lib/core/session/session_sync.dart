@@ -7,6 +7,7 @@ import '../routing/app_router.dart';
 import '../../providers/account_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/document_provider.dart';
+import '../../providers/memory_provider.dart';
 import '../../providers/settings_provider.dart';
 import '../../providers/trusted_contact_provider.dart';
 import '../../providers/user_provider.dart';
@@ -28,6 +29,7 @@ class SessionCoordinator {
   final UserProvider user;
   final VaultProvider vault;
   final DocumentProvider documents;
+  final MemoryProvider memories;
   final AccountProvider accounts;
   final TrustedContactProvider contacts;
   final SettingsProvider settings;
@@ -44,6 +46,7 @@ class SessionCoordinator {
     required this.user,
     required this.vault,
     required this.documents,
+    required this.memories,
     required this.accounts,
     required this.contacts,
     required this.settings,
@@ -96,6 +99,7 @@ class SessionCoordinator {
     unawaited(vault.fetchVaultSummary());
     unawaited(settings.fetchSecuritySettings());
     unawaited(documents.fetchDocuments());
+    unawaited(memories.fetchMemories());
     unawaited(accounts.fetchAccounts());
     unawaited(contacts.fetchContacts());
   }
@@ -104,6 +108,7 @@ class SessionCoordinator {
     user.reset();
     vault.reset();
     documents.reset();
+    memories.reset();
     accounts.reset();
     contacts.reset();
     settings.reset();
@@ -141,6 +146,7 @@ class _SessionSyncState extends State<SessionSync> {
       user: context.read<UserProvider>(),
       vault: context.read<VaultProvider>(),
       documents: context.read<DocumentProvider>(),
+      memories: context.read<MemoryProvider>(),
       accounts: context.read<AccountProvider>(),
       contacts: context.read<TrustedContactProvider>(),
       settings: context.read<SettingsProvider>(),

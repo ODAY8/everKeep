@@ -18,6 +18,12 @@ class GlassTextField extends StatelessWidget {
   final TextInputAction? textInputAction;
   final String? errorText;
 
+  /// For a multi-line field (e.g. a memory's content): the field grows with
+  /// its text between [minLines] and [maxLines] instead of staying a fixed
+  /// 48px single line. Leave both at 1 (the default) for a normal field.
+  final int minLines;
+  final int maxLines;
+
   const GlassTextField({
     super.key,
     this.controller,
@@ -30,10 +36,14 @@ class GlassTextField extends StatelessWidget {
     this.keyboardType,
     this.textInputAction,
     this.errorText,
+    this.minLines = 1,
+    this.maxLines = 1,
   });
 
   @override
   Widget build(BuildContext context) {
+    final multiline = maxLines != 1;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -47,8 +57,8 @@ class GlassTextField extends StatelessWidget {
           const SizedBox(height: 8),
         ],
         Container(
-          height: 48,
-          padding: const EdgeInsets.symmetric(horizontal: 16),
+          height: multiline ? null : 48,
+          padding: EdgeInsets.symmetric(horizontal: 16, vertical: multiline ? 12 : 0),
           decoration: BoxDecoration(
             color: AppColors.glassBackground,
             borderRadius: AppRadius.radiusLG,
@@ -57,6 +67,8 @@ class GlassTextField extends StatelessWidget {
             ),
           ),
           child: Row(
+            crossAxisAlignment:
+                multiline ? CrossAxisAlignment.start : CrossAxisAlignment.center,
             children: [
               if (prefixIcon != null) ...[
                 Icon(prefixIcon, color: AppColors.glassOnSurfaceFaint, size: 20),
@@ -66,8 +78,10 @@ class GlassTextField extends StatelessWidget {
                 child: TextField(
                   controller: controller,
                   obscureText: obscureText,
-                  keyboardType: keyboardType,
+                  keyboardType: keyboardType ?? (multiline ? TextInputType.multiline : null),
                   textInputAction: textInputAction,
+                  minLines: multiline ? minLines : null,
+                  maxLines: multiline ? maxLines : 1,
                   style: AppTextStyles.bodyMedium.copyWith(
                     fontSize: 15,
                     color: AppColors.glassOnSurface,

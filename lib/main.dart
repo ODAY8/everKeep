@@ -11,6 +11,7 @@ import 'core/theme/app_theme.dart';
 import 'providers/account_provider.dart';
 import 'providers/auth_provider.dart';
 import 'providers/document_provider.dart';
+import 'providers/memory_provider.dart';
 import 'providers/settings_provider.dart';
 import 'providers/trusted_contact_provider.dart';
 import 'providers/user_provider.dart';
@@ -57,6 +58,7 @@ Future<void> main() async {
         ChangeNotifierProvider(create: (_) => UserProvider()),
         ChangeNotifierProvider(create: (_) => VaultProvider()),
         ChangeNotifierProvider(create: (_) => DocumentProvider()),
+        ChangeNotifierProvider(create: (_) => MemoryProvider()),
         ChangeNotifierProvider(create: (_) => AccountProvider()),
         ChangeNotifierProvider(create: (_) => TrustedContactProvider()),
         ChangeNotifierProvider(create: (_) => SettingsProvider()),

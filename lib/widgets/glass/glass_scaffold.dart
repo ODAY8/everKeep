@@ -12,6 +12,10 @@ class GlassScaffold extends StatelessWidget {
   final EdgeInsetsGeometry padding;
   final bool scrollable;
 
+  /// When given, the content can be pulled down to refresh (e.g. reloading a
+  /// list from the backend). Requires [scrollable] (the default).
+  final Future<void> Function()? onRefresh;
+
   const GlassScaffold({
     super.key,
     required this.child,
@@ -20,21 +24,39 @@ class GlassScaffold extends StatelessWidget {
     this.floatingActionButtonLocation,
     this.padding = const EdgeInsets.fromLTRB(20, 8, 20, 110),
     this.scrollable = true,
+    this.onRefresh,
   });
 
   @override
   Widget build(BuildContext context) {
     final content = scrollable
         ? SingleChildScrollView(
-            physics: const BouncingScrollPhysics(),
+            physics: const ClampingScrollPhysics(),
             padding: padding,
             child: child,
           )
         : Padding(padding: padding, child: child);
 
+    final refreshable = onRefresh == null
+        ? content
+        : RefreshIndicator(
+            onRefresh: onRefresh!,
+            color: AppColors.glassAccentPink,
+            backgroundColor: AppColors.glassSurfaceRaised,
+            child: content,
+          );
+
+    final hasParentScaffold = Scaffold.maybeOf(context) != null &&
+        bottomNavigationBar == null &&
+        floatingActionButton == null;
+
+    if (hasParentScaffold) {
+      return SafeArea(bottom: false, child: refreshable);
+    }
+
     return Scaffold(
       backgroundColor: AppColors.glassBackground,
-      body: SafeArea(bottom: bottomNavigationBar == null, child: content),
+      body: SafeArea(bottom: bottomNavigationBar == null, child: refreshable),
       bottomNavigationBar: bottomNavigationBar,
       floatingActionButton: floatingActionButton,
       floatingActionButtonLocation: floatingActionButtonLocation,

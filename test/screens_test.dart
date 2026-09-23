@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:everkeep/features/accounts/presentation/screens/accounts_screen.dart';
 import 'package:everkeep/features/documents/presentation/screens/documents_screen.dart';
 import 'package:everkeep/features/emergency_access/presentation/screens/emergency_access_screen.dart';
@@ -13,6 +15,7 @@ import 'package:everkeep/models/user.dart';
 import 'package:everkeep/providers/account_provider.dart';
 import 'package:everkeep/providers/auth_provider.dart';
 import 'package:everkeep/providers/document_provider.dart';
+import 'package:everkeep/providers/memory_provider.dart';
 import 'package:everkeep/providers/settings_provider.dart';
 import 'package:everkeep/providers/trusted_contact_provider.dart';
 import 'package:everkeep/providers/user_provider.dart';
@@ -34,12 +37,14 @@ void main() {
   late FakeAuthRepository authRepo;
   late FakeUserRepository userRepo;
   late FakeDocumentRepository docRepo;
+  late FakeMemoryRepository memoryRepo;
   late FakeAccountRepository accRepo;
   late FakeTrustedContactRepository contactRepo;
   late AuthProvider auth;
   late UserProvider user;
   late VaultProvider vault;
   late DocumentProvider documents;
+  late MemoryProvider memories;
   late AccountProvider accounts;
   late TrustedContactProvider contacts;
 
@@ -47,12 +52,14 @@ void main() {
     authRepo = FakeAuthRepository();
     userRepo = FakeUserRepository(authRepo);
     docRepo = FakeDocumentRepository();
+    memoryRepo = FakeMemoryRepository();
     accRepo = FakeAccountRepository();
     contactRepo = FakeTrustedContactRepository();
     auth = AuthProvider(authRepository: authRepo);
     user = UserProvider(userRepository: userRepo)..setUser(testUser);
     vault = VaultProvider(vaultRepository: FakeVaultRepository());
     documents = DocumentProvider(documentRepository: docRepo);
+    memories = MemoryProvider(memoryRepository: memoryRepo);
     accounts = AccountProvider(accountRepository: accRepo);
     contacts = TrustedContactProvider(trustedContactRepository: contactRepo);
   });
@@ -75,6 +82,7 @@ void main() {
           ChangeNotifierProvider<UserProvider>.value(value: user),
           ChangeNotifierProvider<VaultProvider>.value(value: vault),
           ChangeNotifierProvider<DocumentProvider>.value(value: documents),
+          ChangeNotifierProvider<MemoryProvider>.value(value: memories),
           ChangeNotifierProvider<AccountProvider>.value(value: accounts),
           ChangeNotifierProvider<TrustedContactProvider>.value(value: contacts),
           ChangeNotifierProvider<SettingsProvider>(
@@ -96,6 +104,7 @@ void main() {
 
   Future<void> loadEverything() async {
     await documents.fetchDocuments();
+    await memories.fetchMemories();
     await accounts.fetchAccounts();
     await contacts.fetchContacts();
     await vault.fetchVaultSummary();
@@ -757,29 +766,344 @@ void main() {
   });
 
   group('Memories', () {
-    testWidgets('has no sample photos or letters, and says it\'s coming', (
+    testWidgets('shows only real memories and wishes, split by tab', (
       tester,
     ) async {
       await pump(tester, const WishesScreen());
 
-      expect(find.text('Memories'), findsOneWidget);
-      expect(find.text('Coming soon'), findsOneWidget);
-      expect(
-        find.byType(TextField),
-        findsNothing,
-        reason: 'no search over nothing',
-      );
+      // Memories is the default tab; the seeded wish is not shown on it.
+      expect(find.text('Summer at the lake'), findsOneWidget);
+      expect(find.text('For my daughter'), findsNothing);
+      expect(find.text('Coming soon'), findsNothing);
       expectNoSampleContent();
+
+      await tester.tap(find.text('Wishes'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('For my daughter'), findsOneWidget);
+      expect(find.text('Summer at the lake'), findsNothing);
     });
 
-    testWidgets('points at what works today', (tester) async {
+    testWidgets('an empty tab invites you to add the first one', (
+      tester,
+    ) async {
+      memoryRepo.items.clear();
       await pump(tester, const WishesScreen());
 
-      await tester.tap(
-        find.widgetWithText(GlassPrimaryButton, 'Go to Documents'),
+      expect(find.textContaining('No memories yet'), findsOneWidget);
+      expect(find.widgetWithText(GlassPrimaryButton, 'Add Memory'), findsOneWidget);
+    });
+
+    testWidgets('adding a memory without a file shows it in the list', (
+      tester,
+    ) async {
+      await pump(tester, const WishesScreen());
+
+      await tester.tap(find.byIcon(Icons.add_rounded));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Add without a file'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField).first, 'A quiet morning');
+      await tester.tap(find.widgetWithText(GlassPrimaryButton, 'Save'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('A quiet morning'), findsOneWidget);
+      expect(find.text('Memory added'), findsOneWidget);
+      expect(memories.memoriesCount, 2);
+    });
+
+    testWidgets('an empty title is rejected before anything is saved', (
+      tester,
+    ) async {
+      await pump(tester, const WishesScreen());
+
+      await tester.tap(find.byIcon(Icons.add_rounded));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Add without a file'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(GlassPrimaryButton, 'Save'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Title is required'), findsOneWidget);
+      expect(memories.count, 2); // nothing added
+    });
+
+    testWidgets('a failed save keeps the sheet open with what was typed', (
+      tester,
+    ) async {
+      await pump(tester, const WishesScreen());
+      memoryRepo.failWith = 'Storage is full';
+
+      await tester.tap(find.byIcon(Icons.add_rounded));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Add without a file'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField).first, 'A quiet morning');
+      await tester.tap(find.widgetWithText(GlassPrimaryButton, 'Save'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Storage is full'), findsOneWidget);
+      expect(find.text('A quiet morning'), findsOneWidget); // still typed
+      expect(memories.count, 2);
+
+      memoryRepo.failWith = null;
+      await tester.tap(find.widgetWithText(GlassPrimaryButton, 'Save'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Storage is full'), findsNothing);
+      expect(memories.count, 3);
+    });
+
+    testWidgets('the + button adds to whichever tab is open', (tester) async {
+      await pump(tester, const WishesScreen());
+      await tester.tap(find.text('Wishes'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byIcon(Icons.add_rounded));
+      await tester.pumpAndSettle();
+      expect(find.text('Add Wish'), findsWidgets);
+
+      await tester.tap(find.text('Add without a file'));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byType(TextField).first,
+        'Take care of the garden',
+      );
+      await tester.tap(find.widgetWithText(GlassPrimaryButton, 'Save'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Take care of the garden'), findsOneWidget);
+      expect(find.text('Wish added'), findsOneWidget);
+      expect(memories.wishesCount, 2);
+    });
+
+    testWidgets('editing a memory updates it in place', (tester) async {
+      await pump(tester, const WishesScreen());
+
+      await tester.tap(find.text('Summer at the lake'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Edit'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField).first, 'Summer at the cabin');
+      await tester.tap(find.widgetWithText(GlassPrimaryButton, 'Save Changes'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Summer at the cabin'), findsOneWidget);
+      expect(find.text('Memory updated'), findsOneWidget);
+    });
+
+    testWidgets('a failed edit keeps the original and reports why', (
+      tester,
+    ) async {
+      await pump(tester, const WishesScreen());
+      memoryRepo.failWith = 'Offline';
+
+      await tester.tap(find.text('Summer at the lake'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Edit'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField).first, 'Summer at the cabin');
+      await tester.tap(find.widgetWithText(GlassPrimaryButton, 'Save Changes'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Offline'), findsOneWidget);
+      expect(memories.items.first.title, 'Summer at the lake');
+    });
+
+    testWidgets('viewing details shows the full content, read only', (
+      tester,
+    ) async {
+      await pump(tester, const WishesScreen());
+
+      await tester.tap(find.text('Summer at the lake'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('View details'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Some notes about Summer at the lake.'), findsOneWidget);
+
+      await tester.tap(find.widgetWithText(GlassPrimaryButton, 'Close'));
+      await tester.pumpAndSettle();
+      expect(find.text('Some notes about Summer at the lake.'), findsNothing);
+    });
+
+    testWidgets('deleting a memory asks first, then removes it', (
+      tester,
+    ) async {
+      await pump(tester, const WishesScreen());
+
+      await tester.tap(find.text('Summer at the lake'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Delete memory'));
+      await tester.pumpAndSettle();
+      expect(find.text('Delete memory?'), findsOneWidget);
+      expect(memories.count, 2); // nothing deleted yet
+
+      await tester.tap(find.widgetWithText(TextButton, 'Delete'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Summer at the lake'), findsNothing);
+      expect(find.text('Memory deleted'), findsOneWidget);
+      expect(memories.count, 1);
+    });
+
+    testWidgets('cancelling the confirmation deletes nothing', (tester) async {
+      await pump(tester, const WishesScreen());
+
+      await tester.tap(find.text('Summer at the lake'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Delete memory'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(TextButton, 'Cancel'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Summer at the lake'), findsOneWidget);
+      expect(memories.count, 2);
+    });
+
+    testWidgets('a failed delete keeps the list and reports the error', (
+      tester,
+    ) async {
+      await pump(tester, const WishesScreen());
+      memoryRepo.failWith = 'Locked by another device';
+
+      await tester.tap(find.text('Summer at the lake'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Delete memory'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(TextButton, 'Delete'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Summer at the lake'), findsOneWidget);
+      expect(find.text('Locked by another device'), findsOneWidget);
+      expect(memories.count, 2);
+    });
+
+    testWidgets(
+      'an item without a file offers to add one, not replace or remove',
+      (tester) async {
+        await pump(tester, const WishesScreen());
+
+        await tester.tap(find.text('Summer at the lake'));
+        await tester.pumpAndSettle();
+
+        expect(find.text('Add attachment'), findsOneWidget);
+        expect(find.text('Replace attachment'), findsNothing);
+        expect(find.text('Remove attachment'), findsNothing);
+        expect(find.text('Open attachment'), findsNothing);
+      },
+    );
+
+    testWidgets('an item with a file offers to open, replace or remove it', (
+      tester,
+    ) async {
+      memoryRepo.items
+        ..clear()
+        ..add(
+          FakeMemoryRepository.memory(
+            'm1',
+            'Old photo',
+            filePath: 'user/memories/a.jpg',
+          ),
+        );
+      await pump(tester, const WishesScreen());
+
+      await tester.tap(find.text('Old photo'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Open attachment'), findsOneWidget);
+      expect(find.text('Replace attachment'), findsOneWidget);
+      expect(find.text('Remove attachment'), findsOneWidget);
+      expect(find.text('Add attachment'), findsNothing);
+    });
+
+    testWidgets('removing an attachment keeps the memory itself', (
+      tester,
+    ) async {
+      memoryRepo.items
+        ..clear()
+        ..add(
+          FakeMemoryRepository.memory(
+            'm1',
+            'Old photo',
+            filePath: 'user/memories/a.jpg',
+          ),
+        );
+      await pump(tester, const WishesScreen());
+
+      await tester.tap(find.text('Old photo'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Remove attachment'));
+      await tester.pumpAndSettle();
+      expect(find.text('Remove attachment?'), findsOneWidget);
+
+      await tester.tap(find.widgetWithText(TextButton, 'Remove'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Attachment removed'), findsOneWidget);
+      expect(find.text('Old photo'), findsOneWidget); // the memory is kept
+      expect(memories.items.first.hasAttachment, isFalse);
+    });
+
+    testWidgets('a failed attachment removal keeps the file and says why', (
+      tester,
+    ) async {
+      memoryRepo.items
+        ..clear()
+        ..add(
+          FakeMemoryRepository.memory(
+            'm1',
+            'Old photo',
+            filePath: 'user/memories/a.jpg',
+          ),
+        );
+      await pump(tester, const WishesScreen());
+      memoryRepo.failWith = 'Could not reach the server';
+
+      await tester.tap(find.text('Old photo'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Remove attachment'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(TextButton, 'Remove'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Could not reach the server'), findsOneWidget);
+      expect(memories.items.first.hasAttachment, isTrue);
+    });
+
+    testWidgets('pulling to refresh reloads the list', (tester) async {
+      await pump(tester, const WishesScreen());
+      memoryRepo.items.add(FakeMemoryRepository.memory('m3', 'Added on the server'));
+
+      expect(find.byType(RefreshIndicator), findsOneWidget);
+      // Not awaited: the returned future only resolves as frames are pumped,
+      // so awaiting it directly here would deadlock.
+      unawaited(
+        tester
+            .state<RefreshIndicatorState>(find.byType(RefreshIndicator))
+            .show(),
       );
       await tester.pumpAndSettle();
-      expect(find.text('ROUTE /documents'), findsOneWidget);
+
+      expect(find.text('Added on the server'), findsOneWidget);
+    });
+
+    testWidgets('a failed first load shows a retry that recovers', (
+      tester,
+    ) async {
+      memoryRepo.failWith = 'No connection';
+      await pump(tester, const WishesScreen());
+
+      expect(find.text('No connection'), findsOneWidget);
+      expect(find.text('Try again'), findsOneWidget);
+      expect(find.text('Summer at the lake'), findsNothing);
+
+      memoryRepo.failWith = null;
+      await tester.tap(find.text('Try again'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('No connection'), findsNothing);
+      expect(find.text('Summer at the lake'), findsOneWidget);
     });
   });
 

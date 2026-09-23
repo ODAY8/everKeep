@@ -29,6 +29,7 @@ abstract class UserService {
 /// Security restricts every query to the caller's own row.
 class UserServiceImpl implements UserService {
   static const String _documentsBucket = 'documents';
+  static const String _memoriesBucket = 'memories';
   static const String _avatarsBucket = 'avatars';
 
   final supa.SupabaseClient _client;
@@ -173,6 +174,7 @@ class UserServiceImpl implements UserService {
       // can't reach Storage), so clear them first. If this fails nothing has
       // been deleted yet and the user can simply retry.
       await _removeFolder(_documentsBucket, userId);
+      await _removeFolder(_memoriesBucket, userId);
       await _removeFolder(_avatarsBucket, userId);
 
       // Deletes the login and, by cascade, every row the user owns. It acts only

@@ -2,6 +2,7 @@ import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:file_picker/file_picker.dart';
+import 'package:image_picker/image_picker.dart' as img;
 
 import '../../models/document_upload.dart';
 
@@ -40,8 +41,15 @@ Future<DocumentUpload?> pickDocument() async {
 
 /// Lets the user choose a photo and returns it shrunk to a small square-ish PNG
 /// suitable for an avatar. Returns null if they cancel.
+///
+/// Uses `image_picker` rather than `file_picker` here: on Android it opens the
+/// OS's modern Photo Picker, which only ever hands back a fully-readable
+/// image. `file_picker`'s general file picker instead falls back to the older
+/// Files app for `FileType.image`, whose "Recent" list can include stale or
+/// cloud-only entries that throw a file-not-found error when opened —
+/// `pickDocument` keeps using it because documents aren't only images.
 Future<DocumentUpload?> pickAvatar() async {
-  final file = await FilePicker.pickFile(type: FileType.image);
+  final file = await img.ImagePicker().pickImage(source: img.ImageSource.gallery);
   if (file == null) return null;
 
   final resized = await resizeForAvatar(await file.readAsBytes());

@@ -20,6 +20,7 @@ import 'package:everkeep/providers/settings_provider.dart';
 import 'package:everkeep/providers/trusted_contact_provider.dart';
 import 'package:everkeep/providers/user_provider.dart';
 import 'package:everkeep/providers/vault_provider.dart';
+import 'package:everkeep/widgets/app_network_image.dart';
 import 'package:everkeep/widgets/glass/glass_primary_button.dart';
 import 'package:everkeep/widgets/glass/security_score_card.dart';
 import 'package:flutter/material.dart';
@@ -688,8 +689,43 @@ void main() {
         expect(find.text('Profile photo'), findsOneWidget);
         expect(find.text('Choose a photo'), findsOneWidget);
         expect(find.text('Remove photo'), findsNothing);
+        expect(find.text('View photo'), findsNothing, reason: 'nothing to view yet');
       },
     );
+
+    testWidgets('a photo can be viewed full-size and closed', (tester) async {
+      user.setUser(testUser.copyWith(avatarUrl: 'https://example.test/me.png'));
+      await pump(tester, const ProfileScreen());
+
+      await tester.tap(find.byIcon(Icons.camera_alt_rounded));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('View photo'));
+      await tester.pumpAndSettle();
+
+      // The full-size viewer shows the same photo again, over black.
+      expect(find.byType(AppNetworkImage), findsNWidgets(2));
+      expect(find.byIcon(Icons.close_rounded), findsOneWidget);
+
+      await tester.tap(find.byIcon(Icons.close_rounded));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(AppNetworkImage), findsOneWidget, reason: 'back to just the thumbnail');
+    });
+
+    testWidgets('tapping the backdrop also closes the viewer', (tester) async {
+      user.setUser(testUser.copyWith(avatarUrl: 'https://example.test/me.png'));
+      await pump(tester, const ProfileScreen());
+
+      await tester.tap(find.byIcon(Icons.camera_alt_rounded));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('View photo'));
+      await tester.pumpAndSettle();
+
+      await tester.tapAt(const Offset(400, 100));
+      await tester.pumpAndSettle();
+
+      expect(find.byIcon(Icons.close_rounded), findsNothing);
+    });
 
     testWidgets('a photo can be removed', (tester) async {
       user.setUser(testUser.copyWith(avatarUrl: 'https://example.test/me.png'));

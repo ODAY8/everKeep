@@ -12,6 +12,8 @@ import 'package:everkeep/models/document_upload.dart';
 import 'package:everkeep/models/vault_summary.dart';
 import 'package:everkeep/providers/user_provider.dart';
 import 'package:everkeep/providers/vault_provider.dart';
+import 'package:everkeep/widgets/app_network_image.dart';
+import 'package:everkeep/widgets/circular_icon_button.dart';
 import 'package:everkeep/widgets/circular_progress_ring.dart';
 import 'package:everkeep/widgets/fade_slide_in.dart';
 import 'package:everkeep/widgets/feedback.dart';
@@ -65,12 +67,19 @@ class ProfileScreen extends StatelessWidget {
 
   void _photoActions(BuildContext context) {
     final userProv = context.read<UserProvider>();
-    final hasPhoto = (userProv.user?.avatarUrl ?? '').isNotEmpty;
+    final avatarUrl = userProv.user?.avatarUrl ?? '';
+    final hasPhoto = avatarUrl.isNotEmpty;
 
     showGlassActionSheet(
       context,
       title: 'Profile photo',
       actions: [
+        if (hasPhoto)
+          GlassSheetAction(
+            label: 'View photo',
+            icon: Icons.visibility_outlined,
+            onTap: () => _viewPhoto(context, avatarUrl),
+          ),
         GlassSheetAction(
           label: 'Choose a photo',
           icon: Icons.photo_library_outlined,
@@ -84,6 +93,19 @@ class ProfileScreen extends StatelessWidget {
             onTap: () => _removePhoto(context),
           ),
       ],
+    );
+  }
+
+  /// Shows the full-size profile photo over a black backdrop.
+  void _viewPhoto(BuildContext context, String url) {
+    Navigator.of(context).push(
+      PageRouteBuilder<void>(
+        opaque: false,
+        barrierColor: Colors.black,
+        transitionDuration: const Duration(milliseconds: 200),
+        pageBuilder: (_, animation, _) =>
+            FadeTransition(opacity: animation, child: _PhotoViewer(url: url)),
+      ),
     );
   }
 
@@ -440,6 +462,48 @@ class ProfileScreen extends StatelessWidget {
               color: AppColors.glassDestructive,
               fontWeight: FontWeight.w600,
             ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// The profile photo shown full-size over black, dismissed by the close
+/// button, the back gesture, or tapping the backdrop.
+class _PhotoViewer extends StatelessWidget {
+  final String url;
+
+  const _PhotoViewer({required this.url});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () => Navigator.of(context).pop(),
+      child: Scaffold(
+        backgroundColor: Colors.black,
+        body: SafeArea(
+          child: Stack(
+            children: [
+              Center(
+                child: AppNetworkImage(
+                  url: url,
+                  fit: BoxFit.contain,
+                  fallbackIcon: Icons.person_rounded,
+                ),
+              ),
+              Positioned(
+                top: 12,
+                left: 12,
+                child: CircularIconButton(
+                  icon: Icons.close_rounded,
+                  background: Colors.white24,
+                  foreground: Colors.white,
+                  tooltip: 'Close',
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
+              ),
+            ],
           ),
         ),
       ),

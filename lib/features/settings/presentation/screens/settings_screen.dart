@@ -12,6 +12,7 @@ import 'package:everkeep/core/utils/validators.dart';
 import 'package:everkeep/providers/auth_provider.dart';
 import 'package:everkeep/providers/user_provider.dart';
 import 'package:everkeep/features/settings/presentation/widgets/change_password_sheet.dart';
+import 'package:everkeep/features/settings/presentation/widgets/phone_edit_sheet.dart';
 import 'package:everkeep/widgets/feedback.dart';
 import 'package:everkeep/widgets/glass/glass_list_row.dart';
 import 'package:everkeep/widgets/glass/glass_page_header.dart';
@@ -52,36 +53,6 @@ class SettingsScreen extends StatelessWidget {
     if (saved && context.mounted) {
       showAppSnackBar(context, auth.notice ?? 'Check your new email to confirm.');
     }
-  }
-
-  Future<void> _editPhone(BuildContext context) async {
-    final userProv = context.read<UserProvider>();
-    final current = userProv.user;
-    if (current == null) return;
-
-    final saved = await showGlassFormSheet(
-      context,
-      title: 'Phone Number',
-      subtitle: 'Saved to your profile. It isn\'t verified by text message.',
-      submitLabel: 'Save',
-      fields: [
-        GlassFormField(
-          key: 'phone',
-          label: 'Phone',
-          hint: 'Leave empty to remove',
-          required: false,
-          keyboardType: TextInputType.phone,
-          initialValue: current.phone ?? '',
-        ),
-      ],
-      onSubmit: (values) async {
-        final ok = await userProv.updateUserProfile(
-          current.copyWith(phone: values['phone']),
-        );
-        return ok ? null : userProv.error ?? 'Could not save your number.';
-      },
-    );
-    if (saved && context.mounted) showAppSnackBar(context, 'Phone number saved');
   }
 
   // ── Data ────────────────────────────────────────────────────────────────────
@@ -191,7 +162,7 @@ class SettingsScreen extends StatelessWidget {
             GlassListRow(
               label: 'Phone',
               subtitle: phone,
-              onTap: () => _editPhone(context),
+              onTap: () => showPhoneEditSheet(context),
             ),
           ]),
           const SizedBox(height: 20),

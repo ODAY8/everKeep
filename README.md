@@ -17,27 +17,33 @@ if the app isn't connected to Supabase it says so instead of pretending.
 | **Accounts** | Save account logins by category (username only — see *Security notes*), search, favourite, edit, delete |
 | **Trusted people** | Invite / remove people, with a relationship and access level |
 | **Vault** | One search across documents and accounts, category totals from your real data |
+| **Memories & Wishes** | Add a memory or a wish (title, content, an optional date and an optional attached file up to 25 MB), edit, view details, delete, replace or remove just the attachment |
 | **Home** | Time-based greeting, real counts, a setup checklist that points at your next step, recent activity from what you really added, and a security score that reflects what is actually set up |
 | **Settings** | Your details, **download my data** (JSON to the clipboard), about, log out, delete account |
 
 ### Deliberately "Coming soon"
 
-These are labelled as such in the app rather than faked: **Memories**, **Future Messages**,
+These are labelled as such in the app rather than faked: **Future Messages**,
 **two-factor authentication**, **biometric lock**, **emergency-access requests**, and
 **push notifications**. Help/legal links appear only when you provide them (see below).
 
 ## Set up
 
 1. **Create a Supabase project** (dashboard → New project).
-2. **Apply both migrations** in the dashboard's *SQL Editor*, in this order (or
+2. **Apply all three migrations**, in order, in the dashboard's *SQL Editor* (or
    `supabase db push` with the Supabase CLI):
    1. [`supabase/migrations/20260921000000_initial_schema.sql`](supabase/migrations/20260921000000_initial_schema.sql)
       — tables, Row Level Security, the sign-up trigger, and the private `documents` bucket.
    2. [`supabase/migrations/20260922000000_account_management.sql`](supabase/migrations/20260922000000_account_management.sql)
       — the `delete_my_account()` function (used by *Delete Account*) and the public `avatars`
       bucket (profile photos, 2 MB, images only, each user limited to their own folder).
+   3. [`supabase/migrations/20260923000000_memories_and_wishes.sql`](supabase/migrations/20260923000000_memories_and_wishes.sql)
+      — the `memories_wishes` table and the private `memories` bucket (attachments, 25 MB, each
+      user limited to their own folder) that back the Memories tab.
 
-   Without the second one, deleting an account and profile photos will report an error.
+   Without the second one, deleting an account and profile photos will report an error. Without the
+   third, the Memories tab's "Add" will fail with a database error (delete_my_account() still works —
+   the table's foreign key cascades on account deletion once the migration exists).
 3. **Allow the email links to open the app.** Authentication → *URL Configuration* → *Redirect URLs* →
    add `com.example.everkeep://login-callback/` (or your own value — see `AUTH_REDIRECT_URL`).
    Confirmation and password-reset emails link back through this address.
@@ -98,7 +104,7 @@ flutter test                     # app, providers, screens, and the Supabase ser
 bash supabase/tests/run.sh       # schema + Row Level Security, on a throwaway Postgres in Docker
 ```
 
-`supabase/tests/run.sh` (needs Docker running) applies both migrations and then acts as two different users
+`supabase/tests/run.sh` (needs Docker running) applies all the migrations and then acts as two different users
 (and an anonymous one), checking that nobody can read or change anyone else's rows or files, that a client
 can't mark its own document "verified", and that account deletion only ever removes the caller's data. It uses a
 small stand-in for Supabase's `auth`/`storage` schemas, so it verifies the policy logic; it does not replace
@@ -163,13 +169,16 @@ Screen  →  Provider (ChangeNotifier)  →  Repository  →  Service  →  Supa
 | `documents` | title, category, file path/size | file bytes live in Storage; `is_verified` can't be set by clients |
 | `accounts` | name, username, category, favourite | **no secret column** — see below |
 | `trusted_contacts` | name, relationship, access level | |
+| `memories_wishes` | title, content, memory/wish, optional date, optional file path/size | powers the Memories tab |
 | `documents` bucket | your uploaded files | **private**; opened only through short-lived signed links |
+| `memories` bucket | memory/wish attachments | **private**; same pattern as `documents` |
 | `avatars` bucket | profile photos | public read (an avatar has to load in an `<Image>`); writes limited to your own `<user id>/` folder |
 
 Every table has Row Level Security with owner-only policies for each operation, keyed on `auth.uid()`.
-Document files live under `<user id>/documents/…` with matching Storage policies; a document row can only
-point into its owner's folder. Deleting a document removes its file too; deleting an account removes every
-file first and only then the account (if any file can't be removed, the account is kept and you're told).
+Document and memory files live under `<user id>/documents/…` and `<user id>/memories/…` respectively,
+with matching Storage policies — a row can only point into its owner's own folder. Deleting a document
+or a memory/wish removes its file too; deleting an account removes every file first (across all three
+buckets) and only then the account (if any file can't be removed, the account is kept and you're told).
 
 ### Conventions
 
@@ -203,5 +212,5 @@ file first and only then the account (if any file can't be removed, the account 
   treat an avatar as private.
 - **"Download my data"** copies your data as JSON to the clipboard; other apps can read the clipboard, so
   clear it after pasting.
-- Consider lowering `file_size_limit` / adding `allowed_mime_types` on the `documents` bucket to what you
+- Consider lowering `file_size_limit` / adding `allowed_mime_types` on the `documents` and `memories` buckets to what you
   really accept.

@@ -16,6 +16,7 @@ class GlassCard extends StatelessWidget {
   final Color? glowColor;
   final Color borderColor;
   final VoidCallback? onTap;
+  final VoidCallback? onLongPress;
 
   const GlassCard({
     super.key,
@@ -26,6 +27,7 @@ class GlassCard extends StatelessWidget {
     this.glowColor,
     this.borderColor = AppColors.glassBorder,
     this.onTap,
+    this.onLongPress,
   });
 
   @override
@@ -52,7 +54,7 @@ class GlassCard extends StatelessWidget {
 
     final content = Container(padding: padding, decoration: decoration, child: child);
 
-    if (onTap == null) return content;
+    if (onTap == null && onLongPress == null) return content;
 
     return Material(
       color: Colors.transparent,
@@ -60,6 +62,7 @@ class GlassCard extends StatelessWidget {
       child: InkWell(
         borderRadius: borderRadius,
         onTap: onTap,
+        onLongPress: onLongPress,
         child: content,
       ),
     );

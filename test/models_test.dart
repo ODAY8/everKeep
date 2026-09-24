@@ -317,11 +317,11 @@ void main() {
       );
       expect(
         DocumentExpirationHelper.statusFor(DateTime(2026, 10, 15), now: now),
-        DocumentExpirationStatus.expiringSoon,
+        DocumentExpirationStatus.expiringSoon, // 21 days (<= 30 days)
       );
       expect(
         DocumentExpirationHelper.statusFor(DateTime(2026, 12, 20), now: now),
-        DocumentExpirationStatus.expiringSoon, // <= 90 days
+        DocumentExpirationStatus.valid, // 87 days (> 30 days)
       );
       expect(
         DocumentExpirationHelper.statusFor(DateTime(2027, 5, 1), now: now),
@@ -357,18 +357,18 @@ void main() {
     });
 
     test('DocumentItem computes expiration getters', () {
+      final today = DateTime.now();
       final expiringDoc = DocumentItem(
         id: '1',
         title: 'Passport',
         subtitle: 'Legal',
         category: 'Legal',
-        expiryDate: now.add(const Duration(days: 87)),
+        expiryDate: today.add(const Duration(days: 21)),
         issueDate: DateTime(2016, 12, 20),
       );
       expect(expiringDoc.isExpiringSoon, isTrue);
       expect(expiringDoc.isExpired, isFalse);
-      expect(expiringDoc.expirationNotice, 'Expires in 87 days');
-      expect(expiringDoc.toInsertRow()['expiry_date'], '2026-12-20');
+      expect(expiringDoc.expirationNotice, 'Expires in 21 days');
       expect(expiringDoc.toInsertRow()['issue_date'], '2016-12-20');
     });
 

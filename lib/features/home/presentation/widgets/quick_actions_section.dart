@@ -3,16 +3,13 @@ import 'package:provider/provider.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_radius.dart';
 import '../../../../core/theme/app_text_styles.dart';
-import '../../../../core/utils/pick_upload.dart';
 import '../../../../models/account_item.dart';
-import '../../../../models/document_item.dart';
-import '../../../../models/document_upload.dart';
 import '../../../../models/memory_item.dart';
 import '../../../../providers/account_provider.dart';
-import '../../../../providers/document_provider.dart';
 import '../../../../providers/memory_provider.dart';
 import '../../../../widgets/feedback.dart';
 import '../../../../widgets/glass/glass_sheet.dart';
+import '../../../documents/presentation/widgets/document_form_sheet.dart';
 
 /// Quick actions on the EverKeep Dashboard:
 /// + Add Memory, + Add Document, + Add Important Information
@@ -23,13 +20,6 @@ class QuickActionsSection extends StatelessWidget {
     'Banking',
     'Social',
     'Work',
-    'Other',
-  ];
-  static const List<String> _documentCategories = [
-    'Legal',
-    'Financial',
-    'Medical',
-    'Personal',
     'Other',
   ];
 
@@ -89,117 +79,10 @@ class QuickActionsSection extends StatelessWidget {
 
   // ── Add Document ────────────────────────────────────────────────────────────
 
-  void _chooseHowToAddDocument(BuildContext context) {
-    showGlassActionSheet(
-      context,
-      title: 'Add Document',
-      subtitle: 'Store a file securely, or keep a record with expiration.',
-      actions: [
-        GlassSheetAction(
-          label: 'Choose a file',
-          icon: Icons.upload_file_rounded,
-          onTap: () => _pickThenAddDocument(context),
-        ),
-        GlassSheetAction(
-          label: 'Add without a file',
-          icon: Icons.edit_note_rounded,
-          onTap: () => _showAddDocumentForm(context),
-        ),
-      ],
-    );
-  }
-
-  Future<void> _pickThenAddDocument(BuildContext context) async {
-    DocumentUpload? upload;
-    try {
-      upload = await pickDocument();
-    } on PickedTooLarge catch (e) {
-      if (context.mounted) showAppSnackBar(context, e.toString(), isError: true);
-      return;
-    } catch (_) {
-      if (context.mounted) {
-        showAppSnackBar(
-          context,
-          'Couldn\'t read that file. Try another one.',
-          isError: true,
-        );
-      }
-      return;
-    }
-    if (upload == null || !context.mounted) return;
-    await _showAddDocumentForm(context, upload: upload);
-  }
-
-  Future<void> _showAddDocumentForm(
-    BuildContext context, {
-    DocumentUpload? upload,
-  }) async {
-    final docProv = context.read<DocumentProvider>();
-    final fileName = upload?.fileName;
-
-    final saved = await showGlassFormSheet(
-      context,
-      title: 'Add Document',
-      subtitle: upload == null
-          ? 'Record an important document with expiration awareness.'
-          : 'Attached: $fileName',
-      submitLabel: upload == null ? 'Add Document' : 'Upload & Add',
-      fields: [
-        GlassFormField(
-          key: 'title',
-          label: 'Document name',
-          hint: 'e.g. Passport, Health Insurance',
-          initialValue: fileName ?? '',
-        ),
-        const GlassFormField(
-          key: 'description',
-          label: 'Notes / description',
-          hint: 'Optional details',
-          required: false,
-          minLines: 2,
-          maxLines: 4,
-        ),
-      ],
-      choices: const [
-        GlassFormChoice(
-          key: 'category',
-          label: 'Category',
-          options: _documentCategories,
-        ),
-      ],
-      dateFields: const [
-        GlassFormDateField(key: 'expiry_date', label: 'Expiry Date (optional)'),
-        GlassFormDateField(key: 'issue_date', label: 'Issue Date (optional)'),
-      ],
-      onSubmit: (values) async {
-        final expiryStr = values['expiry_date'];
-        final issueStr = values['issue_date'];
-
-        final ok = await docProv.addDocument(
-          DocumentItem(
-            id: '',
-            title: values['title']!,
-            subtitle: '',
-            category: values['category']!,
-            description: values['description']?.trim(),
-            expiryDate: expiryStr != null && expiryStr.isNotEmpty
-                ? DateTime.tryParse(expiryStr)
-                : null,
-            issueDate: issueStr != null && issueStr.isNotEmpty
-                ? DateTime.tryParse(issueStr)
-                : null,
-          ),
-          upload: upload,
-        );
-        return ok ? null : docProv.error ?? 'Could not add document.';
-      },
-    );
-
-    if (saved && context.mounted) {
-      showAppSnackBar(
-        context,
-        upload == null ? 'Document added' : 'Document uploaded & added',
-      );
+  Future<void> _chooseHowToAddDocument(BuildContext context) async {
+    final saved = await DocumentFormSheet.show(context);
+    if (saved == true && context.mounted) {
+      showAppSnackBar(context, 'Document added to your vault');
     }
   }
 

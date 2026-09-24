@@ -6,15 +6,20 @@ enum DocumentExpirationStatus {
   expired,
   expiringSoon,
   valid,
-  noExpiryDate,
+  noExpiryDate;
+
+  bool get isActive => this == DocumentExpirationStatus.valid;
+  bool get isExpiringSoon => this == DocumentExpirationStatus.expiringSoon;
+  bool get isExpired => this == DocumentExpirationStatus.expired;
+  bool get isNone => this == DocumentExpirationStatus.noExpiryDate;
 }
 
 /// Reusable utility for calculating and displaying document expiration states.
 class DocumentExpirationHelper {
   DocumentExpirationHelper._();
 
-  /// Default threshold for warning about an impending expiration.
-  static const int defaultExpiringSoonDays = 90;
+  /// Default threshold for warning about an impending expiration (30 days).
+  static const int defaultExpiringSoonDays = 30;
 
   /// Calculates the difference in full calendar days between [date] and [now].
   /// Compares dates by day (ignoring time components).

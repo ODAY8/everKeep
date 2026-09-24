@@ -55,7 +55,7 @@ void main() {
       // The + button asks how to add: with a file from the device, or just a record.
       await tester.tap(find.text('Add without a file'));
       await tester.pumpAndSettle();
-      await tester.enterText(find.byType(TextField), name);
+      await tester.enterText(find.byType(TextField).first, name);
       await tester.tap(find.widgetWithText(GlassPrimaryButton, 'Add Document'));
       await tester.pumpAndSettle();
     }

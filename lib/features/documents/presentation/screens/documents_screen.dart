@@ -1,28 +1,29 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:everkeep/core/theme/app_colors.dart';
-import 'package:everkeep/core/theme/app_radius.dart';
-import 'package:everkeep/core/theme/app_text_styles.dart';
-import 'package:everkeep/core/utils/document_expiration.dart';
-import 'package:everkeep/core/utils/pick_upload.dart';
-import 'package:everkeep/models/document_item.dart';
-import 'package:everkeep/models/document_upload.dart';
-import 'package:everkeep/models/vault_summary.dart';
-import 'package:everkeep/providers/document_provider.dart';
-import 'package:everkeep/providers/vault_provider.dart';
-import 'package:everkeep/widgets/circular_icon_button.dart';
-import 'package:everkeep/widgets/fade_slide_in.dart';
-import 'package:everkeep/widgets/feedback.dart';
-import 'package:everkeep/widgets/glass/glass_card.dart';
-import 'package:everkeep/widgets/glass/glass_fab.dart';
-import 'package:everkeep/widgets/glass/glass_filter_chips.dart';
-import 'package:everkeep/widgets/glass/glass_item_row.dart';
-import 'package:everkeep/widgets/glass/glass_page_header.dart';
-import 'package:everkeep/widgets/glass/glass_primary_button.dart';
-import 'package:everkeep/widgets/glass/glass_scaffold.dart';
-import 'package:everkeep/widgets/glass/glass_search_bar.dart';
-import 'package:everkeep/widgets/glass/glass_sheet.dart';
-import 'package:everkeep/widgets/glass/status_badge.dart';
+
+import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_radius.dart';
+import '../../../../core/theme/app_text_styles.dart';
+import '../../../../core/utils/document_expiration.dart';
+import '../../../../core/utils/pick_upload.dart';
+import '../../../../models/document_item.dart';
+import '../../../../models/document_upload.dart';
+import '../../../../models/vault_summary.dart';
+import '../../../../providers/document_provider.dart';
+import '../../../../providers/vault_provider.dart';
+import '../../../../widgets/circular_icon_button.dart';
+import '../../../../widgets/fade_slide_in.dart';
+import '../../../../widgets/feedback.dart';
+import '../../../../widgets/glass/glass_card.dart';
+import '../../../../widgets/glass/glass_fab.dart';
+import '../../../../widgets/glass/glass_filter_chips.dart';
+import '../../../../widgets/glass/glass_page_header.dart';
+import '../../../../widgets/glass/glass_scaffold.dart';
+import '../../../../widgets/glass/glass_search_bar.dart';
+import '../../../../widgets/glass/glass_sheet.dart';
+import '../../../../widgets/glass/status_badge.dart';
+import '../widgets/document_details_sheet.dart';
+import '../widgets/document_form_sheet.dart';
 
 class DocumentsScreen extends StatefulWidget {
   const DocumentsScreen({super.key});
@@ -32,11 +33,17 @@ class DocumentsScreen extends StatefulWidget {
 }
 
 class _DocumentsScreenState extends State<DocumentsScreen> {
-  static const List<String> _categories = ['Legal', 'Financial', 'Medical'];
+  static const List<String> _filters = [
+    'All',
+    'Expiring Soon',
+    'Expired',
+    'No Expiry',
+    'Legal',
+    'Financial',
+    'Medical',
+  ];
 
   int _selectedFilter = 0;
-  final List<String> _filters = const ['All', ..._categories];
-
   bool _searching = false;
   String _query = '';
 
@@ -59,8 +66,6 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
     });
   }
 
-  // ── Adding ──────────────────────────────────────────────────────────────────
-
   void _chooseHowToAdd() {
     showGlassActionSheet(
       context,
@@ -75,19 +80,20 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
         GlassSheetAction(
           label: 'Add without a file',
           icon: Icons.edit_note_rounded,
-          onTap: () => _showAddForm(),
+          onTap: () => _openAddForm(),
         ),
       ],
     );
   }
 
   Future<void> _pickThenAdd() async {
-    DocumentUpload? upload;
     try {
-      upload = await pickDocument();
+      final upload = await pickDocument();
+      if (upload != null && mounted) {
+        await _openAddForm(upload: upload);
+      }
     } on PickedTooLarge catch (e) {
       if (mounted) showAppSnackBar(context, e.toString(), isError: true);
-      return;
     } catch (_) {
       if (mounted) {
         showAppSnackBar(
@@ -96,68 +102,12 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
           isError: true,
         );
       }
-      return;
     }
-    if (upload == null || !mounted) return; // cancelled
-    await _showAddForm(upload: upload);
   }
 
-  Future<void> _showAddForm({DocumentUpload? upload}) async {
-    final docProv = context.read<DocumentProvider>();
-    final fileName = upload?.fileName;
-
-    final saved = await showGlassFormSheet(
-      context,
-      title: 'Add Document',
-      subtitle: upload == null
-          ? 'Keep a record of an important document.'
-          : 'Attached: $fileName',
-      submitLabel: upload == null ? 'Add Document' : 'Upload & Add',
-      fields: [
-        GlassFormField(
-          key: 'title',
-          label: 'Document name',
-          hint: 'e.g. Passport.pdf',
-          initialValue: fileName ?? '',
-          validator: (value) =>
-              value.trim().isEmpty ? 'Document name is required' : null,
-        ),
-      ],
-      choices: const [
-        GlassFormChoice(
-          key: 'category',
-          label: 'Category',
-          options: _categories,
-        ),
-      ],
-      dateFields: const [
-        GlassFormDateField(key: 'expiry_date', label: 'Expiry date (optional)'),
-        GlassFormDateField(key: 'issue_date', label: 'Issue date (optional)'),
-      ],
-      onSubmit: (values) async {
-        final expiryStr = values['expiry_date'];
-        final issueStr = values['issue_date'];
-
-        final added = await docProv.addDocument(
-          DocumentItem(
-            id: '',
-            title: values['title']!,
-            subtitle: '',
-            category: values['category']!,
-            expiryDate: expiryStr != null && expiryStr.isNotEmpty
-                ? DateTime.tryParse(expiryStr)
-                : null,
-            issueDate: issueStr != null && issueStr.isNotEmpty
-                ? DateTime.tryParse(issueStr)
-                : null,
-          ),
-          upload: upload,
-        );
-        return added ? null : docProv.error ?? 'Could not add the document.';
-      },
-    );
-
-    if (saved && mounted) {
+  Future<void> _openAddForm({DocumentUpload? upload}) async {
+    final saved = await DocumentFormSheet.show(context, initialUpload: upload);
+    if (saved == true && mounted) {
       showAppSnackBar(
         context,
         upload == null ? 'Document added' : 'Document uploaded',
@@ -165,69 +115,9 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
     }
   }
 
-  // ── Editing & Details ───────────────────────────────────────────────────────
-
   Future<void> _showEditForm(DocumentItem document) async {
-    final docProv = context.read<DocumentProvider>();
-
-    final initialCategoryIndex = _categories.indexOf(document.category);
-
-    final saved = await showGlassFormSheet(
-      context,
-      title: 'Edit Document',
-      subtitle: document.title,
-      submitLabel: 'Save Changes',
-      fields: [
-        GlassFormField(
-          key: 'title',
-          label: 'Document name',
-          hint: 'e.g. Passport or Insurance Policy',
-          initialValue: document.title,
-          validator: (v) =>
-              v.trim().isEmpty ? 'Document name is required' : null,
-        ),
-      ],
-      choices: [
-        GlassFormChoice(
-          key: 'category',
-          label: 'Category',
-          options: _categories,
-          initialIndex: initialCategoryIndex != -1 ? initialCategoryIndex : 0,
-        ),
-      ],
-      dateFields: [
-        GlassFormDateField(
-          key: 'expiry_date',
-          label: 'Expiry date (optional)',
-          initialValue: document.expiryDate,
-        ),
-        GlassFormDateField(
-          key: 'issue_date',
-          label: 'Issue date (optional)',
-          initialValue: document.issueDate,
-        ),
-      ],
-      onSubmit: (values) async {
-        final expiryStr = values['expiry_date'];
-        final issueStr = values['issue_date'];
-
-        final ok = await docProv.updateDocument(
-          document.copyWith(
-            title: values['title']!,
-            category: values['category']!,
-            expiryDate: expiryStr != null && expiryStr.isNotEmpty
-                ? DateTime.tryParse(expiryStr)
-                : null,
-            issueDate: issueStr != null && issueStr.isNotEmpty
-                ? DateTime.tryParse(issueStr)
-                : null,
-          ),
-        );
-        return ok ? null : docProv.error ?? 'Could not save changes.';
-      },
-    );
-
-    if (saved && mounted) {
+    final saved = await DocumentFormSheet.show(context, document: document);
+    if (saved == true && mounted) {
       showAppSnackBar(context, 'Document updated');
     }
   }
@@ -235,11 +125,20 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
   void _showDetails(DocumentItem document) {
     showGlassSheet<void>(
       context,
-      builder: (_) => _DocumentDetailsSheet(document: document),
+      builder: (sheetContext) => DocumentDetailsSheet(
+        document: document,
+        onEdit: () {
+          Navigator.of(sheetContext).pop();
+          _showEditForm(document);
+        },
+        onDelete: () {
+          Navigator.of(sheetContext).pop();
+          _confirmDelete(document);
+        },
+        onOpenFile: document.hasFile ? () => _openFile(document) : null,
+      ),
     );
   }
-
-  // ── Existing documents ──────────────────────────────────────────────────────
 
   void _showActions(DocumentItem document) {
     showGlassActionSheet(
@@ -257,7 +156,7 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
           icon: Icons.edit_outlined,
           onTap: () => _showEditForm(document),
         ),
-        if (document.filePath != null)
+        if (document.hasFile)
           GlassSheetAction(
             label: 'Open file',
             icon: Icons.open_in_new_rounded,
@@ -305,8 +204,6 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
     );
   }
 
-  // ── Layout ──────────────────────────────────────────────────────────────────
-
   @override
   Widget build(BuildContext context) {
     final activeFilter = _filters[_selectedFilter];
@@ -332,7 +229,7 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
           const SizedBox(height: 18),
           if (_searching) ...[
             GlassSearchBar(
-              hintText: 'Search documents...',
+              hintText: 'Search title, type, country, institution...',
               autofocus: true,
               onChanged: (value) => setState(() => _query = value),
             ),
@@ -359,23 +256,38 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
                 return const LoadingView();
               }
 
-              final displayedDocuments = docProv.filterByCategory(
-                activeFilter,
+              final displayedDocuments = docProv.filterDocuments(
+                filter: activeFilter,
                 query: _query,
               );
 
               if (displayedDocuments.isEmpty) {
                 return Center(
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 32),
-                    child: Text(
-                      _query.trim().isNotEmpty
-                          ? 'No documents match "${_query.trim()}".'
-                          : 'No documents yet. Tap + to add one.',
-                      textAlign: TextAlign.center,
-                      style: AppTextStyles.bodyMedium.copyWith(
-                        color: AppColors.glassOnSurfaceMuted,
-                      ),
+                    padding: const EdgeInsets.symmetric(vertical: 36),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          _query.trim().isNotEmpty
+                              ? Icons.search_off_rounded
+                              : Icons.folder_open_outlined,
+                          size: 42,
+                          color: AppColors.glassOnSurfaceFaint,
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          _query.trim().isNotEmpty
+                              ? 'No documents match "${_query.trim()}".'
+                              : (_selectedFilter > 0
+                                  ? 'No documents in "$activeFilter".'
+                                  : 'No documents yet. Tap + to add one.'),
+                          textAlign: TextAlign.center,
+                          style: AppTextStyles.bodyMedium.copyWith(
+                            color: AppColors.glassOnSurfaceMuted,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 );
@@ -386,21 +298,10 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
                   for (final entry in displayedDocuments.asMap().entries) ...[
                     FadeSlideIn(
                       index: entry.key,
-                      child: GlassItemRow(
-                        icon: entry.value.icon,
-                        iconColor: entry.value.isExpired
-                            ? AppColors.glassDestructive
-                            : (entry.value.isExpiringSoon
-                                ? AppColors.glassWarningColor
-                                : AppColors.glassAccentPink),
-                        title: entry.value.title,
-                        subtitle: entry.value.isExpired
-                            ? '⚠️ Expired · ${entry.value.subtitle}'
-                            : (entry.value.isExpiringSoon
-                                ? '⚠️ ${entry.value.expirationNotice} · ${entry.value.category}'
-                                : entry.value.subtitle),
-                        trailing: _buildTrailingBadge(entry.value),
+                      child: _DocumentCard(
+                        document: entry.value,
                         onTap: () => _showActions(entry.value),
+                        onLongPress: () => _showDetails(entry.value),
                       ),
                     ),
                     const SizedBox(height: 10),
@@ -412,20 +313,6 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
         ],
       ),
     );
-  }
-
-  Widget _buildTrailingBadge(DocumentItem doc) {
-    if (doc.isExpired) {
-      return const StatusBadge.danger('Expired');
-    }
-    if (doc.isExpiringSoon) {
-      return StatusBadge.warning(
-        DocumentExpirationHelper.shortLabel(doc.expiryDate),
-      );
-    }
-    return doc.isVerified
-        ? const StatusBadge.success('Verified')
-        : const StatusBadge.pending('Pending');
   }
 
   Widget _buildStorageCard() {
@@ -448,27 +335,28 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
                 children: [
                   Text(
                     'Vault Storage',
-                    style: AppTextStyles.titleSmall.copyWith(
-                      color: AppColors.glassOnSurface,
-                      fontWeight: FontWeight.w600,
+                    style: AppTextStyles.labelSmall.copyWith(
+                      color: AppColors.glassOnSurfaceMuted,
+                      letterSpacing: 0.8,
                     ),
                   ),
                   Text(
-                    '${usedMb.toStringAsFixed(1)} MB of $totalGb GB used',
-                    style: AppTextStyles.bodySmall.copyWith(
-                      color: AppColors.glassOnSurfaceMuted,
+                    '${usedMb.toStringAsFixed(1)} MB of $totalGb GB',
+                    style: AppTextStyles.labelSmall.copyWith(
+                      color: AppColors.glassAccentPink,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 10),
               ClipRRect(
                 borderRadius: AppRadius.radiusPill,
                 child: LinearProgressIndicator(
                   value: ratio,
-                  minHeight: 8,
+                  minHeight: 4,
                   backgroundColor: AppColors.glassBorder,
-                  valueColor: const AlwaysStoppedAnimation<Color>(
+                  valueColor: const AlwaysStoppedAnimation(
                     AppColors.glassAccentPink,
                   ),
                 ),
@@ -481,182 +369,157 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
   }
 }
 
-class _DocumentDetailsSheet extends StatelessWidget {
+/// Clean, structured document card displaying emoji/icon, title, document type,
+/// contextual metadata (country/institution), expiration status, and file indicator.
+class _DocumentCard extends StatelessWidget {
   final DocumentItem document;
+  final VoidCallback onTap;
+  final VoidCallback onLongPress;
 
-  const _DocumentDetailsSheet({required this.document});
+  const _DocumentCard({
+    required this.document,
+    required this.onTap,
+    required this.onLongPress,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
+    final status = document.expirationStatus;
+    final statusColor = DocumentExpirationHelper.colorFor(status);
+
+    final String metadataSubtitle;
+    if (document.country != null && document.country!.isNotEmpty) {
+      metadataSubtitle = '${document.displayType} · ${document.country}';
+    } else if (document.institution != null && document.institution!.isNotEmpty) {
+      metadataSubtitle = '${document.displayType} · ${document.institution}';
+    } else {
+      metadataSubtitle = document.displayType;
+    }
+
+    return GlassCard(
+      onTap: onTap,
+      onLongPress: onLongPress,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
+            // Leading Emoji / Icon
             Container(
-              padding: const EdgeInsets.all(10),
+              width: 42,
+              height: 42,
               decoration: BoxDecoration(
-                color: document.isExpired
-                    ? AppColors.glassDestructive.withValues(alpha: 0.16)
-                    : (document.isExpiringSoon
+                color: status.isExpired
+                    ? AppColors.glassDestructive.withValues(alpha: 0.14)
+                    : (status.isExpiringSoon
                         ? AppColors.glassWarningBg
-                        : AppColors.glassAccentSecondaryBg),
-                borderRadius: AppRadius.radiusLG,
+                        : AppColors.glassSurface),
+                borderRadius: AppRadius.radiusMD,
+                border: Border.all(
+                  color: status.isExpired
+                      ? AppColors.glassDestructive.withValues(alpha: 0.3)
+                      : (status.isExpiringSoon
+                          ? AppColors.glassWarningColor.withValues(alpha: 0.3)
+                          : AppColors.glassBorder),
+                ),
               ),
-              child: Icon(
-                document.icon,
-                color: document.isExpired
-                    ? AppColors.glassDestructive
-                    : (document.isExpiringSoon
-                        ? AppColors.glassWarningColor
-                        : AppColors.glassAccentSecondary),
-                size: 20,
+              alignment: Alignment.center,
+              child: Text(
+                document.emoji,
+                style: const TextStyle(fontSize: 20),
               ),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 14),
+
+            // Center details
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    document.title,
-                    style: AppTextStyles.serifTitleSmall.copyWith(
-                      color: AppColors.glassOnSurface,
-                      fontSize: 18,
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          document.title,
+                          style: AppTextStyles.bodyMedium.copyWith(
+                            color: AppColors.glassOnSurface,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      if (document.hasFile) ...[
+                        const SizedBox(width: 6),
+                        const Icon(
+                          Icons.attach_file_rounded,
+                          size: 14,
+                          color: AppColors.glassOnSurfaceMuted,
+                        ),
+                      ],
+                    ],
                   ),
-                  const SizedBox(height: 2),
+                  const SizedBox(height: 3),
                   Text(
-                    document.subtitle,
+                    metadataSubtitle,
                     style: AppTextStyles.bodySmall.copyWith(
                       color: AppColors.glassOnSurfaceMuted,
+                      fontSize: 12,
                     ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
+                  if (document.hasExpiryDate) ...[
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Container(
+                          width: 6,
+                          height: 6,
+                          decoration: BoxDecoration(
+                            color: statusColor,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 5),
+                        Text(
+                          document.expirationNotice,
+                          style: AppTextStyles.labelSmall.copyWith(
+                            color: statusColor,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ],
               ),
             ),
+            const SizedBox(width: 8),
+
+            // Trailing badge
+            _buildTrailingBadge(),
           ],
         ),
-        const SizedBox(height: 16),
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: DocumentExpirationHelper.backgroundColorFor(
-              document.expirationStatus,
-            ),
-            borderRadius: AppRadius.radiusMD,
-            border: Border.all(
-              color: DocumentExpirationHelper.colorFor(
-                document.expirationStatus,
-              ).withValues(alpha: 0.3),
-            ),
-          ),
-          child: Row(
-            children: [
-              Icon(
-                document.isExpired
-                    ? Icons.warning_amber_rounded
-                    : (document.isExpiringSoon
-                        ? Icons.schedule_rounded
-                        : Icons.verified_user_outlined),
-                color: DocumentExpirationHelper.colorFor(
-                  document.expirationStatus,
-                ),
-                size: 18,
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  document.expirationNotice,
-                  style: AppTextStyles.bodySmall.copyWith(
-                    color: DocumentExpirationHelper.colorFor(
-                      document.expirationStatus,
-                    ),
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 16),
-        if (document.issueDate != null) ...[
-          _DetailRow(
-            label: 'Issue Date',
-            value:
-                '${document.issueDate!.year}-${document.issueDate!.month.toString().padLeft(2, '0')}-${document.issueDate!.day.toString().padLeft(2, '0')}',
-          ),
-          const SizedBox(height: 8),
-        ],
-        if (document.expiryDate != null) ...[
-          _DetailRow(
-            label: 'Expiry Date',
-            value:
-                '${document.expiryDate!.year}-${document.expiryDate!.month.toString().padLeft(2, '0')}-${document.expiryDate!.day.toString().padLeft(2, '0')}',
-          ),
-          const SizedBox(height: 8),
-        ],
-        _DetailRow(label: 'Category', value: document.category),
-        if (document.filePath != null) ...[
-          const SizedBox(height: 8),
-          const _DetailRow(label: 'Stored File', value: 'Saved in secure vault'),
-        ],
-        if (document.description != null &&
-            document.description!.trim().isNotEmpty) ...[
-          const SizedBox(height: 12),
-          Text(
-            'Notes',
-            style: AppTextStyles.labelSmall.copyWith(
-              color: AppColors.glassOnSurfaceFaint,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            document.description!,
-            style: AppTextStyles.bodyMedium.copyWith(
-              color: AppColors.glassOnSurface,
-            ),
-          ),
-        ],
-        const SizedBox(height: 20),
-        GlassPrimaryButton(
-          text: 'Close',
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-      ],
     );
   }
-}
 
-class _DetailRow extends StatelessWidget {
-  final String label;
-  final String value;
-
-  const _DetailRow({required this.label, required this.value});
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(
-          label,
-          style: AppTextStyles.bodySmall.copyWith(
-            color: AppColors.glassOnSurfaceMuted,
-          ),
-        ),
-        Text(
-          value,
-          style: AppTextStyles.bodySmall.copyWith(
-            color: AppColors.glassOnSurface,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-      ],
+  Widget _buildTrailingBadge() {
+    if (document.isExpired) {
+      return const StatusBadge.danger('Expired');
+    }
+    if (document.isExpiringSoon) {
+      return StatusBadge.warning(
+        DocumentExpirationHelper.shortLabel(document.expiryDate),
+      );
+    }
+    if (document.isVerified) {
+      return const StatusBadge.success('Verified');
+    }
+    return const Icon(
+      Icons.chevron_right_rounded,
+      color: AppColors.glassOnSurfaceFaint,
+      size: 18,
     );
   }
 }

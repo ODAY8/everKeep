@@ -44,16 +44,88 @@ class DocumentProvider extends ChangeNotifier with SessionScoped {
     return list;
   }
 
-  /// Documents in [category] ("All" or empty for every category) whose title
-  /// contains [query] (ignoring case).
+  /// Documents that do not have an expiration date set.
+  List<DocumentItem> get noExpiryDocuments =>
+      _documents.where((d) => !d.hasExpiryDate).toList();
+
+  /// Checks whether [doc] matches the search [needle].
+  bool _matchesQuery(DocumentItem doc, String needle) {
+    if (needle.isEmpty) return true;
+    if (doc.title.toLowerCase().contains(needle)) return true;
+    if (doc.displayType.toLowerCase().contains(needle)) return true;
+    if (doc.documentType != null &&
+        doc.documentType!.toLowerCase().contains(needle)) {
+      return true;
+    }
+    if (doc.documentNumber != null &&
+        doc.documentNumber!.toLowerCase().contains(needle)) {
+      return true;
+    }
+    if (doc.country != null && doc.country!.toLowerCase().contains(needle)) {
+      return true;
+    }
+    if (doc.institution != null &&
+        doc.institution!.toLowerCase().contains(needle)) {
+      return true;
+    }
+    if (doc.notes != null && doc.notes!.toLowerCase().contains(needle)) {
+      return true;
+    }
+    return false;
+  }
+
+  /// Documents in [category] ("All" or empty for every category) whose metadata
+  /// matches [query] (ignoring case).
   List<DocumentItem> filterByCategory(String category, {String query = ''}) {
     final needle = query.trim().toLowerCase();
     final anyCategory = category.isEmpty || category == 'All';
     return _documents.where((doc) {
-      if (!anyCategory && doc.category.toLowerCase() != category.toLowerCase()) {
+      if (!anyCategory &&
+          doc.category.toLowerCase() != category.toLowerCase() &&
+          doc.displayType.toLowerCase() != category.toLowerCase()) {
         return false;
       }
-      return needle.isEmpty || doc.title.toLowerCase().contains(needle);
+      return _matchesQuery(doc, needle);
+    }).toList();
+  }
+
+  /// Filters documents based on a status/organization filter ('All', 'Expiring Soon',
+  /// 'Expired', 'No Expiry', or category), optional [documentType], and search [query].
+  List<DocumentItem> filterDocuments({
+    String filter = 'All',
+    String? documentType,
+    String query = '',
+  }) {
+    final needle = query.trim().toLowerCase();
+    return _documents.where((doc) {
+      switch (filter) {
+        case 'All':
+          break;
+        case 'Expiring Soon':
+          if (!doc.isExpiringSoon) return false;
+          break;
+        case 'Expired':
+          if (!doc.isExpired) return false;
+          break;
+        case 'No Expiry':
+          if (doc.hasExpiryDate) return false;
+          break;
+        default:
+          if (doc.category.toLowerCase() != filter.toLowerCase() &&
+              doc.displayType.toLowerCase() != filter.toLowerCase()) {
+            return false;
+          }
+      }
+
+      if (documentType != null &&
+          documentType.isNotEmpty &&
+          documentType != 'All') {
+        final matchesType = doc.typeInfo.code == documentType ||
+            doc.typeInfo.label.toLowerCase() == documentType.toLowerCase();
+        if (!matchesType) return false;
+      }
+
+      return _matchesQuery(doc, needle);
     }).toList();
   }
 

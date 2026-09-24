@@ -2,13 +2,18 @@ import 'package:flutter/material.dart';
 
 import '../core/utils/document_expiration.dart';
 import '../core/utils/relative_time.dart';
+import 'document_type.dart';
 
 class DocumentItem {
   final String id;
   final String title;
   final String subtitle;
   final String category;
-  final String? description;
+  final String? documentType;
+  final String? documentNumber;
+  final String? country;
+  final String? institution;
+  final String? notes;
   final DateTime? issueDate;
   final DateTime? expiryDate;
   final IconData icon;
@@ -24,7 +29,11 @@ class DocumentItem {
     required this.title,
     required this.subtitle,
     required this.category,
-    this.description,
+    this.documentType,
+    this.documentNumber,
+    this.country,
+    this.institution,
+    this.notes,
     this.issueDate,
     this.expiryDate,
     this.icon = Icons.description_outlined,
@@ -33,21 +42,36 @@ class DocumentItem {
     this.filePath,
   });
 
-  /// Alias for description.
-  String? get notes => description;
+  /// Alias for notes to preserve existing call sites.
+  String? get description => notes;
+
+  /// Structured type information derived from [documentType] or [category].
+  DocumentType get typeInfo => DocumentType.fromCode(documentType ?? category);
+
+  /// Human-friendly document type label, e.g. "Passport", "Insurance".
+  String get displayType => typeInfo.label;
+
+  /// Emoji representing the document type, e.g. 🛂, 🪪, 🎓.
+  String get emoji => typeInfo.emoji;
+
+  /// True if the document has a stored file attachment.
+  bool get hasFile => filePath != null && filePath!.isNotEmpty;
+
+  /// True if an expiry date is set.
+  bool get hasExpiryDate => expiryDate != null;
 
   /// Expiration status computed by the attention system.
   DocumentExpirationStatus get expirationStatus =>
       DocumentExpirationHelper.statusFor(expiryDate);
 
-  /// True if the document expires soon (within 90 days) and is not yet expired.
+  /// True if the document expires soon (within 30 days) and is not yet expired.
   bool get isExpiringSoon =>
       expirationStatus == DocumentExpirationStatus.expiringSoon;
 
   /// True if the document has passed its expiration date.
   bool get isExpired => expirationStatus == DocumentExpirationStatus.expired;
 
-  /// Human-friendly expiration notice, e.g. "Expires in 87 days".
+  /// Human-friendly expiration notice, e.g. "Expires in 21 days".
   String get expirationNotice =>
       DocumentExpirationHelper.descriptiveNotice(expiryDate);
 
@@ -63,25 +87,37 @@ class DocumentItem {
     }
 
     final category = (row['category'] as String?) ?? 'Other';
+    final docType = row['document_type'] as String?;
     final rawCreatedAt = row['created_at'] as String?;
     final createdAt = rawCreatedAt != null
         ? DateTime.tryParse(rawCreatedAt)?.toLocal()
         : null;
 
-    final subtitle = createdAt != null
-        ? '$category · Added ${relativeTime(createdAt)}'
+    final typeResolved = DocumentType.fromCode(docType ?? category);
+    final displayLabel = typeResolved != DocumentType.other
+        ? typeResolved.label
         : category;
+
+    final subtitle = createdAt != null
+        ? '$displayLabel · Added ${relativeTime(createdAt)}'
+        : displayLabel;
+
+    final resolvedNotes = (row['notes'] as String?) ?? (row['description'] as String?);
 
     return DocumentItem(
       id: (row['id'] as String?) ?? '',
       title: (row['title'] as String?) ?? '',
       subtitle: subtitle,
       category: category,
-      description: row['description'] as String?,
+      documentType: docType ?? typeResolved.code,
+      documentNumber: row['document_number'] as String?,
+      country: row['country'] as String?,
+      institution: row['institution'] as String?,
+      notes: resolvedNotes,
       issueDate: parseDate(row['issue_date']),
       expiryDate: parseDate(row['expiry_date']),
       icon: row['file_path'] == null
-          ? Icons.description_outlined
+          ? typeResolved.icon
           : Icons.attach_file_rounded,
       isVerified: row['is_verified'] as bool? ?? false,
       dateAdded: createdAt,
@@ -95,8 +131,21 @@ class DocumentItem {
       'title': title.trim(),
       'category': category,
     };
-    if (description != null && description!.trim().isNotEmpty) {
-      row['description'] = description!.trim();
+    if (documentType != null && documentType!.trim().isNotEmpty) {
+      row['document_type'] = documentType!.trim();
+    }
+    if (documentNumber != null && documentNumber!.trim().isNotEmpty) {
+      row['document_number'] = documentNumber!.trim();
+    }
+    if (country != null && country!.trim().isNotEmpty) {
+      row['country'] = country!.trim();
+    }
+    if (institution != null && institution!.trim().isNotEmpty) {
+      row['institution'] = institution!.trim();
+    }
+    if (notes != null && notes!.trim().isNotEmpty) {
+      row['notes'] = notes!.trim();
+      row['description'] = notes!.trim();
     }
     if (issueDate != null) {
       row['issue_date'] = _formatIsoDate(issueDate!);
@@ -109,13 +158,30 @@ class DocumentItem {
 
   /// The columns written when updating a document.
   Map<String, dynamic> toUpdateRow() {
-    return {
+    final row = <String, dynamic>{
       'title': title.trim(),
       'category': category,
-      'description': description?.trim(),
+      'description': (notes ?? description)?.trim(),
+      'notes': (notes ?? description)?.trim(),
       'issue_date': issueDate != null ? _formatIsoDate(issueDate!) : null,
       'expiry_date': expiryDate != null ? _formatIsoDate(expiryDate!) : null,
     };
+    if (documentType != null) {
+      row['document_type'] =
+          documentType!.trim().isEmpty ? null : documentType!.trim();
+    }
+    if (documentNumber != null) {
+      row['document_number'] =
+          documentNumber!.trim().isEmpty ? null : documentNumber!.trim();
+    }
+    if (country != null) {
+      row['country'] = country!.trim().isEmpty ? null : country!.trim();
+    }
+    if (institution != null) {
+      row['institution'] =
+          institution!.trim().isEmpty ? null : institution!.trim();
+    }
+    return row;
   }
 
   static String _formatIsoDate(DateTime dt) {
@@ -129,6 +195,11 @@ class DocumentItem {
     String? title,
     String? subtitle,
     String? category,
+    String? documentType,
+    String? documentNumber,
+    String? country,
+    String? institution,
+    String? notes,
     String? description,
     DateTime? issueDate,
     DateTime? expiryDate,
@@ -142,7 +213,11 @@ class DocumentItem {
       title: title ?? this.title,
       subtitle: subtitle ?? this.subtitle,
       category: category ?? this.category,
-      description: description ?? this.description,
+      documentType: documentType ?? this.documentType,
+      documentNumber: documentNumber ?? this.documentNumber,
+      country: country ?? this.country,
+      institution: institution ?? this.institution,
+      notes: notes ?? description ?? this.notes,
       issueDate: issueDate ?? this.issueDate,
       expiryDate: expiryDate ?? this.expiryDate,
       icon: icon ?? this.icon,

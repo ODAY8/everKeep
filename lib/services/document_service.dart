@@ -16,6 +16,10 @@ abstract class DocumentService {
     DocumentUpload? upload,
   });
 
+  /// Updates an existing document's metadata (title, category, description,
+  /// issue_date, expiry_date).
+  Future<DocumentItem> updateDocument(DocumentItem document);
+
   /// Deletes the document and, if it has one, its stored file.
   Future<void> deleteDocument(String id);
 
@@ -91,6 +95,20 @@ class DocumentServiceImpl implements DocumentService {
         }
         rethrow;
       }
+    });
+  }
+
+  @override
+  Future<DocumentItem> updateDocument(DocumentItem document) {
+    return guardBackend(() async {
+      final row = document.toUpdateRow();
+      final updated = await _client
+          .from('documents')
+          .update(row)
+          .eq('id', document.id)
+          .select()
+          .single();
+      return DocumentItem.fromRow(updated);
     });
   }
 

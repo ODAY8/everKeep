@@ -185,6 +185,16 @@ class FakeDocumentRepository with Failable implements DocumentRepository {
   }
 
   @override
+  Future<DocumentItem> updateDocument(DocumentItem document) async {
+    throwIfFailing();
+    final index = items.indexWhere((d) => d.id == document.id);
+    if (index != -1) {
+      items[index] = document;
+    }
+    return document;
+  }
+
+  @override
   Future<void> deleteDocument(String id) async {
     throwIfFailing();
     items.removeWhere((d) => d.id == id);

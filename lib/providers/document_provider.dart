@@ -22,6 +22,28 @@ class DocumentProvider extends ChangeNotifier with SessionScoped {
   bool get hasFetched => _hasFetched;
   bool get isEmpty => _documents.isEmpty;
 
+  /// Documents that expire soon (within 90 days) and are not expired yet.
+  List<DocumentItem> get expiringSoonDocuments =>
+      _documents.where((d) => d.isExpiringSoon).toList();
+
+  /// Documents that are past their expiry date.
+  List<DocumentItem> get expiredDocuments =>
+      _documents.where((d) => d.isExpired).toList();
+
+  /// All documents needing attention (expired or expiring soon), sorted by urgency.
+  List<DocumentItem> get attentionDocuments {
+    final list =
+        _documents.where((d) => d.isExpired || d.isExpiringSoon).toList();
+    list.sort((a, b) {
+      if (a.isExpired && !b.isExpired) return -1;
+      if (!a.isExpired && b.isExpired) return 1;
+      final aDate = a.expiryDate ?? DateTime(2100);
+      final bDate = b.expiryDate ?? DateTime(2100);
+      return aDate.compareTo(bDate);
+    });
+    return list;
+  }
+
   /// Documents in [category] ("All" or empty for every category) whose title
   /// contains [query] (ignoring case).
   List<DocumentItem> filterByCategory(String category, {String query = ''}) {
@@ -92,6 +114,33 @@ class DocumentProvider extends ChangeNotifier with SessionScoped {
       );
       if (isStale(epoch)) return false;
       _documents.insert(0, added);
+      return true;
+    } catch (e) {
+      if (isStale(epoch)) return false;
+      _error = errorMessage(e);
+      return false;
+    } finally {
+      if (!isStale(epoch)) {
+        _isLoading = false;
+        notifyListeners();
+      }
+    }
+  }
+
+  /// Updates an existing document's metadata.
+  Future<bool> updateDocument(DocumentItem document) async {
+    final epoch = sessionEpoch;
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final updated = await _documentRepository.updateDocument(document);
+      if (isStale(epoch)) return false;
+      final index = _documents.indexWhere((d) => d.id == updated.id);
+      if (index != -1) {
+        _documents[index] = updated;
+      }
       return true;
     } catch (e) {
       if (isStale(epoch)) return false;

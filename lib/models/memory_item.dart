@@ -9,6 +9,8 @@ class MemoryItem {
   final String content;
   final String type; // 'memory' or 'wish'
   final DateTime? date;
+  final String? location;
+  final String? tags;
   final String? filePath;
   final int? fileSize;
   final String? mimeType;
@@ -21,6 +23,8 @@ class MemoryItem {
     required this.content,
     this.type = 'memory',
     this.date,
+    this.location,
+    this.tags,
     this.filePath,
     this.fileSize,
     this.mimeType,
@@ -31,6 +35,28 @@ class MemoryItem {
   bool get isMemory => type.toLowerCase() == 'memory';
   bool get isWish => type.toLowerCase() == 'wish';
   bool get hasAttachment => filePath != null && filePath!.trim().isNotEmpty;
+
+  /// Alias for content representing the story behind the memory.
+  String get story => content;
+
+  /// Parsed list of tags.
+  List<String> get tagList => (tags ?? '')
+      .split(',')
+      .map((t) => t.trim())
+      .where((t) => t.isNotEmpty)
+      .toList();
+
+  /// True if attachment is likely an image.
+  bool get isPhotoAttachment {
+    if (!hasAttachment) return false;
+    final mime = mimeType?.toLowerCase() ?? '';
+    final path = filePath?.toLowerCase() ?? '';
+    return mime.startsWith('image/') ||
+        path.endsWith('.jpg') ||
+        path.endsWith('.jpeg') ||
+        path.endsWith('.png') ||
+        path.endsWith('.webp');
+  }
 
   /// Human-readable type label.
   String get typeLabel => isMemory ? 'Memory' : 'Wish';
@@ -66,6 +92,8 @@ class MemoryItem {
       content: (row['content'] as String?) ?? '',
       type: (row['type'] as String?) ?? 'memory',
       date: parseDate(row['date']),
+      location: row['location'] as String?,
+      tags: row['tags'] as String?,
       filePath: row['file_path'] as String?,
       fileSize: (row['file_size'] as num?)?.toInt(),
       mimeType: row['mime_type'] as String?,
@@ -86,6 +114,12 @@ class MemoryItem {
           '${date!.year.toString().padLeft(4, '0')}-'
           '${date!.month.toString().padLeft(2, '0')}-'
           '${date!.day.toString().padLeft(2, '0')}';
+    }
+    if (location != null && location!.trim().isNotEmpty) {
+      row['location'] = location!.trim();
+    }
+    if (tags != null && tags!.trim().isNotEmpty) {
+      row['tags'] = tags!.trim();
     }
     if (filePath != null) row['file_path'] = filePath;
     if (fileSize != null) row['file_size'] = fileSize;
@@ -108,6 +142,12 @@ class MemoryItem {
       'file_size': fileSize,
       'mime_type': mimeType,
     };
+    if (location != null) {
+      row['location'] = location!.trim();
+    }
+    if (tags != null) {
+      row['tags'] = tags!.trim();
+    }
     return row;
   }
 
@@ -117,6 +157,8 @@ class MemoryItem {
     String? content,
     String? type,
     DateTime? date,
+    String? location,
+    String? tags,
     String? filePath,
     int? fileSize,
     String? mimeType,
@@ -129,6 +171,8 @@ class MemoryItem {
       content: content ?? this.content,
       type: type ?? this.type,
       date: date ?? this.date,
+      location: location ?? this.location,
+      tags: tags ?? this.tags,
       filePath: filePath ?? this.filePath,
       fileSize: fileSize ?? this.fileSize,
       mimeType: mimeType ?? this.mimeType,

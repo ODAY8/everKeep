@@ -44,6 +44,18 @@ class StatusBadge extends StatelessWidget {
         background = AppColors.glassWarningBg,
         borderColor = AppColors.glassWarningColor;
 
+  /// Amber/Gold "Expiring" style.
+  const StatusBadge.warning(this.label, {super.key})
+      : color = AppColors.glassWarningColor,
+        background = AppColors.glassWarningBg,
+        borderColor = null;
+
+  /// Red "Expired" / "Destructive" style.
+  const StatusBadge.danger(this.label, {super.key})
+      : color = AppColors.glassDestructive,
+        background = const Color(0x26FF453A),
+        borderColor = null;
+
   /// Peach-bordered trust pill ("Full Access", "On Release"...).
   const StatusBadge.trust(this.label, {super.key})
       : color = AppColors.glassAccentSecondary,

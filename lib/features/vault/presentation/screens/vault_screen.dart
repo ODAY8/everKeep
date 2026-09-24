@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:everkeep/core/routing/app_router.dart';
 import 'package:everkeep/core/theme/app_colors.dart';
+import 'package:everkeep/core/theme/app_radius.dart';
 import 'package:everkeep/core/theme/app_text_styles.dart';
+import 'package:everkeep/widgets/glass/glass_card.dart';
 import 'package:everkeep/models/vault_summary.dart';
 import 'package:everkeep/providers/account_provider.dart';
 import 'package:everkeep/providers/document_provider.dart';
@@ -58,7 +60,60 @@ class _VaultScreenState extends State<VaultScreen> {
             onChanged: (value) => setState(() => _query = value),
           ),
           const SizedBox(height: 20),
-          if (_searching) _SearchResults(query: _query) else const _Categories(),
+          if (_searching)
+            _SearchResults(query: _query)
+          else ...[
+            const _Categories(),
+            const SizedBox(height: 18),
+            GlassCard(
+              onTap: () =>
+                  Navigator.of(context).pushNamed(AppRouter.timeline),
+              child: Row(
+                children: [
+                  Container(
+                    width: 38,
+                    height: 38,
+                    decoration: BoxDecoration(
+                      color: AppColors.glassAccentPink
+                          .withValues(alpha: 0.16),
+                      borderRadius: AppRadius.radiusMD,
+                    ),
+                    child: const Icon(
+                      Icons.history_edu_rounded,
+                      color: AppColors.glassAccentPink,
+                      size: 20,
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Life Timeline',
+                          style: AppTextStyles.titleSmall.copyWith(
+                            color: AppColors.glassOnSurface,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'View your memories and documents unified through time',
+                          style: AppTextStyles.bodySmall.copyWith(
+                            color: AppColors.glassOnSurfaceMuted,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Icon(
+                    Icons.chevron_right_rounded,
+                    color: AppColors.glassOnSurfaceFaint,
+                  ),
+                ],
+              ),
+            ),
+          ],
         ],
       ),
     );

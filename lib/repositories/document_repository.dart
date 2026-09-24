@@ -8,6 +8,7 @@ abstract class DocumentRepository {
     DocumentItem document, {
     DocumentUpload? upload,
   });
+  Future<DocumentItem> updateDocument(DocumentItem document);
   Future<void> deleteDocument(String id);
   Future<String> createDownloadUrl(String filePath);
 }
@@ -29,6 +30,11 @@ class DocumentRepositoryImpl implements DocumentRepository {
     DocumentUpload? upload,
   }) {
     return _documentService.addDocument(document, upload: upload);
+  }
+
+  @override
+  Future<DocumentItem> updateDocument(DocumentItem document) {
+    return _documentService.updateDocument(document);
   }
 
   @override

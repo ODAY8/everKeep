@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:everkeep/core/config/app_info.dart';
 import 'package:everkeep/features/accounts/presentation/screens/accounts_screen.dart';
 import 'package:everkeep/features/documents/presentation/screens/documents_screen.dart';
 import 'package:everkeep/features/emergency_access/presentation/screens/emergency_access_screen.dart';
@@ -175,11 +176,12 @@ void main() {
       expect(find.text('2 trustees'), findsOneWidget);
     });
 
-    testWidgets('a feature that isn\'t built says "Coming soon"', (
+    testWidgets('all core vault chapters are present on the dashboard', (
       tester,
     ) async {
       await pump(tester, const HomeScreen());
-      expect(find.text('Coming soon'), findsOneWidget); // Memories
+      expect(find.text('Memories'), findsWidgets);
+      expect(find.text('Documents'), findsWidgets);
       expect(find.text('Future Messages'), findsNothing);
     });
 
@@ -632,7 +634,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byType(AboutDialog), findsOneWidget);
-      expect(find.text('1.0.0'), findsWidgets);
+      expect(find.text(appVersion), findsWidgets);
     });
 
     testWidgets('logging out returns to the welcome screen', (tester) async {

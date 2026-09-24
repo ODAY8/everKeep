@@ -49,15 +49,17 @@ class VaultSummary {
     required int accounts,
     required int bankingAccounts,
     required int trustedContacts,
+    int memories = 0,
     required int storageBytes,
     required bool emailVerified,
     required SecuritySettings settings,
   }) {
     return VaultSummary(
-      totalItems: documents + accounts,
+      totalItems: documents + accounts + memories,
       passwordsCount: accounts - bankingAccounts,
       financialsCount: bankingAccounts,
       documentsCount: documents,
+      memoriesCount: memories,
       trustedContactsCount: trustedContacts,
       emailVerified: emailVerified,
       protectionsEnabled: settings.enabledCount > 0,

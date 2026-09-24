@@ -13,6 +13,7 @@ import 'package:everkeep/features/profile/presentation/screens/profile_screen.da
 import 'package:everkeep/features/security/presentation/screens/security_screen.dart';
 import 'package:everkeep/features/settings/presentation/screens/settings_screen.dart';
 import 'package:everkeep/features/splash/presentation/screens/splash_screen.dart';
+import 'package:everkeep/features/timeline/presentation/screens/timeline_screen.dart';
 import 'package:everkeep/features/trusted_contacts/presentation/screens/trusted_contacts_screen.dart';
 import 'package:everkeep/features/vault/presentation/screens/vault_screen.dart';
 import 'package:everkeep/features/wishes/presentation/screens/wishes_screen.dart';
@@ -40,6 +41,7 @@ class AppRouter {
   static const String profile = '/profile';
   static const String security = '/security';
   static const String settings = '/settings';
+  static const String timeline = '/timeline';
 
   /// Public screens (splash, onboarding, auth) are built as-is; everything
   /// else is wrapped in an [AuthGuard] so it can't be reached signed out.
@@ -62,6 +64,7 @@ class AppRouter {
       AppRouter.profile => _guarded(const ProfileScreen()),
       AppRouter.security => _guarded(const SecurityScreen()),
       AppRouter.settings => _guarded(const SettingsScreen()),
+      AppRouter.timeline => _guarded(const TimelineScreen()),
       _ => _guarded(const MainShell()),
     };
 

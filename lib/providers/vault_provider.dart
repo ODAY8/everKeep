@@ -9,11 +9,12 @@ class VaultProvider extends ChangeNotifier with SessionScoped {
   /// The summary as last returned by the backend.
   VaultSummary _base = const VaultSummary();
 
-  /// [_base] with the counts replaced by what the Documents, Accounts and
-  /// Trusted People providers actually hold, and the score/progress recomputed
+  /// [_base] with the counts replaced by what the Documents, Accounts, Memories,
+  /// and Trusted People providers actually hold, and the score/progress recomputed
   /// from them. Cached so `Selector`s only rebuild when it really changes.
   VaultSummary _summary = const VaultSummary();
   int? _documentsCount;
+  int? _memoriesCount;
   int? _accountsCount;
   int? _bankingCount;
   int? _contactsCount;
@@ -51,21 +52,23 @@ class VaultProvider extends ChangeNotifier with SessionScoped {
   }
 
   /// Overrides the counts with live values. Pass null for a count that isn't
-  /// loaded yet to fall back to the backend's figure. [accounts] is every
-  /// account; [banking] is how many of them are in the Banking category.
+  /// loaded yet to fall back to the backend's figure.
   void updateLiveCounts({
     int? documents,
+    int? memories,
     int? accounts,
     int? banking,
     int? contacts,
   }) {
     if (documents == _documentsCount &&
+        memories == _memoriesCount &&
         accounts == _accountsCount &&
         banking == _bankingCount &&
         contacts == _contactsCount) {
       return;
     }
     _documentsCount = documents;
+    _memoriesCount = memories;
     _accountsCount = accounts;
     _bankingCount = banking;
     _contactsCount = contacts;
@@ -76,6 +79,7 @@ class VaultProvider extends ChangeNotifier with SessionScoped {
   void _recompute() {
     final baseAccounts = _base.accountsCount;
     final documents = _documentsCount ?? _base.documentsCount;
+    final memories = _memoriesCount ?? _base.memoriesCount;
     final accounts = _accountsCount ?? baseAccounts;
     final banking = _bankingCount ?? _base.financialsCount;
     final contacts = _contactsCount ?? _base.trustedContactsCount;
@@ -88,6 +92,7 @@ class VaultProvider extends ChangeNotifier with SessionScoped {
               (documents - _base.documentsCount) +
               (accounts - baseAccounts),
           documentsCount: documents,
+          memoriesCount: memories,
           passwordsCount: accounts - banking,
           financialsCount: banking,
           trustedContactsCount: contacts,
@@ -102,6 +107,7 @@ class VaultProvider extends ChangeNotifier with SessionScoped {
     invalidateSession();
     _base = const VaultSummary();
     _documentsCount = null;
+    _memoriesCount = null;
     _accountsCount = null;
     _bankingCount = null;
     _contactsCount = null;

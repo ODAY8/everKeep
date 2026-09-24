@@ -1,9 +1,11 @@
 import 'account_item.dart';
 import 'document_item.dart';
+import 'memory_item.dart';
 import 'trusted_contact_item.dart';
 
 enum ActivityKind {
   document('Documents'),
+  memory('Memories'),
   account('Accounts'),
   contact('Trusted People');
 
@@ -20,14 +22,15 @@ class ActivityItem {
   const ActivityItem({required this.kind, required this.title, required this.at});
 }
 
-/// The newest [limit] things the user added across documents, accounts and
+/// The newest [limit] things the user added across documents, memories, accounts and
 /// trusted people, newest first. Items with no timestamp are left out (there is
 /// nothing honest to say about when they happened).
 List<ActivityItem> buildRecentActivity({
   required Iterable<DocumentItem> documents,
   required Iterable<AccountItem> accounts,
   required Iterable<TrustedContactItem> contacts,
-  int limit = 3,
+  Iterable<MemoryItem>? memories,
+  int limit = 4,
 }) {
   final items = <ActivityItem>[
     for (final d in documents)
@@ -37,6 +40,14 @@ List<ActivityItem> buildRecentActivity({
           title: '${d.title} added',
           at: d.dateAdded!,
         ),
+    if (memories != null)
+      for (final m in memories)
+        if (m.createdAt != null)
+          ActivityItem(
+            kind: ActivityKind.memory,
+            title: '${m.title} added to memories',
+            at: m.createdAt!,
+          ),
     for (final a in accounts)
       if (a.createdAt != null)
         ActivityItem(

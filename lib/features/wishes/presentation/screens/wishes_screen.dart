@@ -119,6 +119,20 @@ class _WishesScreenState extends State<WishesScreen> {
           maxLines: 6,
           validator: _contentValidator,
         ),
+        if (type == 'memory')
+          const GlassFormField(
+            key: 'location',
+            label: 'Location (optional)',
+            hint: 'e.g. Kyoto, Japan',
+            required: false,
+          ),
+        if (type == 'memory')
+          const GlassFormField(
+            key: 'tags',
+            label: 'Tags (optional)',
+            hint: 'e.g. Travel, Family, Milestone',
+            required: false,
+          ),
       ],
       dateFields: const [GlassFormDateField(key: 'date', label: 'Date (optional)')],
       onSubmit: (values) async {
@@ -129,6 +143,8 @@ class _WishesScreenState extends State<WishesScreen> {
             content: values['content'] ?? '',
             type: type,
             date: _parseIsoDate(values['date']),
+            location: values['location']?.trim(),
+            tags: values['tags']?.trim(),
           ),
           upload: upload,
         );
@@ -168,6 +184,22 @@ class _WishesScreenState extends State<WishesScreen> {
           maxLines: 6,
           validator: _contentValidator,
         ),
+        if (item.isMemory)
+          GlassFormField(
+            key: 'location',
+            label: 'Location (optional)',
+            hint: 'e.g. Kyoto, Japan',
+            initialValue: item.location ?? '',
+            required: false,
+          ),
+        if (item.isMemory)
+          GlassFormField(
+            key: 'tags',
+            label: 'Tags (optional)',
+            hint: 'e.g. Travel, Family, Milestone',
+            initialValue: item.tags ?? '',
+            required: false,
+          ),
       ],
       submitLabel: 'Save Changes',
       dateFields: [
@@ -179,6 +211,8 @@ class _WishesScreenState extends State<WishesScreen> {
             title: values['title']!,
             content: values['content'] ?? '',
             date: _parseIsoDate(values['date']),
+            location: values['location']?.trim(),
+            tags: values['tags']?.trim(),
           ),
         );
         return ok ? null : memoryProv.error ?? 'Could not save your changes.';
@@ -474,6 +508,64 @@ class _MemoryDetailsSheet extends StatelessWidget {
           item.subtitle,
           style: AppTextStyles.bodySmall.copyWith(color: AppColors.glassOnSurfaceMuted),
         ),
+        if (item.date != null || (item.location != null && item.location!.isNotEmpty)) ...[
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 12,
+            runSpacing: 6,
+            children: [
+              if (item.date != null)
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.calendar_today_rounded, size: 14, color: AppColors.glassOnSurfaceMuted),
+                    const SizedBox(width: 4),
+                    Text(
+                      '${item.date!.year}-${item.date!.month.toString().padLeft(2, '0')}-${item.date!.day.toString().padLeft(2, '0')}',
+                      style: AppTextStyles.bodySmall.copyWith(color: AppColors.glassOnSurfaceMuted),
+                    ),
+                  ],
+                ),
+              if (item.location != null && item.location!.isNotEmpty)
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.location_on_outlined, size: 15, color: AppColors.glassAccentPink),
+                    const SizedBox(width: 4),
+                    Text(
+                      item.location!,
+                      style: AppTextStyles.bodySmall.copyWith(color: AppColors.glassOnSurfaceMuted),
+                    ),
+                  ],
+                ),
+            ],
+          ),
+        ],
+        if (item.tagList.isNotEmpty) ...[
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [
+              for (final tag in item.tagList)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: AppColors.glassSurfaceRaised,
+                    borderRadius: AppRadius.radiusSM,
+                    border: Border.all(color: AppColors.glassBorder),
+                  ),
+                  child: Text(
+                    '#$tag',
+                    style: AppTextStyles.labelSmall.copyWith(
+                      color: AppColors.glassAccentPink,
+                      fontSize: 11,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ],
         const SizedBox(height: 18),
         if (item.content.trim().isNotEmpty)
           Text(
@@ -489,14 +581,14 @@ class _MemoryDetailsSheet extends StatelessWidget {
           const SizedBox(height: 18),
           Row(
             children: [
-              const Icon(
-                Icons.attach_file_rounded,
+              Icon(
+                item.isPhotoAttachment ? Icons.photo_outlined : Icons.attach_file_rounded,
                 color: AppColors.glassOnSurfaceMuted,
                 size: 18,
               ),
               const SizedBox(width: 8),
               Text(
-                'Has an attached file',
+                item.isPhotoAttachment ? 'Has an attached photo' : 'Has an attached file',
                 style: AppTextStyles.bodySmall.copyWith(color: AppColors.glassOnSurfaceMuted),
               ),
             ],

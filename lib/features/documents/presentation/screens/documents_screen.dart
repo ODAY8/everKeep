@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:everkeep/core/theme/app_colors.dart';
 import 'package:everkeep/core/theme/app_radius.dart';
 import 'package:everkeep/core/theme/app_text_styles.dart';
+import 'package:everkeep/core/utils/document_expiration.dart';
 import 'package:everkeep/core/utils/pick_upload.dart';
 import 'package:everkeep/models/document_item.dart';
 import 'package:everkeep/models/document_upload.dart';
@@ -17,6 +18,7 @@ import 'package:everkeep/widgets/glass/glass_fab.dart';
 import 'package:everkeep/widgets/glass/glass_filter_chips.dart';
 import 'package:everkeep/widgets/glass/glass_item_row.dart';
 import 'package:everkeep/widgets/glass/glass_page_header.dart';
+import 'package:everkeep/widgets/glass/glass_primary_button.dart';
 import 'package:everkeep/widgets/glass/glass_scaffold.dart';
 import 'package:everkeep/widgets/glass/glass_search_bar.dart';
 import 'package:everkeep/widgets/glass/glass_sheet.dart';
@@ -88,7 +90,11 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
       return;
     } catch (_) {
       if (mounted) {
-        showAppSnackBar(context, 'Couldn\'t read that file. Try another one.', isError: true);
+        showAppSnackBar(
+          context,
+          'Couldn\'t read that file. Try another one.',
+          isError: true,
+        );
       }
       return;
     }
@@ -113,6 +119,8 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
           label: 'Document name',
           hint: 'e.g. Passport.pdf',
           initialValue: fileName ?? '',
+          validator: (value) =>
+              value.trim().isEmpty ? 'Document name is required' : null,
         ),
       ],
       choices: const [
@@ -122,15 +130,26 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
           options: _categories,
         ),
       ],
+      dateFields: const [
+        GlassFormDateField(key: 'expiry_date', label: 'Expiry date (optional)'),
+        GlassFormDateField(key: 'issue_date', label: 'Issue date (optional)'),
+      ],
       onSubmit: (values) async {
+        final expiryStr = values['expiry_date'];
+        final issueStr = values['issue_date'];
+
         final added = await docProv.addDocument(
-          // The id and the "Added ..." subtitle are assigned by the backend;
-          // the saved document comes back with both.
           DocumentItem(
             id: '',
             title: values['title']!,
             subtitle: '',
             category: values['category']!,
+            expiryDate: expiryStr != null && expiryStr.isNotEmpty
+                ? DateTime.tryParse(expiryStr)
+                : null,
+            issueDate: issueStr != null && issueStr.isNotEmpty
+                ? DateTime.tryParse(issueStr)
+                : null,
           ),
           upload: upload,
         );
@@ -146,6 +165,80 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
     }
   }
 
+  // ── Editing & Details ───────────────────────────────────────────────────────
+
+  Future<void> _showEditForm(DocumentItem document) async {
+    final docProv = context.read<DocumentProvider>();
+
+    final initialCategoryIndex = _categories.indexOf(document.category);
+
+    final saved = await showGlassFormSheet(
+      context,
+      title: 'Edit Document',
+      subtitle: document.title,
+      submitLabel: 'Save Changes',
+      fields: [
+        GlassFormField(
+          key: 'title',
+          label: 'Document name',
+          hint: 'e.g. Passport or Insurance Policy',
+          initialValue: document.title,
+          validator: (v) =>
+              v.trim().isEmpty ? 'Document name is required' : null,
+        ),
+      ],
+      choices: [
+        GlassFormChoice(
+          key: 'category',
+          label: 'Category',
+          options: _categories,
+          initialIndex: initialCategoryIndex != -1 ? initialCategoryIndex : 0,
+        ),
+      ],
+      dateFields: [
+        GlassFormDateField(
+          key: 'expiry_date',
+          label: 'Expiry date (optional)',
+          initialValue: document.expiryDate,
+        ),
+        GlassFormDateField(
+          key: 'issue_date',
+          label: 'Issue date (optional)',
+          initialValue: document.issueDate,
+        ),
+      ],
+      onSubmit: (values) async {
+        final expiryStr = values['expiry_date'];
+        final issueStr = values['issue_date'];
+
+        final ok = await docProv.updateDocument(
+          document.copyWith(
+            title: values['title']!,
+            category: values['category']!,
+            expiryDate: expiryStr != null && expiryStr.isNotEmpty
+                ? DateTime.tryParse(expiryStr)
+                : null,
+            issueDate: issueStr != null && issueStr.isNotEmpty
+                ? DateTime.tryParse(issueStr)
+                : null,
+          ),
+        );
+        return ok ? null : docProv.error ?? 'Could not save changes.';
+      },
+    );
+
+    if (saved && mounted) {
+      showAppSnackBar(context, 'Document updated');
+    }
+  }
+
+  void _showDetails(DocumentItem document) {
+    showGlassSheet<void>(
+      context,
+      builder: (_) => _DocumentDetailsSheet(document: document),
+    );
+  }
+
   // ── Existing documents ──────────────────────────────────────────────────────
 
   void _showActions(DocumentItem document) {
@@ -154,6 +247,16 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
       title: document.title,
       subtitle: document.subtitle,
       actions: [
+        GlassSheetAction(
+          label: 'View details',
+          icon: Icons.visibility_outlined,
+          onTap: () => _showDetails(document),
+        ),
+        GlassSheetAction(
+          label: 'Edit document',
+          icon: Icons.edit_outlined,
+          onTap: () => _showEditForm(document),
+        ),
         if (document.filePath != null)
           GlassSheetAction(
             label: 'Open file',
@@ -170,8 +273,6 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
     );
   }
 
-  // A short-lived signed link: documents are private, so this is the only
-  // way to reach one outside the app.
   Future<void> _openFile(DocumentItem document) {
     final docProv = context.read<DocumentProvider>();
     return openRemoteFile(
@@ -185,7 +286,8 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
     final confirmed = await confirmDestructive(
       context,
       title: 'Delete document?',
-      message: '"${document.title}" will be permanently removed from your vault.',
+      message:
+          '"${document.title}" will be permanently removed from your vault.',
       confirmLabel: 'Delete',
     );
     if (!confirmed || !mounted) return;
@@ -246,9 +348,6 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
           const SizedBox(height: 20),
           Consumer<DocumentProvider>(
             builder: (context, docProv, _) {
-              // Only a failed *first load* replaces the list. A failed
-              // add/delete leaves the list alone and is reported in a
-              // snackbar by whoever triggered it.
               if (!docProv.hasFetched) {
                 final loadError = docProv.error;
                 if (loadError != null && !docProv.isLoading) {
@@ -289,12 +388,18 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
                       index: entry.key,
                       child: GlassItemRow(
                         icon: entry.value.icon,
-                        iconColor: AppColors.glassAccentPink,
+                        iconColor: entry.value.isExpired
+                            ? AppColors.glassDestructive
+                            : (entry.value.isExpiringSoon
+                                ? AppColors.glassWarningColor
+                                : AppColors.glassAccentPink),
                         title: entry.value.title,
-                        subtitle: entry.value.subtitle,
-                        trailing: entry.value.isVerified
-                            ? const StatusBadge.success('Verified')
-                            : const StatusBadge.pending('Pending'),
+                        subtitle: entry.value.isExpired
+                            ? '⚠️ Expired · ${entry.value.subtitle}'
+                            : (entry.value.isExpiringSoon
+                                ? '⚠️ ${entry.value.expirationNotice} · ${entry.value.category}'
+                                : entry.value.subtitle),
+                        trailing: _buildTrailingBadge(entry.value),
                         onTap: () => _showActions(entry.value),
                       ),
                     ),
@@ -309,14 +414,30 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
     );
   }
 
+  Widget _buildTrailingBadge(DocumentItem doc) {
+    if (doc.isExpired) {
+      return const StatusBadge.danger('Expired');
+    }
+    if (doc.isExpiringSoon) {
+      return StatusBadge.warning(
+        DocumentExpirationHelper.shortLabel(doc.expiryDate),
+      );
+    }
+    return doc.isVerified
+        ? const StatusBadge.success('Verified')
+        : const StatusBadge.pending('Pending');
+  }
+
   Widget _buildStorageCard() {
     return Selector<VaultProvider, VaultSummary>(
       selector: (_, vault) => vault.vaultSummary,
       builder: (context, summary, _) {
         final usedMb = summary.storageUsedMb;
         final totalGb = (summary.storageLimitMb / 1024).toStringAsFixed(0);
-        final ratio = (summary.storageUsedMb / summary.storageLimitMb)
-            .clamp(0.0, 1.0);
+        final ratio = (summary.storageUsedMb / summary.storageLimitMb).clamp(
+          0.0,
+          1.0,
+        );
 
         return GlassCard(
           child: Column(
@@ -356,6 +477,186 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
           ),
         );
       },
+    );
+  }
+}
+
+class _DocumentDetailsSheet extends StatelessWidget {
+  final DocumentItem document;
+
+  const _DocumentDetailsSheet({required this.document});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: document.isExpired
+                    ? AppColors.glassDestructive.withValues(alpha: 0.16)
+                    : (document.isExpiringSoon
+                        ? AppColors.glassWarningBg
+                        : AppColors.glassAccentSecondaryBg),
+                borderRadius: AppRadius.radiusLG,
+              ),
+              child: Icon(
+                document.icon,
+                color: document.isExpired
+                    ? AppColors.glassDestructive
+                    : (document.isExpiringSoon
+                        ? AppColors.glassWarningColor
+                        : AppColors.glassAccentSecondary),
+                size: 20,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    document.title,
+                    style: AppTextStyles.serifTitleSmall.copyWith(
+                      color: AppColors.glassOnSurface,
+                      fontSize: 18,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    document.subtitle,
+                    style: AppTextStyles.bodySmall.copyWith(
+                      color: AppColors.glassOnSurfaceMuted,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: DocumentExpirationHelper.backgroundColorFor(
+              document.expirationStatus,
+            ),
+            borderRadius: AppRadius.radiusMD,
+            border: Border.all(
+              color: DocumentExpirationHelper.colorFor(
+                document.expirationStatus,
+              ).withValues(alpha: 0.3),
+            ),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                document.isExpired
+                    ? Icons.warning_amber_rounded
+                    : (document.isExpiringSoon
+                        ? Icons.schedule_rounded
+                        : Icons.verified_user_outlined),
+                color: DocumentExpirationHelper.colorFor(
+                  document.expirationStatus,
+                ),
+                size: 18,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  document.expirationNotice,
+                  style: AppTextStyles.bodySmall.copyWith(
+                    color: DocumentExpirationHelper.colorFor(
+                      document.expirationStatus,
+                    ),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        if (document.issueDate != null) ...[
+          _DetailRow(
+            label: 'Issue Date',
+            value:
+                '${document.issueDate!.year}-${document.issueDate!.month.toString().padLeft(2, '0')}-${document.issueDate!.day.toString().padLeft(2, '0')}',
+          ),
+          const SizedBox(height: 8),
+        ],
+        if (document.expiryDate != null) ...[
+          _DetailRow(
+            label: 'Expiry Date',
+            value:
+                '${document.expiryDate!.year}-${document.expiryDate!.month.toString().padLeft(2, '0')}-${document.expiryDate!.day.toString().padLeft(2, '0')}',
+          ),
+          const SizedBox(height: 8),
+        ],
+        _DetailRow(label: 'Category', value: document.category),
+        if (document.filePath != null) ...[
+          const SizedBox(height: 8),
+          const _DetailRow(label: 'Stored File', value: 'Saved in secure vault'),
+        ],
+        if (document.description != null &&
+            document.description!.trim().isNotEmpty) ...[
+          const SizedBox(height: 12),
+          Text(
+            'Notes',
+            style: AppTextStyles.labelSmall.copyWith(
+              color: AppColors.glassOnSurfaceFaint,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            document.description!,
+            style: AppTextStyles.bodyMedium.copyWith(
+              color: AppColors.glassOnSurface,
+            ),
+          ),
+        ],
+        const SizedBox(height: 20),
+        GlassPrimaryButton(
+          text: 'Close',
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+      ],
+    );
+  }
+}
+
+class _DetailRow extends StatelessWidget {
+  final String label;
+  final String value;
+
+  const _DetailRow({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          label,
+          style: AppTextStyles.bodySmall.copyWith(
+            color: AppColors.glassOnSurfaceMuted,
+          ),
+        ),
+        Text(
+          value,
+          style: AppTextStyles.bodySmall.copyWith(
+            color: AppColors.glassOnSurface,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
     );
   }
 }

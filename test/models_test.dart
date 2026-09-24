@@ -2,11 +2,13 @@ import 'dart:io';
 
 import 'package:everkeep/core/config/app_info.dart';
 import 'package:everkeep/core/config/app_links.dart';
+import 'package:everkeep/core/utils/document_expiration.dart';
 import 'package:everkeep/core/utils/greeting.dart';
 import 'package:everkeep/core/utils/validators.dart';
 import 'package:everkeep/models/account_item.dart';
 import 'package:everkeep/models/document_item.dart';
 import 'package:everkeep/models/legacy_checklist.dart';
+import 'package:everkeep/models/memory_item.dart';
 import 'package:everkeep/models/recent_activity.dart';
 import 'package:everkeep/models/security_settings.dart';
 import 'package:everkeep/models/trusted_contact_item.dart';
@@ -294,6 +296,108 @@ void main() {
       expect(validatePassword(''), 'Password is required');
       expect(validatePassword('12345'), contains('at least'));
       expect(validatePassword('123456'), isNull);
+    });
+  });
+
+  group('DocumentExpirationHelper & Attention', () {
+    final now = DateTime(2026, 9, 24);
+
+    test('determines expiration statuses correctly', () {
+      expect(
+        DocumentExpirationHelper.statusFor(null, now: now),
+        DocumentExpirationStatus.noExpiryDate,
+      );
+      expect(
+        DocumentExpirationHelper.statusFor(DateTime(2026, 9, 20), now: now),
+        DocumentExpirationStatus.expired,
+      );
+      expect(
+        DocumentExpirationHelper.statusFor(DateTime(2026, 9, 24), now: now),
+        DocumentExpirationStatus.expiringSoon,
+      );
+      expect(
+        DocumentExpirationHelper.statusFor(DateTime(2026, 10, 15), now: now),
+        DocumentExpirationStatus.expiringSoon,
+      );
+      expect(
+        DocumentExpirationHelper.statusFor(DateTime(2026, 12, 20), now: now),
+        DocumentExpirationStatus.expiringSoon, // <= 90 days
+      );
+      expect(
+        DocumentExpirationHelper.statusFor(DateTime(2027, 5, 1), now: now),
+        DocumentExpirationStatus.valid,
+      );
+    });
+
+    test('formats short labels and descriptive notices', () {
+      expect(
+        DocumentExpirationHelper.shortLabel(DateTime(2026, 12, 20), now),
+        '87 days',
+      );
+      expect(
+        DocumentExpirationHelper.shortLabel(DateTime(2026, 9, 20), now),
+        'Expired',
+      );
+      expect(
+        DocumentExpirationHelper.shortLabel(DateTime(2026, 9, 25), now),
+        'Tomorrow',
+      );
+      expect(
+        DocumentExpirationHelper.descriptiveNotice(DateTime(2026, 12, 20), now),
+        'Expires in 87 days',
+      );
+      expect(
+        DocumentExpirationHelper.descriptiveNotice(DateTime(2026, 9, 21), now),
+        'Expired 3 days ago',
+      );
+      expect(
+        DocumentExpirationHelper.descriptiveNotice(DateTime(2026, 9, 24), now),
+        'Expires today',
+      );
+    });
+
+    test('DocumentItem computes expiration getters', () {
+      final expiringDoc = DocumentItem(
+        id: '1',
+        title: 'Passport',
+        subtitle: 'Legal',
+        category: 'Legal',
+        expiryDate: now.add(const Duration(days: 87)),
+        issueDate: DateTime(2016, 12, 20),
+      );
+      expect(expiringDoc.isExpiringSoon, isTrue);
+      expect(expiringDoc.isExpired, isFalse);
+      expect(expiringDoc.expirationNotice, 'Expires in 87 days');
+      expect(expiringDoc.toInsertRow()['expiry_date'], '2026-12-20');
+      expect(expiringDoc.toInsertRow()['issue_date'], '2016-12-20');
+    });
+
+    test('buildRecentActivity includes memories when provided', () {
+      final doc = DocumentItem(
+        id: 'd1',
+        title: 'Passport',
+        subtitle: 'Legal',
+        category: 'Legal',
+        dateAdded: now.subtract(const Duration(days: 2)),
+      );
+      final mem = MemoryItem(
+        id: 'm1',
+        title: 'Graduation Day',
+        content: 'Finished college',
+        createdAt: now.subtract(const Duration(days: 1)),
+      );
+
+      final activity = buildRecentActivity(
+        documents: [doc],
+        accounts: [],
+        contacts: [],
+        memories: [mem],
+      );
+
+      expect(activity.length, 2);
+      expect(activity.first.kind, ActivityKind.memory);
+      expect(activity.first.title, 'Graduation Day added to memories');
+      expect(activity.last.kind, ActivityKind.document);
     });
   });
 

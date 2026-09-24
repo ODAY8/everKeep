@@ -54,6 +54,7 @@ class SessionCoordinator {
   }) : _wasAuthenticated = auth.isAuthenticated {
     auth.addListener(_onAuthChanged);
     documents.addListener(_syncVaultCounts);
+    memories.addListener(_syncVaultCounts);
     accounts.addListener(_syncVaultCounts);
     contacts.addListener(_syncVaultCounts);
     if (_wasAuthenticated) _onSignedIn();
@@ -62,6 +63,7 @@ class SessionCoordinator {
   void dispose() {
     auth.removeListener(_onAuthChanged);
     documents.removeListener(_syncVaultCounts);
+    memories.removeListener(_syncVaultCounts);
     accounts.removeListener(_syncVaultCounts);
     contacts.removeListener(_syncVaultCounts);
   }
@@ -117,6 +119,7 @@ class SessionCoordinator {
   void _syncVaultCounts() {
     vault.updateLiveCounts(
       documents: documents.hasFetched ? documents.count : null,
+      memories: memories.hasFetched ? memories.count : null,
       accounts: accounts.hasFetched ? accounts.count : null,
       banking: accounts.hasFetched ? accounts.bankingCount : null,
       contacts: contacts.hasFetched ? contacts.count : null,

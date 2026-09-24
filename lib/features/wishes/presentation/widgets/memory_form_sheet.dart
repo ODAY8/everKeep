@@ -207,228 +207,233 @@ class _MemoryFormSheetState extends State<MemoryFormSheet> {
         ? 'Save Changes'
         : (_pendingUpload != null ? 'Upload & Save' : 'Save');
 
-    return Form(
-      key: _formKey,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Header
-          Text(
-            _isEditing ? 'Edit $_label' : 'Add $_label',
-            style: AppTextStyles.serifHeadline.copyWith(
-              color: AppColors.glassOnSurface,
-              fontSize: 22,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            _isEditing
-                ? 'Update your details below.'
-                : (_isMemory
-                    ? 'Keep a memory worth holding on to.'
-                    : 'Write down a wish for the people you love.'),
-            style: AppTextStyles.bodySmall.copyWith(
-              color: AppColors.glassOnSurfaceMuted,
-            ),
-          ),
-          const SizedBox(height: 18),
-
-          // Error Banner
-          if (_errorMessage != null) ...[
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: AppColors.glassDestructive.withValues(alpha: 0.15),
-                borderRadius: AppRadius.radiusMD,
-                border: Border.all(
-                  color: AppColors.glassDestructive.withValues(alpha: 0.4),
+    return PopScope(
+      canPop: !_saving,
+      child: Form(
+        key: _formKey,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Header
+              Text(
+                _isEditing ? 'Edit $_label' : 'Add $_label',
+                style: AppTextStyles.serifHeadline.copyWith(
+                  color: AppColors.glassOnSurface,
+                  fontSize: 22,
                 ),
               ),
-              child: Row(
-                children: [
-                  const Icon(
-                    Icons.error_outline_rounded,
-                    color: AppColors.glassDestructive,
-                    size: 18,
+              const SizedBox(height: 4),
+              Text(
+                _isEditing
+                    ? 'Update your details below.'
+                    : (_isMemory
+                        ? 'Keep a memory worth holding on to.'
+                        : 'Write down a wish for the people you love.'),
+                style: AppTextStyles.bodySmall.copyWith(
+                  color: AppColors.glassOnSurfaceMuted,
+                ),
+              ),
+              const SizedBox(height: 18),
+
+              // Error Banner
+              if (_errorMessage != null) ...[
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppColors.glassDestructive.withValues(alpha: 0.15),
+                    borderRadius: AppRadius.radiusMD,
+                    border: Border.all(
+                      color: AppColors.glassDestructive.withValues(alpha: 0.4),
+                    ),
                   ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      _errorMessage!,
-                      style: AppTextStyles.bodySmall.copyWith(
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.error_outline_rounded,
                         color: AppColors.glassDestructive,
+                        size: 18,
                       ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 14),
-          ],
-
-          // Title field (first TextField for tests)
-          _FormFieldWrapper(
-            label: 'Title',
-            child: TextFormField(
-              controller: _titleController,
-              enabled: !_saving,
-              style: AppTextStyles.bodyMedium.copyWith(
-                color: AppColors.glassOnSurface,
-              ),
-              decoration: _inputDecoration(
-                hintText: _isMemory
-                    ? 'e.g. Our trip to the coast'
-                    : 'e.g. For my daughter',
-              ),
-              validator: (v) {
-                final trimmed = (v ?? '').trim();
-                if (trimmed.isEmpty) return 'Title is required';
-                if (trimmed.length > 300) {
-                  return 'Keep the title under 300 characters.';
-                }
-                return null;
-              },
-            ),
-          ),
-          const SizedBox(height: 14),
-
-          // Story / Description field
-          _FormFieldWrapper(
-            label: _isMemory ? 'What happened' : 'Your wish',
-            child: TextFormField(
-              controller: _contentController,
-              enabled: !_saving,
-              minLines: 3,
-              maxLines: 5,
-              style: AppTextStyles.bodyMedium.copyWith(
-                color: AppColors.glassOnSurface,
-              ),
-              decoration: _inputDecoration(
-                hintText: _isMemory
-                    ? 'Write as much or as little as you like...'
-                    : 'What you\'d like them to know...',
-              ),
-              validator: (v) {
-                if ((v ?? '').length > 10000) {
-                  return 'Keep it under 10,000 characters.';
-                }
-                return null;
-              },
-            ),
-          ),
-          const SizedBox(height: 14),
-
-          // Date Field
-          _FormFieldWrapper(
-            label: 'Date (optional)',
-            child: GestureDetector(
-              onTap: _saving ? null : _pickDate,
-              behavior: HitTestBehavior.opaque,
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                decoration: BoxDecoration(
-                  color: AppColors.glassSurface,
-                  borderRadius: AppRadius.radiusMD,
-                  border: Border.all(color: AppColors.glassBorder),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(
-                      Icons.calendar_today_rounded,
-                      size: 16,
-                      color: AppColors.glassOnSurfaceMuted,
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        _selectedDate != null
-                            ? '${_selectedDate!.year}-${_selectedDate!.month.toString().padLeft(2, '0')}-${_selectedDate!.day.toString().padLeft(2, '0')}'
-                            : 'Select date...',
-                        style: AppTextStyles.bodyMedium.copyWith(
-                          color: _selectedDate != null
-                              ? AppColors.glassOnSurface
-                              : AppColors.glassOnSurfaceFaint,
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          _errorMessage!,
+                          style: AppTextStyles.bodySmall.copyWith(
+                            color: AppColors.glassDestructive,
+                          ),
                         ),
                       ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 14),
+              ],
+
+              // Title field (first TextField for tests)
+              _FormFieldWrapper(
+                label: 'Title',
+                child: TextFormField(
+                  controller: _titleController,
+                  enabled: !_saving,
+                  style: AppTextStyles.bodyMedium.copyWith(
+                    color: AppColors.glassOnSurface,
+                  ),
+                  decoration: _inputDecoration(
+                    hintText: _isMemory
+                        ? 'e.g. Our trip to the coast'
+                        : 'e.g. For my daughter',
+                  ),
+                  validator: (v) {
+                    final trimmed = (v ?? '').trim();
+                    if (trimmed.isEmpty) return 'Title is required';
+                    if (trimmed.length > 300) {
+                      return 'Keep the title under 300 characters.';
+                    }
+                    return null;
+                  },
+                ),
+              ),
+              const SizedBox(height: 14),
+
+              // Story / Description field
+              _FormFieldWrapper(
+                label: _isMemory ? 'What happened' : 'Your wish',
+                child: TextFormField(
+                  controller: _contentController,
+                  enabled: !_saving,
+                  minLines: 3,
+                  maxLines: 5,
+                  style: AppTextStyles.bodyMedium.copyWith(
+                    color: AppColors.glassOnSurface,
+                  ),
+                  decoration: _inputDecoration(
+                    hintText: _isMemory
+                        ? 'Write as much or as little as you like...'
+                        : 'What you\'d like them to know...',
+                  ),
+                  validator: (v) {
+                    if ((v ?? '').length > 10000) {
+                      return 'Keep it under 10,000 characters.';
+                    }
+                    return null;
+                  },
+                ),
+              ),
+              const SizedBox(height: 14),
+
+              // Date Field
+              _FormFieldWrapper(
+                label: 'Date (optional)',
+                child: GestureDetector(
+                  onTap: _saving ? null : _pickDate,
+                  behavior: HitTestBehavior.opaque,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: AppColors.glassSurface,
+                      borderRadius: AppRadius.radiusMD,
+                      border: Border.all(color: AppColors.glassBorder),
                     ),
-                    if (_selectedDate != null && !_saving)
-                      GestureDetector(
-                        onTap: () => setState(() => _selectedDate = null),
-                        child: const Icon(
-                          Icons.clear_rounded,
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.calendar_today_rounded,
                           size: 16,
                           color: AppColors.glassOnSurfaceMuted,
                         ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            _selectedDate != null
+                                ? '${_selectedDate!.year}-${_selectedDate!.month.toString().padLeft(2, '0')}-${_selectedDate!.day.toString().padLeft(2, '0')}'
+                                : 'Select date...',
+                            style: AppTextStyles.bodyMedium.copyWith(
+                              color: _selectedDate != null
+                                  ? AppColors.glassOnSurface
+                                  : AppColors.glassOnSurfaceFaint,
+                            ),
+                          ),
+                        ),
+                        if (_selectedDate != null && !_saving)
+                          GestureDetector(
+                            onTap: () => setState(() => _selectedDate = null),
+                            child: const Icon(
+                              Icons.clear_rounded,
+                              size: 16,
+                              color: AppColors.glassOnSurfaceMuted,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 14),
+
+              // Location (Memory only)
+              if (_isMemory) ...[
+                _FormFieldWrapper(
+                  label: 'Location (optional)',
+                  child: TextFormField(
+                    controller: _locationController,
+                    enabled: !_saving,
+                    style: AppTextStyles.bodyMedium.copyWith(
+                      color: AppColors.glassOnSurface,
+                    ),
+                    decoration: _inputDecoration(
+                      hintText: 'e.g. Kyoto, Japan',
+                      prefixIcon: const Icon(
+                        Icons.location_on_outlined,
+                        size: 18,
+                        color: AppColors.glassOnSurfaceMuted,
                       ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 14),
-
-          // Location (Memory only)
-          if (_isMemory) ...[
-            _FormFieldWrapper(
-              label: 'Location (optional)',
-              child: TextFormField(
-                controller: _locationController,
-                enabled: !_saving,
-                style: AppTextStyles.bodyMedium.copyWith(
-                  color: AppColors.glassOnSurface,
-                ),
-                decoration: _inputDecoration(
-                  hintText: 'e.g. Kyoto, Japan',
-                  prefixIcon: const Icon(
-                    Icons.location_on_outlined,
-                    size: 18,
-                    color: AppColors.glassOnSurfaceMuted,
+                    ),
                   ),
                 ),
-              ),
-            ),
-            const SizedBox(height: 14),
-          ],
+                const SizedBox(height: 14),
+              ],
 
-          // Tags (Memory only)
-          if (_isMemory) ...[
-            _FormFieldWrapper(
-              label: 'Tags (optional)',
-              child: TextFormField(
-                controller: _tagsController,
-                enabled: !_saving,
-                style: AppTextStyles.bodyMedium.copyWith(
-                  color: AppColors.glassOnSurface,
-                ),
-                decoration: _inputDecoration(
-                  hintText: 'e.g. Travel, Family, Milestone',
-                  prefixIcon: const Icon(
-                    Icons.tag_rounded,
-                    size: 18,
-                    color: AppColors.glassOnSurfaceMuted,
+              // Tags (Memory only)
+              if (_isMemory) ...[
+                _FormFieldWrapper(
+                  label: 'Tags (optional)',
+                  child: TextFormField(
+                    controller: _tagsController,
+                    enabled: !_saving,
+                    style: AppTextStyles.bodyMedium.copyWith(
+                      color: AppColors.glassOnSurface,
+                    ),
+                    decoration: _inputDecoration(
+                      hintText: 'e.g. Travel, Family, Milestone',
+                      prefixIcon: const Icon(
+                        Icons.tag_rounded,
+                        size: 18,
+                        color: AppColors.glassOnSurfaceMuted,
+                      ),
+                    ),
                   ),
                 ),
+                const SizedBox(height: 14),
+              ],
+
+              // Attachment / Photo section
+              _FormFieldWrapper(
+                label: 'Photo or Attachment (optional)',
+                child: _buildAttachmentPicker(),
               ),
-            ),
-            const SizedBox(height: 14),
-          ],
+              const SizedBox(height: 24),
 
-          // Attachment / Photo section
-          _FormFieldWrapper(
-            label: 'Photo or Attachment (optional)',
-            child: _buildAttachmentPicker(),
+              // Submit Button
+              GlassPrimaryButton(
+                text: _saving ? 'Saving...' : submitText,
+                onPressed: _saving ? null : _submit,
+              ),
+            ],
           ),
-          const SizedBox(height: 24),
-
-          // Submit Button
-          GlassPrimaryButton(
-            text: _saving ? 'Saving...' : submitText,
-            onPressed: _saving ? null : _submit,
-          ),
-        ],
+        ),
       ),
     );
   }

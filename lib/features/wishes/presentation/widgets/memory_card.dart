@@ -189,9 +189,10 @@ class MemoryCard extends StatelessWidget {
           if (item.content.trim().isNotEmpty) ...[
             const SizedBox(height: 10),
             Text(
-              item.shortStoryPreview,
+              '“${item.shortStoryPreview}”',
               style: AppTextStyles.bodySmall.copyWith(
                 color: AppColors.glassOnSurfaceMuted,
+                fontStyle: FontStyle.italic,
                 height: 1.35,
               ),
               maxLines: 2,

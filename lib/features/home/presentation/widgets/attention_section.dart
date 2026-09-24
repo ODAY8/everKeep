@@ -23,7 +23,7 @@ class AttentionSection extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(
-              'ITEMS NEEDING ATTENTION',
+              'WHAT NEEDS MY ATTENTION',
               style: AppTextStyles.labelSmall.copyWith(
                 color: AppColors.glassOnSurfaceFaint,
                 letterSpacing: 1.2,
@@ -32,25 +32,54 @@ class AttentionSection extends StatelessWidget {
             ),
             Consumer<DocumentProvider>(
               builder: (context, docProv, _) {
-                final attentionItems = docProv.attentionDocuments;
-                if (attentionItems.isEmpty) return const SizedBox.shrink();
-                return Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: AppColors.glassWarningBg,
-                    borderRadius: AppRadius.radiusPill,
-                    border: Border.all(
-                      color: AppColors.glassWarningColor.withValues(alpha: 0.3),
-                    ),
-                  ),
-                  child: Text(
-                    '${attentionItems.length} urgent',
-                    style: AppTextStyles.labelSmall.copyWith(
-                      color: AppColors.glassWarningColor,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
+                final expiredCount = docProv.expiredDocuments.length;
+                final expiringCount = docProv.expiringSoonDocuments.length;
+                if (expiredCount == 0 && expiringCount == 0) return const SizedBox.shrink();
+
+                return Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (expiredCount > 0) ...[
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: AppColors.glassDestructive.withValues(alpha: 0.16),
+                          borderRadius: AppRadius.radiusPill,
+                          border: Border.all(
+                            color: AppColors.glassDestructive.withValues(alpha: 0.3),
+                          ),
+                        ),
+                        child: Text(
+                          '$expiredCount expired',
+                          style: AppTextStyles.labelSmall.copyWith(
+                            color: AppColors.glassDestructive,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      if (expiringCount > 0) const SizedBox(width: 6),
+                    ],
+                    if (expiringCount > 0)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: AppColors.glassWarningBg,
+                          borderRadius: AppRadius.radiusPill,
+                          border: Border.all(
+                            color: AppColors.glassWarningColor.withValues(alpha: 0.3),
+                          ),
+                        ),
+                        child: Text(
+                          '$expiringCount expiring soon',
+                          style: AppTextStyles.labelSmall.copyWith(
+                            color: AppColors.glassWarningColor,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                  ],
                 );
               },
             ),
@@ -104,11 +133,22 @@ class _AttentionItemCard extends StatelessWidget {
         ? AppColors.glassDestructive
         : AppColors.glassWarningColor;
     final bgColor = isExpired
-        ? AppColors.glassDestructive.withValues(alpha: 0.12)
+        ? AppColors.glassDestructive.withValues(alpha: 0.14)
         : AppColors.glassWarningBg;
 
     final shortText = DocumentExpirationHelper.shortLabel(document.expiryDate);
-    final statusHeader = isExpired ? '⚠️ Expired' : '⚠️ Expiring soon';
+    final statusHeader = isExpired
+        ? '⚠️ Expired · ${document.expirationNotice}'
+        : '⏳ Expiring soon · ${document.expirationNotice}';
+
+    final String metadataSubtitle;
+    if (document.country != null && document.country!.isNotEmpty) {
+      metadataSubtitle = '${document.displayType} · ${document.country}';
+    } else if (document.institution != null && document.institution!.isNotEmpty) {
+      metadataSubtitle = '${document.displayType} · ${document.institution}';
+    } else {
+      metadataSubtitle = document.displayType;
+    }
 
     return GlassCard(
       onTap: onTap,
@@ -116,18 +156,19 @@ class _AttentionItemCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           Container(
-            width: 38,
-            height: 38,
+            width: 42,
+            height: 42,
             decoration: BoxDecoration(
               color: bgColor,
               borderRadius: AppRadius.radiusMD,
+              border: Border.all(
+                color: accentColor.withValues(alpha: 0.3),
+              ),
             ),
-            child: Icon(
-              isExpired
-                  ? Icons.warning_amber_rounded
-                  : Icons.schedule_rounded,
-              color: accentColor,
-              size: 20,
+            alignment: Alignment.center,
+            child: Text(
+              document.emoji,
+              style: const TextStyle(fontSize: 20),
             ),
           ),
           const SizedBox(width: 14),
@@ -142,10 +183,12 @@ class _AttentionItemCard extends StatelessWidget {
                     fontSize: 11,
                     fontWeight: FontWeight.w600,
                   ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  '${document.title} — $shortText',
+                  document.title,
                   style: AppTextStyles.titleSmall.copyWith(
                     color: AppColors.glassOnSurface,
                     fontWeight: FontWeight.w600,
@@ -153,24 +196,35 @@ class _AttentionItemCard extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
-                if (document.category.isNotEmpty) ...[
-                  const SizedBox(height: 2),
-                  Text(
-                    document.category,
-                    style: AppTextStyles.bodySmall.copyWith(
-                      color: AppColors.glassOnSurfaceMuted,
-                      fontSize: 11,
-                    ),
+                const SizedBox(height: 2),
+                Text(
+                  metadataSubtitle,
+                  style: AppTextStyles.bodySmall.copyWith(
+                    color: AppColors.glassOnSurfaceMuted,
+                    fontSize: 12,
                   ),
-                ],
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ],
             ),
           ),
           const SizedBox(width: 8),
-          Icon(
-            Icons.chevron_right_rounded,
-            color: AppColors.glassOnSurfaceFaint,
-            size: 20,
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: bgColor,
+              borderRadius: AppRadius.radiusPill,
+              border: Border.all(color: accentColor.withValues(alpha: 0.3)),
+            ),
+            child: Text(
+              isExpired ? 'Expired' : shortText,
+              style: AppTextStyles.labelSmall.copyWith(
+                color: accentColor,
+                fontWeight: FontWeight.w600,
+                fontSize: 11,
+              ),
+            ),
           ),
         ],
       ),

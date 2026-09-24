@@ -59,9 +59,9 @@ class HomeScreen extends StatelessWidget {
           const SizedBox(height: 22),
           const _LegacyProgressCard(),
           const SizedBox(height: 26),
-          const RecentItemsSection(),
-          const SizedBox(height: 26),
           const QuickActionsSection(),
+          const SizedBox(height: 26),
+          const RecentItemsSection(),
           const SizedBox(height: 22),
           Selector<VaultProvider, VaultSummary>(
             selector: (_, vault) => vault.vaultSummary,

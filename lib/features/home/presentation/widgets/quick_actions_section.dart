@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_radius.dart';
 import '../../../../core/theme/app_text_styles.dart';
+import '../../../../core/utils/pick_upload.dart';
 import '../../../../models/account_item.dart';
 import '../../../../models/memory_item.dart';
 import '../../../../providers/account_provider.dart';
@@ -12,7 +13,7 @@ import '../../../../widgets/glass/glass_sheet.dart';
 import '../../../documents/presentation/widgets/document_form_sheet.dart';
 
 /// Quick actions on the EverKeep Dashboard:
-/// + Add Memory, + Add Document, + Add Important Information
+/// + Add Document, + Add Memory, + Add Important Information
 class QuickActionsSection extends StatelessWidget {
   const QuickActionsSection({super.key});
 
@@ -22,6 +23,56 @@ class QuickActionsSection extends StatelessWidget {
     'Work',
     'Other',
   ];
+
+  // ── Add Document ────────────────────────────────────────────────────────────
+
+  Future<void> _chooseHowToAddDocument(BuildContext context) async {
+    showGlassActionSheet(
+      context,
+      title: 'Add Document',
+      subtitle: 'Store a file securely, or keep a record in your vault.',
+      actions: [
+        GlassSheetAction(
+          label: 'Choose a file',
+          icon: Icons.upload_file_rounded,
+          onTap: () async {
+            try {
+              final upload = await pickDocument();
+              if (upload != null && context.mounted) {
+                final saved = await DocumentFormSheet.show(
+                  context,
+                  initialUpload: upload,
+                );
+                if (saved == true && context.mounted) {
+                  showAppSnackBar(context, 'Document uploaded to your vault');
+                }
+              }
+            } on PickedTooLarge catch (e) {
+              if (context.mounted) showAppSnackBar(context, e.toString(), isError: true);
+            } catch (_) {
+              if (context.mounted) {
+                showAppSnackBar(
+                  context,
+                  'Couldn\'t read that file. Try another one.',
+                  isError: true,
+                );
+              }
+            }
+          },
+        ),
+        GlassSheetAction(
+          label: 'Add without a file',
+          icon: Icons.edit_note_rounded,
+          onTap: () async {
+            final saved = await DocumentFormSheet.show(context);
+            if (saved == true && context.mounted) {
+              showAppSnackBar(context, 'Document added to your vault');
+            }
+          },
+        ),
+      ],
+    );
+  }
 
   // ── Add Memory ──────────────────────────────────────────────────────────────
 
@@ -74,15 +125,6 @@ class QuickActionsSection extends StatelessWidget {
 
     if (saved && context.mounted) {
       showAppSnackBar(context, 'Memory saved to your vault');
-    }
-  }
-
-  // ── Add Document ────────────────────────────────────────────────────────────
-
-  Future<void> _chooseHowToAddDocument(BuildContext context) async {
-    final saved = await DocumentFormSheet.show(context);
-    if (saved == true && context.mounted) {
-      showAppSnackBar(context, 'Document added to your vault');
     }
   }
 
@@ -157,19 +199,19 @@ class QuickActionsSection extends StatelessWidget {
         ),
         const SizedBox(height: 12),
         _QuickActionButton(
-          icon: Icons.add_photo_alternate_outlined,
-          iconColor: AppColors.glassAccentPink,
-          label: 'Add Memory',
-          subtitle: 'Store photos, stories, and meaningful moments',
-          onTap: () => _addMemory(context),
-        ),
-        const SizedBox(height: 10),
-        _QuickActionButton(
           icon: Icons.note_add_outlined,
           iconColor: AppColors.glassAccentSecondary,
           label: 'Add Document',
           subtitle: 'Upload files and track expiration dates',
           onTap: () => _chooseHowToAddDocument(context),
+        ),
+        const SizedBox(height: 10),
+        _QuickActionButton(
+          icon: Icons.favorite_outline_rounded,
+          iconColor: AppColors.glassAccentPink,
+          label: 'Add Memory',
+          subtitle: 'Store photos, stories, and meaningful moments',
+          onTap: () => _addMemory(context),
         ),
         const SizedBox(height: 10),
         _QuickActionButton(

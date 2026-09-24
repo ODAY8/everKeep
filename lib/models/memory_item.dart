@@ -5,6 +5,7 @@ import '../core/utils/relative_time.dart';
 /// A memory or wish saved in Everkeep.
 class MemoryItem {
   final String id;
+  final String? userId;
   final String title;
   final String content;
   final String type; // 'memory' or 'wish'
@@ -19,6 +20,7 @@ class MemoryItem {
 
   const MemoryItem({
     required this.id,
+    this.userId,
     required this.title,
     required this.content,
     this.type = 'memory',
@@ -76,6 +78,44 @@ class MemoryItem {
     return typeName;
   }
 
+  /// Compact preview of the story for cards and list views.
+  String get shortStoryPreview {
+    final clean = content.trim().replaceAll(RegExp(r'\s+'), ' ');
+    if (clean.length <= 110) return clean;
+    return '${clean.substring(0, 107)}...';
+  }
+
+  /// Human-formatted date for the memory (e.g. 'Oct 14, 2024').
+  String? get formattedDate {
+    if (date == null) return null;
+    const months = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+    ];
+    return '${months[date!.month - 1]} ${date!.day}, ${date!.year}';
+  }
+
+  /// Date used for Life Timeline positioning: user-entered memory date first,
+  /// falling back to createdAt or epoch.
+  DateTime get timelineDate => date ?? createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+
+  /// Checks if this item matches a search query across title, content, tags, or location.
+  bool matchesQuery(String query) {
+    final q = query.trim().toLowerCase();
+    if (q.isEmpty) return true;
+    if (title.toLowerCase().contains(q)) return true;
+    if (content.toLowerCase().contains(q)) return true;
+    if (location != null && location!.toLowerCase().contains(q)) return true;
+    if (tags != null && tags!.toLowerCase().contains(q)) return true;
+    return false;
+  }
+
+  /// Checks whether this memory has a specific tag.
+  bool hasTag(String tag) {
+    final target = tag.trim().toLowerCase().replaceAll('#', '');
+    return tagList.any((t) => t.toLowerCase() == target);
+  }
+
   /// Builds a [MemoryItem] from a `memories_wishes` table row.
   factory MemoryItem.fromRow(Map<String, dynamic> row) {
     DateTime? parseDate(dynamic value) {
@@ -88,6 +128,7 @@ class MemoryItem {
 
     return MemoryItem(
       id: row['id'] as String,
+      userId: row['user_id'] as String?,
       title: (row['title'] as String?) ?? '',
       content: (row['content'] as String?) ?? '',
       type: (row['type'] as String?) ?? 'memory',
@@ -109,6 +150,9 @@ class MemoryItem {
       'content': content.trim(),
       'type': type.toLowerCase(),
     };
+    if (userId != null && userId!.trim().isNotEmpty) {
+      row['user_id'] = userId!.trim();
+    }
     if (date != null) {
       row['date'] =
           '${date!.year.toString().padLeft(4, '0')}-'
@@ -153,6 +197,7 @@ class MemoryItem {
 
   MemoryItem copyWith({
     String? id,
+    String? userId,
     String? title,
     String? content,
     String? type,
@@ -167,6 +212,7 @@ class MemoryItem {
   }) {
     return MemoryItem(
       id: id ?? this.id,
+      userId: userId ?? this.userId,
       title: title ?? this.title,
       content: content ?? this.content,
       type: type ?? this.type,

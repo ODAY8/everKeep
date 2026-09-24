@@ -378,6 +378,17 @@ class _RecentMemoryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final String subtitle;
+    if (memory.content.isNotEmpty) {
+      subtitle = memory.shortStoryPreview;
+    } else if (memory.formattedDate != null) {
+      subtitle = memory.formattedDate!;
+    } else if (memory.createdAt != null) {
+      subtitle = relativeTime(memory.createdAt!);
+    } else {
+      subtitle = memory.typeLabel;
+    }
+
     return GlassCard(
       onTap: onTap,
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -391,7 +402,13 @@ class _RecentMemoryCard extends StatelessWidget {
               borderRadius: AppRadius.radiusMD,
             ),
             child: Icon(
-              memory.isWish ? Icons.star_rounded : Icons.favorite_rounded,
+              memory.hasAttachment
+                  ? (memory.isPhotoAttachment
+                      ? Icons.photo_outlined
+                      : Icons.attach_file_rounded)
+                  : (memory.isWish
+                      ? Icons.star_rounded
+                      : Icons.favorite_rounded),
               color: AppColors.glassAccentPink,
               size: 20,
             ),
@@ -412,11 +429,7 @@ class _RecentMemoryCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  memory.content.isNotEmpty
-                      ? memory.content
-                      : (memory.createdAt != null
-                          ? relativeTime(memory.createdAt!)
-                          : memory.type),
+                  subtitle,
                   style: AppTextStyles.bodySmall.copyWith(
                     color: AppColors.glassOnSurfaceMuted,
                     fontSize: 11,

@@ -1,24 +1,27 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:everkeep/core/theme/app_colors.dart';
-import 'package:everkeep/core/theme/app_radius.dart';
-import 'package:everkeep/core/theme/app_text_styles.dart';
-import 'package:everkeep/core/utils/pick_upload.dart';
-import 'package:everkeep/models/document_upload.dart';
-import 'package:everkeep/models/memory_item.dart';
-import 'package:everkeep/providers/memory_provider.dart';
-import 'package:everkeep/widgets/fade_slide_in.dart';
-import 'package:everkeep/widgets/feedback.dart';
-import 'package:everkeep/widgets/glass/glass_filter_chips.dart';
-import 'package:everkeep/widgets/glass/glass_item_row.dart';
-import 'package:everkeep/widgets/glass/glass_page_header.dart';
-import 'package:everkeep/widgets/glass/glass_primary_button.dart';
-import 'package:everkeep/widgets/glass/glass_scaffold.dart';
-import 'package:everkeep/widgets/glass/glass_sheet.dart';
-import 'package:everkeep/widgets/circular_icon_button.dart';
+import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_radius.dart';
+import '../../../../core/theme/app_text_styles.dart';
+import '../../../../core/utils/pick_upload.dart';
+import '../../../../models/document_upload.dart';
+import '../../../../models/memory_item.dart';
+import '../../../../providers/memory_provider.dart';
+import '../../../../widgets/circular_icon_button.dart';
+import '../../../../widgets/fade_slide_in.dart';
+import '../../../../widgets/feedback.dart';
+import '../../../../widgets/glass/glass_filter_chips.dart';
+import '../../../../widgets/glass/glass_page_header.dart';
+import '../../../../widgets/glass/glass_primary_button.dart';
+import '../../../../widgets/glass/glass_scaffold.dart';
+import '../../../../widgets/glass/glass_search_bar.dart';
+import '../../../../widgets/glass/glass_sheet.dart';
+import '../widgets/memory_card.dart';
+import '../widgets/memory_details_sheet.dart';
+import '../widgets/memory_form_sheet.dart';
 
-/// The Memories tab (routed as AppRouter.wishes): memories and wishes the
-/// user has actually saved, backed by Supabase — nothing sample here.
+/// The Memories & Wishes screen (routed as AppRouter.wishes):
+/// Production-quality personal archive for memories, stories, photos, and wishes.
 class WishesScreen extends StatefulWidget {
   const WishesScreen({super.key});
 
@@ -29,11 +32,13 @@ class WishesScreen extends StatefulWidget {
 class _WishesScreenState extends State<WishesScreen> {
   static const List<String> _tabs = ['Memories', 'Wishes'];
   static const List<String> _types = ['memory', 'wish'];
-  // Singular forms, matched by index to _tabs/_types — "Memories" minus a
-  // trailing "s" would read "Memorie", so this is spelled out instead.
   static const List<String> _singularLabels = ['Memory', 'Wish'];
 
   int _selectedTab = 0;
+  bool _searching = false;
+  String _query = '';
+  String? _selectedTag;
+  MemorySortOption _sortOption = MemorySortOption.memoryDateDesc;
 
   String get _selectedType => _types[_selectedTab];
   String get _selectedLabel => _singularLabels[_selectedTab];
@@ -45,6 +50,13 @@ class _WishesScreenState extends State<WishesScreen> {
       if (!mounted) return;
       final memoryProv = context.read<MemoryProvider>();
       if (!memoryProv.hasFetched) memoryProv.fetchMemories();
+    });
+  }
+
+  void _toggleSearch() {
+    setState(() {
+      _searching = !_searching;
+      if (!_searching) _query = '';
     });
   }
 
@@ -80,7 +92,11 @@ class _WishesScreenState extends State<WishesScreen> {
       return;
     } catch (_) {
       if (mounted) {
-        showAppSnackBar(context, 'Couldn\'t read that file. Try another one.', isError: true);
+        showAppSnackBar(
+          context,
+          'Couldn\'t read that file. Try another one.',
+          isError: true,
+        );
       }
       return;
     }
@@ -89,70 +105,13 @@ class _WishesScreenState extends State<WishesScreen> {
   }
 
   Future<void> _showAddForm(String type, {DocumentUpload? upload}) async {
-    final memoryProv = context.read<MemoryProvider>();
     final label = type == 'memory' ? 'Memory' : 'Wish';
-
-    final saved = await showGlassFormSheet(
+    final saved = await MemoryFormSheet.show(
       context,
-      title: 'Add $label',
-      subtitle: upload == null
-          ? (type == 'memory'
-              ? 'Keep a memory worth holding on to.'
-              : 'Write down a wish for the people you love.')
-          : 'Attached: ${upload.fileName}',
-      submitLabel: upload == null ? 'Save' : 'Upload & Save',
-      fields: [
-        GlassFormField(
-          key: 'title',
-          label: 'Title',
-          hint: type == 'memory' ? 'e.g. Our trip to the coast' : 'e.g. For my daughter',
-          validator: _titleValidator,
-        ),
-        GlassFormField(
-          key: 'content',
-          label: type == 'memory' ? 'What happened' : 'Your wish',
-          hint: type == 'memory'
-              ? 'Write as much or as little as you like...'
-              : 'What you\'d like them to know...',
-          required: false,
-          minLines: 3,
-          maxLines: 6,
-          validator: _contentValidator,
-        ),
-        if (type == 'memory')
-          const GlassFormField(
-            key: 'location',
-            label: 'Location (optional)',
-            hint: 'e.g. Kyoto, Japan',
-            required: false,
-          ),
-        if (type == 'memory')
-          const GlassFormField(
-            key: 'tags',
-            label: 'Tags (optional)',
-            hint: 'e.g. Travel, Family, Milestone',
-            required: false,
-          ),
-      ],
-      dateFields: const [GlassFormDateField(key: 'date', label: 'Date (optional)')],
-      onSubmit: (values) async {
-        final added = await memoryProv.createMemory(
-          MemoryItem(
-            id: '',
-            title: values['title']!,
-            content: values['content'] ?? '',
-            type: type,
-            date: _parseIsoDate(values['date']),
-            location: values['location']?.trim(),
-            tags: values['tags']?.trim(),
-          ),
-          upload: upload,
-        );
-        return added ? null : memoryProv.error ?? 'Could not save the $label.';
-      },
+      type: type,
+      initialUpload: upload,
     );
-
-    if (saved && mounted) {
+    if (saved == true && mounted) {
       showAppSnackBar(context, '$label added');
     }
   }
@@ -160,66 +119,11 @@ class _WishesScreenState extends State<WishesScreen> {
   // ── Editing & attachments ──────────────────────────────────────────────────
 
   Future<void> _showEditForm(MemoryItem item) async {
-    final memoryProv = context.read<MemoryProvider>();
     final label = item.typeLabel;
-
-    final saved = await showGlassFormSheet(
-      context,
-      title: 'Edit $label',
-      fields: [
-        GlassFormField(
-          key: 'title',
-          label: 'Title',
-          hint: 'e.g. Our trip to the coast',
-          initialValue: item.title,
-          validator: _titleValidator,
-        ),
-        GlassFormField(
-          key: 'content',
-          label: item.isMemory ? 'What happened' : 'Your wish',
-          hint: 'Write as much or as little as you like...',
-          required: false,
-          initialValue: item.content,
-          minLines: 3,
-          maxLines: 6,
-          validator: _contentValidator,
-        ),
-        if (item.isMemory)
-          GlassFormField(
-            key: 'location',
-            label: 'Location (optional)',
-            hint: 'e.g. Kyoto, Japan',
-            initialValue: item.location ?? '',
-            required: false,
-          ),
-        if (item.isMemory)
-          GlassFormField(
-            key: 'tags',
-            label: 'Tags (optional)',
-            hint: 'e.g. Travel, Family, Milestone',
-            initialValue: item.tags ?? '',
-            required: false,
-          ),
-      ],
-      submitLabel: 'Save Changes',
-      dateFields: [
-        GlassFormDateField(key: 'date', label: 'Date (optional)', initialValue: item.date),
-      ],
-      onSubmit: (values) async {
-        final ok = await memoryProv.updateMemory(
-          item.copyWith(
-            title: values['title']!,
-            content: values['content'] ?? '',
-            date: _parseIsoDate(values['date']),
-            location: values['location']?.trim(),
-            tags: values['tags']?.trim(),
-          ),
-        );
-        return ok ? null : memoryProv.error ?? 'Could not save your changes.';
-      },
-    );
-
-    if (saved && mounted) showAppSnackBar(context, '$label updated');
+    final saved = await MemoryFormSheet.show(context, item: item);
+    if (saved == true && mounted) {
+      showAppSnackBar(context, '$label updated');
+    }
   }
 
   Future<void> _pickThenAttach(MemoryItem item) async {
@@ -231,7 +135,11 @@ class _WishesScreenState extends State<WishesScreen> {
       return;
     } catch (_) {
       if (mounted) {
-        showAppSnackBar(context, 'Couldn\'t read that file. Try another one.', isError: true);
+        showAppSnackBar(
+          context,
+          'Couldn\'t read that file. Try another one.',
+          isError: true,
+        );
       }
       return;
     }
@@ -242,7 +150,9 @@ class _WishesScreenState extends State<WishesScreen> {
     if (!mounted) return;
     showAppSnackBar(
       context,
-      ok ? 'Attachment saved' : memoryProv.error ?? 'Could not upload the attachment.',
+      ok
+          ? 'Attachment saved'
+          : memoryProv.error ?? 'Could not upload the attachment.',
       isError: !ok,
     );
   }
@@ -251,7 +161,8 @@ class _WishesScreenState extends State<WishesScreen> {
     final confirmed = await confirmDestructive(
       context,
       title: 'Remove attachment?',
-      message: 'The file attached to "${item.title}" will be permanently removed. '
+      message:
+          'The file attached to "${item.title}" will be permanently removed. '
           '${item.typeLabel} itself is kept.',
       confirmLabel: 'Remove',
     );
@@ -262,7 +173,9 @@ class _WishesScreenState extends State<WishesScreen> {
     if (!mounted) return;
     showAppSnackBar(
       context,
-      ok ? 'Attachment removed' : memoryProv.error ?? 'Could not remove the attachment.',
+      ok
+          ? 'Attachment removed'
+          : memoryProv.error ?? 'Could not remove the attachment.',
       isError: !ok,
     );
   }
@@ -293,7 +206,9 @@ class _WishesScreenState extends State<WishesScreen> {
 
     showAppSnackBar(
       context,
-      deleted ? '${item.typeLabel} deleted' : memoryProv.error ?? 'Could not delete it.',
+      deleted
+          ? '${item.typeLabel} deleted'
+          : memoryProv.error ?? 'Could not delete it.',
       isError: !deleted,
     );
   }
@@ -303,7 +218,19 @@ class _WishesScreenState extends State<WishesScreen> {
   void _showDetails(MemoryItem item) {
     showGlassSheet<void>(
       context,
-      builder: (sheetContext) => _MemoryDetailsSheet(item: item),
+      builder: (sheetContext) => MemoryDetailsSheet(
+        item: item,
+        onEdit: () {
+          Navigator.of(sheetContext).pop();
+          _showEditForm(item);
+        },
+        onDelete: () {
+          Navigator.of(sheetContext).pop();
+          _confirmDelete(item);
+        },
+        onOpenAttachment:
+            item.hasAttachment ? () => _openAttachment(item) : null,
+      ),
     );
   }
 
@@ -350,6 +277,24 @@ class _WishesScreenState extends State<WishesScreen> {
     );
   }
 
+  void _cycleSortOption() {
+    setState(() {
+      _sortOption = switch (_sortOption) {
+        MemorySortOption.memoryDateDesc => MemorySortOption.memoryDateAsc,
+        MemorySortOption.memoryDateAsc => MemorySortOption.createdDateDesc,
+        MemorySortOption.createdDateDesc => MemorySortOption.titleAsc,
+        MemorySortOption.titleAsc => MemorySortOption.memoryDateDesc,
+      };
+    });
+  }
+
+  String _sortLabel(MemorySortOption option) => switch (option) {
+    MemorySortOption.memoryDateDesc => 'Date (Newest)',
+    MemorySortOption.memoryDateAsc => 'Date (Oldest)',
+    MemorySortOption.createdDateDesc => 'Date Added',
+    MemorySortOption.titleAsc => 'Title (A-Z)',
+  };
+
   // ── Layout ──────────────────────────────────────────────────────────────────
 
   @override
@@ -362,41 +307,67 @@ class _WishesScreenState extends State<WishesScreen> {
           GlassPageHeader(
             title: 'Memories',
             showBackButton: Navigator.of(context).canPop(),
-            trailing: CircularIconButton(
-              icon: Icons.add_rounded,
-              background: AppColors.glassSurface,
-              foreground: AppColors.glassOnSurface,
-              size: 40,
-              tooltip: 'Add $_selectedLabel',
-              onPressed: _chooseHowToAdd,
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CircularIconButton(
+                  icon: _searching ? Icons.close_rounded : Icons.search_rounded,
+                  background: AppColors.glassSurface,
+                  foreground: AppColors.glassOnSurface,
+                  size: 40,
+                  tooltip: _searching ? 'Close search' : 'Search memories',
+                  onPressed: _toggleSearch,
+                ),
+                const SizedBox(width: 8),
+                CircularIconButton(
+                  icon: Icons.add_rounded,
+                  background: AppColors.glassSurface,
+                  foreground: AppColors.glassOnSurface,
+                  size: 40,
+                  tooltip: 'Add $_selectedLabel',
+                  onPressed: _chooseHowToAdd,
+                ),
+              ],
             ),
           ),
+          if (_searching) ...[
+            const SizedBox(height: 14),
+            GlassSearchBar(
+              hintText: 'Search $_selectedLabel.toLowerCase()...',
+              onChanged: (q) => setState(() => _query = q),
+            ),
+          ],
           const SizedBox(height: 18),
           GlassFilterChips(
             labels: _tabs,
             selectedIndex: _selectedTab,
-            onSelected: (index) => setState(() => _selectedTab = index),
+            onSelected: (index) => setState(() {
+              _selectedTab = index;
+              _selectedTag = null;
+            }),
           ),
-          const SizedBox(height: 20),
           Consumer<MemoryProvider>(
             builder: (context, memoryProv, _) {
-              // Only a failed *first load* replaces the list. A failed
-              // add/edit/delete leaves the list alone and is reported in a
-              // snackbar by whoever triggered it.
               if (!memoryProv.hasFetched) {
                 final loadError = memoryProv.error;
                 if (loadError != null && !memoryProv.isLoading) {
-                  return ErrorRetryView(
-                    message: loadError,
-                    onRetry: memoryProv.fetchMemories,
+                  return Padding(
+                    padding: const EdgeInsets.only(top: 20),
+                    child: ErrorRetryView(
+                      message: loadError,
+                      onRetry: memoryProv.fetchMemories,
+                    ),
                   );
                 }
-                return const LoadingView();
+                return const Padding(
+                  padding: EdgeInsets.only(top: 20),
+                  child: LoadingView(),
+                );
               }
 
-              final displayed = memoryProv.filterByType(_selectedType);
+              final allForTab = memoryProv.filterByType(_selectedType);
 
-              if (displayed.isEmpty) {
+              if (allForTab.isEmpty) {
                 return _EmptyState(
                   label: _tabs[_selectedTab],
                   singular: _selectedLabel,
@@ -404,21 +375,114 @@ class _WishesScreenState extends State<WishesScreen> {
                 );
               }
 
+              final displayed = memoryProv.getFilteredMemories(
+                query: _query,
+                tag: _selectedTag,
+                sort: _sortOption,
+                type: _selectedType,
+              );
+
+              final availableTags = memoryProv.allMemoryTags;
+
               return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  for (final entry in displayed.asMap().entries) ...[
-                    FadeSlideIn(
-                      index: entry.key,
-                      child: GlassItemRow(
-                        icon: entry.value.icon,
-                        iconColor: AppColors.glassAccentPink,
-                        title: entry.value.title,
-                        subtitle: entry.value.subtitle,
-                        onTap: () => _showActions(entry.value),
+                  const SizedBox(height: 14),
+
+                  // Tag filters row (only when memories have tags)
+                  if (_selectedTab == 0 && availableTags.isNotEmpty) ...[
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: [
+                          _TagChip(
+                            label: 'All tags',
+                            isSelected:
+                                _selectedTag == null || _selectedTag == 'all',
+                            onTap: () => setState(() => _selectedTag = null),
+                          ),
+                          const SizedBox(width: 6),
+                          for (final tag in availableTags) ...[
+                            _TagChip(
+                              label: '#$tag',
+                              isSelected: _selectedTag == tag,
+                              onTap: () => setState(() {
+                                _selectedTag = _selectedTag == tag ? null : tag;
+                              }),
+                            ),
+                            const SizedBox(width: 6),
+                          ],
+                        ],
                       ),
                     ),
                     const SizedBox(height: 10),
                   ],
+
+                  // Sort & Count Row
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 2),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          '${displayed.length} ${displayed.length == 1 ? _selectedLabel.toLowerCase() : _tabs[_selectedTab].toLowerCase()}',
+                          style: AppTextStyles.labelSmall.copyWith(
+                            color: AppColors.glassOnSurfaceMuted,
+                            fontSize: 12,
+                          ),
+                        ),
+                        GestureDetector(
+                          onTap: _cycleSortOption,
+                          behavior: HitTestBehavior.opaque,
+                          child: Row(
+                            children: [
+                              const Icon(
+                                Icons.sort_rounded,
+                                size: 14,
+                                color: AppColors.glassAccentPink,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                _sortLabel(_sortOption),
+                                style: AppTextStyles.labelSmall.copyWith(
+                                  color: AppColors.glassAccentPink,
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 11,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+
+                  if (displayed.isEmpty)
+                    _SearchEmptyState(
+                      query: _query,
+                      tag: _selectedTag,
+                      onClear: () => setState(() {
+                        _query = '';
+                        _selectedTag = null;
+                      }),
+                    )
+                  else
+                    Column(
+                      children: [
+                        for (final entry in displayed.asMap().entries) ...[
+                          FadeSlideIn(
+                            index: entry.key,
+                            child: MemoryCard(
+                              item: entry.value,
+                              onTap: () => _showActions(entry.value),
+                              onMore: () => _showActions(entry.value),
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                        ],
+                      ],
+                    ),
                 ],
               );
             },
@@ -429,23 +493,113 @@ class _WishesScreenState extends State<WishesScreen> {
   }
 }
 
-DateTime? _parseIsoDate(String? value) {
-  if (value == null || value.isEmpty) return null;
-  return DateTime.tryParse(value);
+class _TagChip extends StatelessWidget {
+  final String label;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  const _TagChip({
+    required this.label,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? AppColors.glassAccentPink.withValues(alpha: 0.2)
+              : AppColors.glassSurface,
+          borderRadius: AppRadius.radiusPill,
+          border: Border.all(
+            color: isSelected
+                ? AppColors.glassAccentPink
+                : AppColors.glassBorder,
+          ),
+        ),
+        child: Text(
+          label,
+          style: AppTextStyles.labelSmall.copyWith(
+            color: isSelected
+                ? AppColors.glassAccentPink
+                : AppColors.glassOnSurfaceMuted,
+            fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+            fontSize: 11,
+          ),
+        ),
+      ),
+    );
+  }
 }
 
-String? _titleValidator(String value) =>
-    value.length > 300 ? 'Keep the title under 300 characters.' : null;
+class _SearchEmptyState extends StatelessWidget {
+  final String query;
+  final String? tag;
+  final VoidCallback onClear;
 
-String? _contentValidator(String value) =>
-    value.length > 10000 ? 'Keep it under 10,000 characters.' : null;
+  const _SearchEmptyState({
+    required this.query,
+    this.tag,
+    required this.onClear,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 36),
+      child: Center(
+        child: Column(
+          children: [
+            const Icon(
+              Icons.search_off_rounded,
+              color: AppColors.glassOnSurfaceFaint,
+              size: 40,
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'No memories found',
+              style: AppTextStyles.titleSmall.copyWith(
+                color: AppColors.glassOnSurface,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              query.isNotEmpty
+                  ? 'No results matching "$query"'
+                  : 'No items with tag #$tag',
+              style: AppTextStyles.bodySmall.copyWith(
+                color: AppColors.glassOnSurfaceMuted,
+              ),
+            ),
+            const SizedBox(height: 14),
+            TextButton(
+              onPressed: onClear,
+              child: const Text('Clear search & filter'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
 
 class _EmptyState extends StatelessWidget {
   final String label;
   final String singular;
   final VoidCallback onAdd;
 
-  const _EmptyState({required this.label, required this.singular, required this.onAdd});
+  const _EmptyState({
+    required this.label,
+    required this.singular,
+    required this.onAdd,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -464,139 +618,6 @@ class _EmptyState extends StatelessWidget {
           GlassPrimaryButton(text: 'Add $singular', onPressed: onAdd),
         ],
       ),
-    );
-  }
-}
-
-/// A read-only view of a memory or wish's full content, reached from its
-/// action sheet ("View details"). Editing and deleting happen from there.
-class _MemoryDetailsSheet extends StatelessWidget {
-  final MemoryItem item;
-
-  const _MemoryDetailsSheet({required this.item});
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: AppColors.glassAccentPink.withValues(alpha: 0.16),
-                borderRadius: AppRadius.radiusLG,
-              ),
-              child: Icon(item.icon, color: AppColors.glassAccentPink, size: 20),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                item.title,
-                style: AppTextStyles.serifTitleSmall.copyWith(
-                  color: AppColors.glassOnSurface,
-                  fontSize: 20,
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 6),
-        Text(
-          item.subtitle,
-          style: AppTextStyles.bodySmall.copyWith(color: AppColors.glassOnSurfaceMuted),
-        ),
-        if (item.date != null || (item.location != null && item.location!.isNotEmpty)) ...[
-          const SizedBox(height: 12),
-          Wrap(
-            spacing: 12,
-            runSpacing: 6,
-            children: [
-              if (item.date != null)
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.calendar_today_rounded, size: 14, color: AppColors.glassOnSurfaceMuted),
-                    const SizedBox(width: 4),
-                    Text(
-                      '${item.date!.year}-${item.date!.month.toString().padLeft(2, '0')}-${item.date!.day.toString().padLeft(2, '0')}',
-                      style: AppTextStyles.bodySmall.copyWith(color: AppColors.glassOnSurfaceMuted),
-                    ),
-                  ],
-                ),
-              if (item.location != null && item.location!.isNotEmpty)
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.location_on_outlined, size: 15, color: AppColors.glassAccentPink),
-                    const SizedBox(width: 4),
-                    Text(
-                      item.location!,
-                      style: AppTextStyles.bodySmall.copyWith(color: AppColors.glassOnSurfaceMuted),
-                    ),
-                  ],
-                ),
-            ],
-          ),
-        ],
-        if (item.tagList.isNotEmpty) ...[
-          const SizedBox(height: 10),
-          Wrap(
-            spacing: 6,
-            runSpacing: 6,
-            children: [
-              for (final tag in item.tagList)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: AppColors.glassSurfaceRaised,
-                    borderRadius: AppRadius.radiusSM,
-                    border: Border.all(color: AppColors.glassBorder),
-                  ),
-                  child: Text(
-                    '#$tag',
-                    style: AppTextStyles.labelSmall.copyWith(
-                      color: AppColors.glassAccentPink,
-                      fontSize: 11,
-                    ),
-                  ),
-                ),
-            ],
-          ),
-        ],
-        const SizedBox(height: 18),
-        if (item.content.trim().isNotEmpty)
-          Text(
-            item.content,
-            style: AppTextStyles.bodyMedium.copyWith(color: AppColors.glassOnSurface),
-          )
-        else
-          Text(
-            'No details written.',
-            style: AppTextStyles.bodyMedium.copyWith(color: AppColors.glassOnSurfaceFaint),
-          ),
-        if (item.hasAttachment) ...[
-          const SizedBox(height: 18),
-          Row(
-            children: [
-              Icon(
-                item.isPhotoAttachment ? Icons.photo_outlined : Icons.attach_file_rounded,
-                color: AppColors.glassOnSurfaceMuted,
-                size: 18,
-              ),
-              const SizedBox(width: 8),
-              Text(
-                item.isPhotoAttachment ? 'Has an attached photo' : 'Has an attached file',
-                style: AppTextStyles.bodySmall.copyWith(color: AppColors.glassOnSurfaceMuted),
-              ),
-            ],
-          ),
-        ],
-        const SizedBox(height: 20),
-        GlassPrimaryButton(text: 'Close', onPressed: () => Navigator.of(context).pop()),
-      ],
     );
   }
 }

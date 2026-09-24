@@ -5,12 +5,12 @@ import '../../../../core/theme/app_radius.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../../core/utils/pick_upload.dart';
 import '../../../../models/account_item.dart';
-import '../../../../models/memory_item.dart';
 import '../../../../providers/account_provider.dart';
-import '../../../../providers/memory_provider.dart';
 import '../../../../widgets/feedback.dart';
 import '../../../../widgets/glass/glass_sheet.dart';
 import '../../../documents/presentation/widgets/document_form_sheet.dart';
+
+import '../../../wishes/presentation/widgets/memory_form_sheet.dart';
 
 /// Quick actions on the EverKeep Dashboard:
 /// + Add Document, + Add Memory, + Add Important Information
@@ -77,53 +77,8 @@ class QuickActionsSection extends StatelessWidget {
   // ── Add Memory ──────────────────────────────────────────────────────────────
 
   Future<void> _addMemory(BuildContext context) async {
-    final memoryProv = context.read<MemoryProvider>();
-
-    final saved = await showGlassFormSheet(
-      context,
-      title: 'Add Memory',
-      subtitle: 'Preserve a story, moment, or milestone.',
-      submitLabel: 'Save Memory',
-      fields: [
-        const GlassFormField(
-          key: 'title',
-          label: 'Title',
-          hint: 'e.g. First day at university',
-        ),
-        const GlassFormField(
-          key: 'content',
-          label: 'Story / Notes',
-          hint: 'What happened...',
-          required: false,
-          minLines: 3,
-          maxLines: 6,
-        ),
-      ],
-      dateFields: const [
-        GlassFormDateField(key: 'date', label: 'Date (optional)'),
-      ],
-      onSubmit: (values) async {
-        final title = values['title']!;
-        final content = values['content'] ?? '';
-        final dateStr = values['date'];
-        final date = dateStr != null && dateStr.isNotEmpty
-            ? DateTime.tryParse(dateStr)
-            : null;
-
-        final ok = await memoryProv.createMemory(
-          MemoryItem(
-            id: '',
-            title: title,
-            content: content,
-            type: 'memory',
-            date: date,
-          ),
-        );
-        return ok ? null : memoryProv.error ?? 'Could not save memory.';
-      },
-    );
-
-    if (saved && context.mounted) {
+    final saved = await MemoryFormSheet.show(context, type: 'memory');
+    if (saved == true && context.mounted) {
       showAppSnackBar(context, 'Memory saved to your vault');
     }
   }

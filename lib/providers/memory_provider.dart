@@ -4,6 +4,13 @@ import '../models/memory_item.dart';
 import '../repositories/memory_repository.dart';
 import 'session_scoped.dart';
 
+enum MemorySortOption {
+  memoryDateDesc,
+  memoryDateAsc,
+  createdDateDesc,
+  titleAsc,
+}
+
 class MemoryProvider extends ChangeNotifier with SessionScoped {
   final MemoryRepository _memoryRepository;
 
@@ -28,6 +35,21 @@ class MemoryProvider extends ChangeNotifier with SessionScoped {
   bool get hasFetched => _hasFetched;
   bool get isEmpty => _items.isEmpty;
 
+  /// Set of all unique tags used across memories, sorted alphabetically.
+  List<String> get allMemoryTags {
+    final tagSet = <String>{};
+    for (final item in _items) {
+      if (item.isMemory) {
+        for (final tag in item.tagList) {
+          if (tag.isNotEmpty) tagSet.add(tag);
+        }
+      }
+    }
+    final list = tagSet.toList()
+      ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+    return list;
+  }
+
   /// Items of [type] ('memory' or 'wish') whose title or content contains
   /// [query] (ignoring case).
   List<MemoryItem> filterByType(String type, {String query = ''}) {
@@ -38,6 +60,51 @@ class MemoryProvider extends ChangeNotifier with SessionScoped {
       return item.title.toLowerCase().contains(needle) ||
           item.content.toLowerCase().contains(needle);
     }).toList();
+  }
+
+  /// Advanced search & filter matching query, optional tag, and sort order.
+  List<MemoryItem> getFilteredMemories({
+    String query = '',
+    String? tag,
+    MemorySortOption sort = MemorySortOption.memoryDateDesc,
+    String type = 'memory',
+  }) {
+    final q = query.trim().toLowerCase();
+    final selectedTag = tag?.trim().toLowerCase().replaceAll('#', '');
+
+    final filtered = _items.where((item) {
+      if (item.type.toLowerCase() != type.toLowerCase()) return false;
+      if (q.isNotEmpty && !item.matchesQuery(q)) return false;
+      if (selectedTag != null &&
+          selectedTag.isNotEmpty &&
+          selectedTag != 'all') {
+        if (!item.hasTag(selectedTag)) return false;
+      }
+      return true;
+    }).toList();
+
+    switch (sort) {
+      case MemorySortOption.memoryDateDesc:
+        filtered.sort((a, b) => b.timelineDate.compareTo(a.timelineDate));
+        break;
+      case MemorySortOption.memoryDateAsc:
+        filtered.sort((a, b) => a.timelineDate.compareTo(b.timelineDate));
+        break;
+      case MemorySortOption.createdDateDesc:
+        filtered.sort((a, b) {
+          final aCreated = a.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+          final bCreated = b.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+          return bCreated.compareTo(aCreated);
+        });
+        break;
+      case MemorySortOption.titleAsc:
+        filtered.sort(
+          (a, b) => a.title.toLowerCase().compareTo(b.title.toLowerCase()),
+        );
+        break;
+    }
+
+    return filtered;
   }
 
   Future<void> fetchMemories() async {

@@ -76,11 +76,12 @@ void main() {
       expect(row['tags'], 'University, Milestone');
     });
 
-    test('matchesQuery checks title, content, location, and tags', () {
+    test('matchesQuery checks title, content, location, tags, date, and year', () {
       final item = MemoryItem(
         id: '1',
         title: 'Mountain Hike',
         content: 'Reaching the summit at sunrise',
+        date: DateTime(2025, 9, 12),
         location: 'Rocky Mountains',
         tags: 'Adventure, Nature',
       );
@@ -89,6 +90,8 @@ void main() {
       expect(item.matchesQuery('summit'), isTrue);
       expect(item.matchesQuery('rocky'), isTrue);
       expect(item.matchesQuery('nature'), isTrue);
+      expect(item.matchesQuery('2025'), isTrue);
+      expect(item.matchesQuery('september'), isTrue);
       expect(item.matchesQuery('beach'), isFalse);
     });
 

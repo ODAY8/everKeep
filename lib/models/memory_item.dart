@@ -99,7 +99,7 @@ class MemoryItem {
   /// falling back to createdAt or epoch.
   DateTime get timelineDate => date ?? createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
 
-  /// Checks if this item matches a search query across title, content, tags, or location.
+  /// Checks if this item matches a search query across title, content, tags, location, or date.
   bool matchesQuery(String query) {
     final q = query.trim().toLowerCase();
     if (q.isEmpty) return true;
@@ -107,6 +107,15 @@ class MemoryItem {
     if (content.toLowerCase().contains(q)) return true;
     if (location != null && location!.toLowerCase().contains(q)) return true;
     if (tags != null && tags!.toLowerCase().contains(q)) return true;
+    if (formattedDate != null && formattedDate!.toLowerCase().contains(q)) return true;
+    if (date != null) {
+      if (date!.year.toString().contains(q)) return true;
+      const fullMonths = [
+        'january', 'february', 'march', 'april', 'may', 'june',
+        'july', 'august', 'september', 'october', 'november', 'december'
+      ];
+      if (fullMonths[date!.month - 1].contains(q)) return true;
+    }
     return false;
   }
 

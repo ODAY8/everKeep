@@ -312,7 +312,13 @@ void main() {
       // FullScreenPhotoViewer is pushed
       expect(find.byType(FullScreenPhotoViewer), findsOneWidget);
       expect(find.text('1 / 1'), findsOneWidget);
-      expect(find.text('Tap to view test'), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byType(FullScreenPhotoViewer),
+          matching: find.text('Tap to view test'),
+        ),
+        findsOneWidget,
+      );
 
       // Close button closes viewer
       await tester.tap(find.byIcon(Icons.close_rounded));
@@ -358,7 +364,7 @@ void main() {
       expect(find.text('First photo'), findsOneWidget);
 
       // Swipe to page 2
-      await tester.drag(find.byType(PageView), const Offset(-400, 0));
+      await tester.fling(find.byType(PageView), const Offset(-400, 0), 1000);
       await tester.pumpAndSettle();
 
       expect(find.text('2 / 2'), findsOneWidget);

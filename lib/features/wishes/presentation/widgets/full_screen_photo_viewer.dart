@@ -100,28 +100,11 @@ class _FullScreenPhotoViewerState extends State<FullScreenPhotoViewer> {
                 final photo = widget.photos[index];
                 final url = widget.signedUrls[photo.filePath];
 
-                return InteractiveViewer(
-                  minScale: 0.8,
-                  maxScale: 4.0,
-                  child: Center(
-                    child: url != null
-                        ? Image.network(
-                            url,
-                            fit: BoxFit.contain,
-                            loadingBuilder: (context, child, progress) {
-                              if (progress == null) return child;
-                              return const Center(
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Colors.white70,
-                                ),
-                              );
-                            },
-                            errorBuilder: (context, error, stackTrace) =>
-                                _buildErrorState(index),
-                          )
-                        : _buildLoadingState(index),
-                  ),
+                return _PhotoPage(
+                  photo: photo,
+                  url: url,
+                  onLoading: () => _buildLoadingState(index),
+                  onError: () => _buildErrorState(index),
                 );
               },
             ),
@@ -252,3 +235,77 @@ class _FullScreenPhotoViewerState extends State<FullScreenPhotoViewer> {
     );
   }
 }
+
+class _PhotoPage extends StatefulWidget {
+  final MemoryMediaItem photo;
+  final String? url;
+  final Widget Function() onLoading;
+  final Widget Function() onError;
+
+  const _PhotoPage({
+    required this.photo,
+    required this.url,
+    required this.onLoading,
+    required this.onError,
+  });
+
+  @override
+  State<_PhotoPage> createState() => _PhotoPageState();
+}
+
+class _PhotoPageState extends State<_PhotoPage> {
+  late final TransformationController _controller;
+  bool _isZoomed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TransformationController();
+    _controller.addListener(_onTransformationChanged);
+  }
+
+  void _onTransformationChanged() {
+    final scale = _controller.value.getMaxScaleOnAxis();
+    final zoomed = (scale - 1.0).abs() > 0.05;
+    if (zoomed != _isZoomed) {
+      setState(() => _isZoomed = zoomed);
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.removeListener(_onTransformationChanged);
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return InteractiveViewer(
+      transformationController: _controller,
+      minScale: 1.0,
+      maxScale: 4.0,
+      panEnabled: _isZoomed,
+      scaleEnabled: true,
+      child: Center(
+        child: widget.url != null
+            ? Image.network(
+                widget.url!,
+                fit: BoxFit.contain,
+                loadingBuilder: (context, child, progress) {
+                  if (progress == null) return child;
+                  return const Center(
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white70,
+                    ),
+                  );
+                },
+                errorBuilder: (context, error, stackTrace) => widget.onError(),
+              )
+            : widget.onLoading(),
+      ),
+    );
+  }
+}
+

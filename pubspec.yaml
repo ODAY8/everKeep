@@ -42,6 +42,8 @@ dependencies:
   url_launcher: ^6.3.2
   image_picker: ^1.2.3
   phone_numbers_parser: ^9.0.26
+  video_player: ^2.9.2
+  audioplayers: ^6.1.0
 
 dev_dependencies:
   flutter_test:

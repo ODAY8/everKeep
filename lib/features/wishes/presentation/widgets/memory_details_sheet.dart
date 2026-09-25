@@ -232,10 +232,16 @@ class _MemoryDetailsSheetState extends State<MemoryDetailsSheet> {
           ),
         ],
 
-        // Rich Media Gallery & Attachments Section
+        // Rich Media Gallery Section
         if (item.allMedia.isNotEmpty) ...[
           const SizedBox(height: 16),
           _buildMediaSection(accentColor),
+        ],
+
+        // Legacy non-media document attachment (e.g. PDF, doc, etc.)
+        if (item.allMedia.isEmpty && item.hasAttachment) ...[
+          const SizedBox(height: 16),
+          _buildAttachmentFallback(item),
         ],
 
         // Story / Content

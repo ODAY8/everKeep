@@ -7,7 +7,11 @@ import '../../../../models/memory_item.dart';
 import '../../../../models/memory_media_item.dart';
 import '../../../../providers/memory_provider.dart';
 import '../../../../widgets/glass/glass_primary_button.dart';
+import 'audio_player_adapter.dart';
 import 'full_screen_photo_viewer.dart';
+import 'memory_audio_player.dart';
+import 'memory_video_player.dart';
+import 'video_player_adapter.dart';
 
 /// Full-view modal sheet for a Memory or Wish.
 /// Displays:
@@ -24,6 +28,8 @@ class MemoryDetailsSheet extends StatefulWidget {
   final VoidCallback? onEdit;
   final VoidCallback? onDelete;
   final VoidCallback? onOpenAttachment;
+  final VideoPlayerAdapter Function(String url)? videoAdapterFactory;
+  final AudioPlayerAdapter Function()? audioAdapterFactory;
 
   const MemoryDetailsSheet({
     super.key,
@@ -31,6 +37,8 @@ class MemoryDetailsSheet extends StatefulWidget {
     this.onEdit,
     this.onDelete,
     this.onOpenAttachment,
+    this.videoAdapterFactory,
+    this.audioAdapterFactory,
   });
 
   @override
@@ -382,16 +390,30 @@ class _MemoryDetailsSheetState extends State<MemoryDetailsSheet> {
           ],
         ],
 
-        // 2. Video Placeholders
+        // 2. In-App Video Players
         if (videos.isNotEmpty) ...[
           const SizedBox(height: 10),
-          for (final video in videos) _buildVideoPlaceholderCard(video),
+          for (final video in videos)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: MemoryVideoPlayer(
+                media: video,
+                adapter: widget.videoAdapterFactory?.call(video.filePath),
+              ),
+            ),
         ],
 
-        // 3. Audio / Voice Note Placeholders
+        // 3. In-App Voice / Audio Players
         if (audioNotes.isNotEmpty) ...[
           const SizedBox(height: 10),
-          for (final audio in audioNotes) _buildAudioPlaceholderCard(audio),
+          for (final audio in audioNotes)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: MemoryAudioPlayer(
+                media: audio,
+                adapter: widget.audioAdapterFactory?.call(),
+              ),
+            ),
         ],
 
         // 4. Non-Media Documents (Legacy fallbacks)
@@ -563,171 +585,7 @@ class _MemoryDetailsSheetState extends State<MemoryDetailsSheet> {
     );
   }
 
-  /// Clean video placeholder indicating attached video asset.
-  Widget _buildVideoPlaceholderCard(MemoryMediaItem video) {
-    final metaText = [
-      if (video.formattedDuration != null) video.formattedDuration!,
-      video.formattedFileSize,
-    ].join(' · ');
 
-    return Semantics(
-      label:
-          'Video attachment: ${video.caption ?? "Video clip"}, size: ${video.formattedFileSize}',
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        margin: const EdgeInsets.only(bottom: 6),
-        decoration: BoxDecoration(
-          color: AppColors.glassSurfaceRaised,
-          borderRadius: AppRadius.radiusMD,
-          border: Border.all(color: AppColors.glassBorder),
-        ),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: AppColors.glassAccentBlue.withValues(alpha: 0.15),
-                borderRadius: AppRadius.radiusSM,
-              ),
-              child: const Icon(
-                Icons.videocam_rounded,
-                color: AppColors.glassAccentBlue,
-                size: 20,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    video.caption?.isNotEmpty == true
-                        ? video.caption!
-                        : 'Video Clip',
-                    style: AppTextStyles.bodyMedium.copyWith(
-                      color: AppColors.glassOnSurface,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 13,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    metaText,
-                    style: AppTextStyles.bodySmall.copyWith(
-                      color: AppColors.glassOnSurfaceMuted,
-                      fontSize: 11,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-              decoration: BoxDecoration(
-                color: AppColors.glassSurface,
-                borderRadius: AppRadius.radiusSM,
-                border: Border.all(color: AppColors.glassBorder),
-              ),
-              child: Text(
-                'VIDEO',
-                style: AppTextStyles.labelSmall.copyWith(
-                  color: AppColors.glassAccentBlue,
-                  fontSize: 9,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0.5,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  /// Clean audio/voice recording placeholder indicating attached audio asset.
-  Widget _buildAudioPlaceholderCard(MemoryMediaItem audio) {
-    final metaText = [
-      if (audio.formattedDuration != null) audio.formattedDuration!,
-      audio.formattedFileSize,
-    ].join(' · ');
-
-    return Semantics(
-      label:
-          'Voice recording attachment: ${audio.caption ?? "Audio clip"}, size: ${audio.formattedFileSize}',
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        margin: const EdgeInsets.only(bottom: 6),
-        decoration: BoxDecoration(
-          color: AppColors.glassSurfaceRaised,
-          borderRadius: AppRadius.radiusMD,
-          border: Border.all(color: AppColors.glassBorder),
-        ),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: AppColors.glassAccentPink.withValues(alpha: 0.15),
-                borderRadius: AppRadius.radiusSM,
-              ),
-              child: const Icon(
-                Icons.graphic_eq_rounded,
-                color: AppColors.glassAccentPink,
-                size: 20,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    audio.caption?.isNotEmpty == true
-                        ? audio.caption!
-                        : 'Voice Recording',
-                    style: AppTextStyles.bodyMedium.copyWith(
-                      color: AppColors.glassOnSurface,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 13,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    metaText,
-                    style: AppTextStyles.bodySmall.copyWith(
-                      color: AppColors.glassOnSurfaceMuted,
-                      fontSize: 11,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-              decoration: BoxDecoration(
-                color: AppColors.glassSurface,
-                borderRadius: AppRadius.radiusSM,
-                border: Border.all(color: AppColors.glassBorder),
-              ),
-              child: Text(
-                'AUDIO',
-                style: AppTextStyles.labelSmall.copyWith(
-                  color: AppColors.glassAccentPink,
-                  fontSize: 9,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0.5,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 
   Widget _buildMediaLoadingContainer() {
     return Container(

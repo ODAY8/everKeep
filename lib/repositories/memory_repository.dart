@@ -13,7 +13,7 @@ abstract class MemoryRepository {
     MemoryItem item,
     List<DocumentUpload> uploads, {
     List<String>? captions,
-    List<int>? durations,
+    List<int?>? durations,
   });
 
   /// Adds a single media item (photo, video, or audio) to an existing memory.
@@ -64,7 +64,7 @@ class MemoryRepositoryImpl implements MemoryRepository {
     MemoryItem item,
     List<DocumentUpload> uploads, {
     List<String>? captions,
-    List<int>? durations,
+    List<int?>? durations,
   }) {
     return _memoryService.createMemoryWithMedia(
       item,

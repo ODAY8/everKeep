@@ -176,7 +176,7 @@ class MemoryProvider extends ChangeNotifier with SessionScoped {
     MemoryItem item,
     List<DocumentUpload> uploads, {
     List<String>? captions,
-    List<int>? durations,
+    List<int?>? durations,
   }) async {
     final epoch = sessionEpoch;
     _isLoading = true;

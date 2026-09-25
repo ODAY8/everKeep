@@ -44,8 +44,13 @@ class MemoryItem {
   /// All media items associated with this memory. If [media] is empty but the
   /// legacy [filePath] is present, synthesizes a single [MemoryMediaItem] for backward compatibility.
   List<MemoryMediaItem> get allMedia {
-    if (media.isNotEmpty) return media;
-    if (hasAttachment) {
+    if (media.isNotEmpty) {
+      final sorted = List<MemoryMediaItem>.from(media)
+        ..sort((a, b) => a.displayOrder.compareTo(b.displayOrder));
+      return sorted;
+    }
+    if (hasAttachment &&
+        (isPhotoAttachment || isVideoAttachment || isAudioAttachment)) {
       return [
         MemoryMediaItem.fromLegacy(
           filePath: filePath!,
@@ -98,6 +103,29 @@ class MemoryItem {
         path.endsWith('.jpeg') ||
         path.endsWith('.png') ||
         path.endsWith('.webp');
+  }
+
+  /// True if attachment is likely a video.
+  bool get isVideoAttachment {
+    if (!hasAttachment) return false;
+    final mime = mimeType?.toLowerCase() ?? '';
+    final path = filePath?.toLowerCase() ?? '';
+    return mime.startsWith('video/') ||
+        path.endsWith('.mp4') ||
+        path.endsWith('.mov') ||
+        path.endsWith('.avi');
+  }
+
+  /// True if attachment is likely an audio recording.
+  bool get isAudioAttachment {
+    if (!hasAttachment) return false;
+    final mime = mimeType?.toLowerCase() ?? '';
+    final path = filePath?.toLowerCase() ?? '';
+    return mime.startsWith('audio/') ||
+        path.endsWith('.mp3') ||
+        path.endsWith('.m4a') ||
+        path.endsWith('.wav') ||
+        path.endsWith('.aac');
   }
 
   /// Human-readable type label.

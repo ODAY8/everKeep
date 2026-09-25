@@ -4,8 +4,10 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_radius.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../../models/memory_item.dart';
+import '../../../../models/memory_media_item.dart';
 import '../../../../providers/memory_provider.dart';
 import '../../../../widgets/glass/glass_primary_button.dart';
+import 'full_screen_photo_viewer.dart';
 
 /// Full-view modal sheet for a Memory or Wish.
 /// Displays:
@@ -13,7 +15,7 @@ import '../../../../widgets/glass/glass_primary_button.dart';
 /// - Full story/content
 /// - Date & location
 /// - Tags
-/// - Media attachment (photo preview or file download card)
+/// - Rich Media Gallery (Photos, Videos, Audio) and legacy attachments
 /// - Edit action
 /// - Delete action
 /// - Close button
@@ -36,27 +38,47 @@ class MemoryDetailsSheet extends StatefulWidget {
 }
 
 class _MemoryDetailsSheetState extends State<MemoryDetailsSheet> {
-  String? _previewUrl;
-  bool _loadingPreview = false;
+  final Map<String, String> _signedUrls = {};
+  bool _loadingMedia = false;
 
   @override
   void initState() {
     super.initState();
-    if (widget.item.isPhotoAttachment) {
-      _loadPhotoPreview();
+    _loadMediaUrls();
+  }
+
+  Future<void> _loadMediaUrls() async {
+    final photos = widget.item.photos;
+    if (photos.isEmpty) return;
+
+    setState(() => _loadingMedia = true);
+    final provider = context.read<MemoryProvider>();
+
+    for (final photo in photos) {
+      try {
+        final url = await provider.createSignedUrl(photo.filePath);
+        if (url != null && mounted) {
+          setState(() {
+            _signedUrls[photo.filePath] = url;
+          });
+        }
+      } catch (_) {
+        // Handled via per-item error fallbacks in UI
+      }
+    }
+
+    if (mounted) {
+      setState(() => _loadingMedia = false);
     }
   }
 
-  Future<void> _loadPhotoPreview() async {
-    setState(() => _loadingPreview = true);
-    final provider = context.read<MemoryProvider>();
-    final url = await provider.downloadUrlFor(widget.item);
-    if (mounted) {
-      setState(() {
-        _previewUrl = url;
-        _loadingPreview = false;
-      });
-    }
+  void _openPhotoViewer(int initialIndex) {
+    FullScreenPhotoViewer.show(
+      context,
+      photos: widget.item.photos,
+      initialIndex: initialIndex,
+      signedUrls: _signedUrls,
+    );
   }
 
   @override
@@ -210,44 +232,10 @@ class _MemoryDetailsSheetState extends State<MemoryDetailsSheet> {
           ),
         ],
 
-        // Media / Attachment Section
-        if (item.hasAttachment) ...[
+        // Rich Media Gallery & Attachments Section
+        if (item.allMedia.isNotEmpty) ...[
           const SizedBox(height: 16),
-          if (item.isPhotoAttachment && _previewUrl != null)
-            ClipRRect(
-              borderRadius: AppRadius.radiusMD,
-              child: Container(
-                constraints: const BoxConstraints(maxHeight: 220),
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  color: AppColors.glassSurfaceRaised,
-                  border: Border.all(color: AppColors.glassBorder),
-                ),
-                child: Image.network(
-                  _previewUrl!,
-                  fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) =>
-                      _buildAttachmentFallback(item),
-                ),
-              ),
-            )
-          else if (_loadingPreview)
-            Container(
-              height: 100,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: AppColors.glassSurfaceRaised,
-                borderRadius: AppRadius.radiusMD,
-                border: Border.all(color: AppColors.glassBorder),
-              ),
-              child: const SizedBox(
-                width: 24,
-                height: 24,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              ),
-            )
-          else
-            _buildAttachmentFallback(item),
+          _buildMediaSection(accentColor),
         ],
 
         // Story / Content
@@ -324,6 +312,453 @@ class _MemoryDetailsSheetState extends State<MemoryDetailsSheet> {
           ],
         ),
       ],
+    );
+  }
+
+  /// Builds the complete rich media section: photo previews, carousel strip,
+  /// video tiles, voice notes, or legacy document fallbacks.
+  Widget _buildMediaSection(Color accentColor) {
+    final item = widget.item;
+    final photos = item.photos;
+    final videos = item.videos;
+    final audioNotes = item.audioNotes;
+    final totalCount = item.totalMediaCount;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Section Header with Media Counter badge
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'MEDIA ARCHIVE',
+              style: AppTextStyles.labelSmall.copyWith(
+                color: AppColors.glassOnSurfaceFaint,
+                letterSpacing: 1.1,
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            if (totalCount > 1)
+              Semantics(
+                label: 'Total media: $totalCount items',
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: accentColor.withValues(alpha: 0.15),
+                    borderRadius: AppRadius.radiusSM,
+                    border:
+                        Border.all(color: accentColor.withValues(alpha: 0.3)),
+                  ),
+                  child: Text(
+                    '$totalCount media',
+                    style: AppTextStyles.labelSmall.copyWith(
+                      color: accentColor,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: 10),
+
+        // 1. Primary Photo Display
+        if (photos.isNotEmpty) ...[
+          _buildPrimaryPhotoCard(photos.first),
+          // Additional Photos Horizontal Strip
+          if (photos.length > 1) ...[
+            const SizedBox(height: 10),
+            _buildPhotosThumbnailStrip(photos),
+          ],
+        ],
+
+        // 2. Video Placeholders
+        if (videos.isNotEmpty) ...[
+          const SizedBox(height: 10),
+          for (final video in videos) _buildVideoPlaceholderCard(video),
+        ],
+
+        // 3. Audio / Voice Note Placeholders
+        if (audioNotes.isNotEmpty) ...[
+          const SizedBox(height: 10),
+          for (final audio in audioNotes) _buildAudioPlaceholderCard(audio),
+        ],
+
+        // 4. Non-Media Documents (Legacy fallbacks)
+        if (photos.isEmpty &&
+            videos.isEmpty &&
+            audioNotes.isEmpty &&
+            item.hasAttachment) ...[
+          _buildAttachmentFallback(item),
+        ],
+      ],
+    );
+  }
+
+  /// Prominent primary cover photo with tap-to-expand full screen viewer.
+  Widget _buildPrimaryPhotoCard(MemoryMediaItem primaryPhoto) {
+    final url = _signedUrls[primaryPhoto.filePath];
+
+    return Semantics(
+      label:
+          'Primary photo: ${primaryPhoto.caption ?? "Memory photo"}, tap to view full screen',
+      button: true,
+      child: GestureDetector(
+        onTap: () => _openPhotoViewer(0),
+        child: Container(
+          width: double.infinity,
+          constraints: const BoxConstraints(maxHeight: 220),
+          decoration: BoxDecoration(
+            color: AppColors.glassSurfaceRaised,
+            borderRadius: AppRadius.radiusMD,
+            border: Border.all(color: AppColors.glassBorder),
+          ),
+          child: ClipRRect(
+            borderRadius: AppRadius.radiusMD,
+            child: Stack(
+              fit: StackFit.passthrough,
+              children: [
+                if (url != null)
+                  Image.network(
+                    url,
+                    fit: BoxFit.cover,
+                    loadingBuilder: (context, child, progress) {
+                      if (progress == null) return child;
+                      return _buildMediaLoadingContainer();
+                    },
+                    errorBuilder: (context, error, stackTrace) =>
+                        _buildPhotoErrorFallback(primaryPhoto),
+                  )
+                else if (_loadingMedia)
+                  _buildMediaLoadingContainer()
+                else
+                  _buildPhotoErrorFallback(primaryPhoto),
+
+                // Expand Icon Badge in top-right
+                Positioned(
+                  top: 10,
+                  right: 10,
+                  child: Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.55),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.fullscreen_rounded,
+                      color: Colors.white,
+                      size: 16,
+                    ),
+                  ),
+                ),
+
+                // Optional Caption Overlay
+                if (primaryPhoto.caption != null &&
+                    primaryPhoto.caption!.isNotEmpty)
+                  Positioned(
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.bottomCenter,
+                          end: Alignment.topCenter,
+                          colors: [
+                            Colors.black.withValues(alpha: 0.8),
+                            Colors.transparent,
+                          ],
+                        ),
+                      ),
+                      child: Text(
+                        primaryPhoto.caption!,
+                        style: AppTextStyles.bodySmall.copyWith(
+                          color: Colors.white,
+                          fontSize: 12,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Horizontal scrolling strip showing thumbnail previews of all photos.
+  Widget _buildPhotosThumbnailStrip(List<MemoryMediaItem> photos) {
+    return SizedBox(
+      height: 68,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: photos.length,
+        separatorBuilder: (_, index) => const SizedBox(width: 8),
+        itemBuilder: (context, index) {
+          final photo = photos[index];
+          final url = _signedUrls[photo.filePath];
+
+          return Semantics(
+            label:
+                'Photo ${index + 1} of ${photos.length}, tap to view full screen',
+            button: true,
+            child: GestureDetector(
+              onTap: () => _openPhotoViewer(index),
+              child: Container(
+                width: 68,
+                height: 68,
+                decoration: BoxDecoration(
+                  color: AppColors.glassSurfaceRaised,
+                  borderRadius: AppRadius.radiusSM,
+                  border: Border.all(
+                    color: index == 0
+                        ? AppColors.glassAccentPink
+                        : AppColors.glassBorder,
+                  ),
+                ),
+                child: ClipRRect(
+                  borderRadius: AppRadius.radiusSM,
+                  child: url != null
+                      ? Image.network(
+                          url,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, error, stack) => const Center(
+                            child: Icon(
+                              Icons.broken_image_outlined,
+                              size: 20,
+                              color: AppColors.glassOnSurfaceMuted,
+                            ),
+                          ),
+                        )
+                      : const Center(
+                          child: Icon(
+                            Icons.photo_outlined,
+                            size: 20,
+                            color: AppColors.glassOnSurfaceMuted,
+                          ),
+                        ),
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  /// Clean video placeholder indicating attached video asset.
+  Widget _buildVideoPlaceholderCard(MemoryMediaItem video) {
+    final metaText = [
+      if (video.formattedDuration != null) video.formattedDuration!,
+      video.formattedFileSize,
+    ].join(' · ');
+
+    return Semantics(
+      label:
+          'Video attachment: ${video.caption ?? "Video clip"}, size: ${video.formattedFileSize}',
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        margin: const EdgeInsets.only(bottom: 6),
+        decoration: BoxDecoration(
+          color: AppColors.glassSurfaceRaised,
+          borderRadius: AppRadius.radiusMD,
+          border: Border.all(color: AppColors.glassBorder),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: AppColors.glassAccentBlue.withValues(alpha: 0.15),
+                borderRadius: AppRadius.radiusSM,
+              ),
+              child: const Icon(
+                Icons.videocam_rounded,
+                color: AppColors.glassAccentBlue,
+                size: 20,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    video.caption?.isNotEmpty == true
+                        ? video.caption!
+                        : 'Video Clip',
+                    style: AppTextStyles.bodyMedium.copyWith(
+                      color: AppColors.glassOnSurface,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    metaText,
+                    style: AppTextStyles.bodySmall.copyWith(
+                      color: AppColors.glassOnSurfaceMuted,
+                      fontSize: 11,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+              decoration: BoxDecoration(
+                color: AppColors.glassSurface,
+                borderRadius: AppRadius.radiusSM,
+                border: Border.all(color: AppColors.glassBorder),
+              ),
+              child: Text(
+                'VIDEO',
+                style: AppTextStyles.labelSmall.copyWith(
+                  color: AppColors.glassAccentBlue,
+                  fontSize: 9,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.5,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Clean audio/voice recording placeholder indicating attached audio asset.
+  Widget _buildAudioPlaceholderCard(MemoryMediaItem audio) {
+    final metaText = [
+      if (audio.formattedDuration != null) audio.formattedDuration!,
+      audio.formattedFileSize,
+    ].join(' · ');
+
+    return Semantics(
+      label:
+          'Voice recording attachment: ${audio.caption ?? "Audio clip"}, size: ${audio.formattedFileSize}',
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        margin: const EdgeInsets.only(bottom: 6),
+        decoration: BoxDecoration(
+          color: AppColors.glassSurfaceRaised,
+          borderRadius: AppRadius.radiusMD,
+          border: Border.all(color: AppColors.glassBorder),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: AppColors.glassAccentPink.withValues(alpha: 0.15),
+                borderRadius: AppRadius.radiusSM,
+              ),
+              child: const Icon(
+                Icons.graphic_eq_rounded,
+                color: AppColors.glassAccentPink,
+                size: 20,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    audio.caption?.isNotEmpty == true
+                        ? audio.caption!
+                        : 'Voice Recording',
+                    style: AppTextStyles.bodyMedium.copyWith(
+                      color: AppColors.glassOnSurface,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    metaText,
+                    style: AppTextStyles.bodySmall.copyWith(
+                      color: AppColors.glassOnSurfaceMuted,
+                      fontSize: 11,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+              decoration: BoxDecoration(
+                color: AppColors.glassSurface,
+                borderRadius: AppRadius.radiusSM,
+                border: Border.all(color: AppColors.glassBorder),
+              ),
+              child: Text(
+                'AUDIO',
+                style: AppTextStyles.labelSmall.copyWith(
+                  color: AppColors.glassAccentPink,
+                  fontSize: 9,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.5,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMediaLoadingContainer() {
+    return Container(
+      height: 120,
+      alignment: Alignment.center,
+      color: AppColors.glassSurfaceRaised,
+      child: const SizedBox(
+        width: 24,
+        height: 24,
+        child: CircularProgressIndicator(strokeWidth: 2),
+      ),
+    );
+  }
+
+  Widget _buildPhotoErrorFallback(MemoryMediaItem photo) {
+    return Container(
+      height: 100,
+      alignment: Alignment.center,
+      padding: const EdgeInsets.all(12),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(
+            Icons.broken_image_outlined,
+            color: AppColors.glassOnSurfaceMuted,
+            size: 28,
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Photo unavailable',
+            style: AppTextStyles.bodySmall.copyWith(
+              color: AppColors.glassOnSurfaceMuted,
+              fontSize: 11,
+            ),
+          ),
+        ],
+      ),
     );
   }
 

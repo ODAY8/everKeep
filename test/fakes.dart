@@ -337,7 +337,7 @@ class FakeMemoryRepository with Failable implements MemoryRepository {
     MemoryItem item,
     List<DocumentUpload> uploads, {
     List<String>? captions,
-    List<int>? durations,
+    List<int?>? durations,
   }) async {
     throwIfFailing();
     final memoryId = item.id.isEmpty ? 'gen-${_nextId++}' : item.id;

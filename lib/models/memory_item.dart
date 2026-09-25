@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../core/utils/relative_time.dart';
+import 'memory_media_item.dart';
 
 /// A memory or wish saved in Everkeep.
 class MemoryItem {
@@ -15,6 +16,7 @@ class MemoryItem {
   final String? filePath;
   final int? fileSize;
   final String? mimeType;
+  final List<MemoryMediaItem> media;
   final DateTime? createdAt;
   final DateTime? updatedAt;
 
@@ -30,6 +32,7 @@ class MemoryItem {
     this.filePath,
     this.fileSize,
     this.mimeType,
+    this.media = const [],
     this.createdAt,
     this.updatedAt,
   });
@@ -37,6 +40,43 @@ class MemoryItem {
   bool get isMemory => type.toLowerCase() == 'memory';
   bool get isWish => type.toLowerCase() == 'wish';
   bool get hasAttachment => filePath != null && filePath!.trim().isNotEmpty;
+
+  /// All media items associated with this memory. If [media] is empty but the
+  /// legacy [filePath] is present, synthesizes a single [MemoryMediaItem] for backward compatibility.
+  List<MemoryMediaItem> get allMedia {
+    if (media.isNotEmpty) return media;
+    if (hasAttachment) {
+      return [
+        MemoryMediaItem.fromLegacy(
+          filePath: filePath!,
+          fileSize: fileSize,
+          mimeType: mimeType,
+          memoryId: id,
+          userId: userId,
+        ),
+      ];
+    }
+    return const [];
+  }
+
+  /// All photo items associated with this memory.
+  List<MemoryMediaItem> get photos => allMedia.where((m) => m.isPhoto).toList();
+
+  /// All video items associated with this memory.
+  List<MemoryMediaItem> get videos => allMedia.where((m) => m.isVideo).toList();
+
+  /// All voice / audio recordings associated with this memory.
+  List<MemoryMediaItem> get audioNotes =>
+      allMedia.where((m) => m.isAudio).toList();
+
+  /// Primary photo to feature for this memory (first in order), or null if none.
+  MemoryMediaItem? get primaryCoverPhoto {
+    final photoList = photos;
+    return photoList.isNotEmpty ? photoList.first : null;
+  }
+
+  /// Total count of media items, including legacy attachment fallback.
+  int get totalMediaCount => allMedia.length;
 
   /// Alias for content representing the story behind the memory.
   String get story => content;
@@ -125,7 +165,7 @@ class MemoryItem {
     return tagList.any((t) => t.toLowerCase() == target);
   }
 
-  /// Builds a [MemoryItem] from a `memories_wishes` table row.
+  /// Builds a [MemoryItem] from a `memories_wishes` table row (optionally joined with `memory_media`).
   factory MemoryItem.fromRow(Map<String, dynamic> row) {
     DateTime? parseDate(dynamic value) {
       if (value == null) return null;
@@ -133,6 +173,16 @@ class MemoryItem {
         return DateTime.tryParse(value)?.toLocal();
       }
       return null;
+    }
+
+    List<MemoryMediaItem> parsedMedia = const [];
+    if (row['memory_media'] is List) {
+      final rawList = row['memory_media'] as List;
+      parsedMedia = rawList
+          .whereType<Map<String, dynamic>>()
+          .map(MemoryMediaItem.fromRow)
+          .toList()
+        ..sort((a, b) => a.displayOrder.compareTo(b.displayOrder));
     }
 
     return MemoryItem(
@@ -147,6 +197,7 @@ class MemoryItem {
       filePath: row['file_path'] as String?,
       fileSize: (row['file_size'] as num?)?.toInt(),
       mimeType: row['mime_type'] as String?,
+      media: parsedMedia,
       createdAt: parseDate(row['created_at']),
       updatedAt: parseDate(row['updated_at']),
     );
@@ -216,6 +267,7 @@ class MemoryItem {
     String? filePath,
     int? fileSize,
     String? mimeType,
+    List<MemoryMediaItem>? media,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -231,6 +283,7 @@ class MemoryItem {
       filePath: filePath ?? this.filePath,
       fileSize: fileSize ?? this.fileSize,
       mimeType: mimeType ?? this.mimeType,
+      media: media ?? this.media,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );

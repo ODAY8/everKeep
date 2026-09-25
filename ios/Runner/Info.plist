@@ -70,6 +70,10 @@
 	     routing would otherwise also react and navigate to a bogus route. -->
 	<key>FlutterDeepLinkingEnabled</key>
 	<false/>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Everkeep needs microphone access to record voice memories and personal audio.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Everkeep needs photo library access to attach photos and videos to your memories.</string>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>

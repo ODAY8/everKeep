@@ -2,6 +2,7 @@
     <!-- Needed in release builds to reach the Supabase backend. Flutter only adds
          this permission to the debug/profile manifests by default. -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    <uses-permission android:name="android.permission.RECORD_AUDIO"/>
     <application
         android:label="Everkeep"
         android:name="${applicationName}"

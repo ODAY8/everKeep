@@ -1,29 +1,41 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_radius.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../../core/utils/pick_upload.dart';
 import '../../../../models/document_upload.dart';
 import '../../../../models/memory_item.dart';
+import '../../../../models/memory_media_item.dart';
 import '../../../../providers/memory_provider.dart';
+import '../../../../services/memory_service.dart';
 import '../../../../widgets/feedback.dart';
 import '../../../../widgets/glass/glass_primary_button.dart';
 import '../../../../widgets/glass/glass_sheet.dart';
+import '../services/memory_media_picker.dart';
+import 'audio_recorder_adapter.dart';
+import 'memory_media_tray.dart';
 
 /// A polished glass bottom sheet for creating or editing a Memory or Wish.
 /// Validates required fields, provides saving/loading states, handles errors
-/// gracefully, and supports attaching/replacing media.
+/// gracefully, supports rich multi-media selection (photos, video, audio),
+/// in-app audio recording, reordering, captions, and preserves legacy attachments.
 class MemoryFormSheet extends StatefulWidget {
   final MemoryItem? initialItem;
   final String initialType;
   final DocumentUpload? initialUpload;
+  final MemoryMediaPicker? mediaPicker;
+  final AudioRecorderAdapterFactory? recorderFactory;
 
   const MemoryFormSheet({
     super.key,
     this.initialItem,
     this.initialType = 'memory',
     this.initialUpload,
+    this.mediaPicker,
+    this.recorderFactory,
   });
 
   /// Displays the form sheet in the current context.
@@ -32,6 +44,8 @@ class MemoryFormSheet extends StatefulWidget {
     MemoryItem? item,
     String type = 'memory',
     DocumentUpload? initialUpload,
+    MemoryMediaPicker? mediaPicker,
+    AudioRecorderAdapterFactory? recorderFactory,
   }) {
     return showGlassSheet<bool>(
       context,
@@ -39,6 +53,8 @@ class MemoryFormSheet extends StatefulWidget {
         initialItem: item,
         initialType: item?.type ?? type,
         initialUpload: initialUpload,
+        mediaPicker: mediaPicker,
+        recorderFactory: recorderFactory,
       ),
     );
   }
@@ -55,10 +71,22 @@ class _MemoryFormSheetState extends State<MemoryFormSheet> {
   late final TextEditingController _locationController;
   late final TextEditingController _tagsController;
 
+  late final MemoryMediaPicker _mediaPicker;
+  late final AudioRecorderAdapter _audioRecorder;
+
   DateTime? _selectedDate;
-  DocumentUpload? _pendingUpload;
+  DocumentUpload? _pendingLegacyUpload;
+  bool _legacyAttachmentRemoved = false;
+
+  final List<FormMediaItem> _mediaItems = [];
   bool _saving = false;
+  String? _uploadStatus;
   String? _errorMessage;
+
+  // Audio recording state
+  bool _isRecording = false;
+  int _recordDuration = 0;
+  Timer? _recordTimer;
 
   bool get _isEditing => widget.initialItem != null;
   String get _type => widget.initialType;
@@ -74,7 +102,32 @@ class _MemoryFormSheetState extends State<MemoryFormSheet> {
     _locationController = TextEditingController(text: item?.location ?? '');
     _tagsController = TextEditingController(text: item?.tags ?? '');
     _selectedDate = item?.date;
-    _pendingUpload = widget.initialUpload;
+    _pendingLegacyUpload = widget.initialUpload;
+
+    _mediaPicker = widget.mediaPicker ?? DefaultMemoryMediaPicker();
+    final factory = widget.recorderFactory ?? () => DefaultAudioRecorderAdapter();
+    _audioRecorder = factory();
+
+    // Populate existing media if editing
+    if (item != null && item.media.isNotEmpty) {
+      for (final m in item.media) {
+        _mediaItems.add(FormMediaItem.existing(m));
+      }
+    }
+
+    // Populate initial upload if provided
+    if (widget.initialUpload != null) {
+      final upload = widget.initialUpload!;
+      final type =
+          MemoryServiceImpl.detectMediaType(upload.mimeType, upload.fileName);
+      _mediaItems.add(
+        FormMediaItem.pending(
+          pendingUpload: upload,
+          mediaType: type,
+          previewBytes: type == MemoryMediaType.photo ? upload.bytes : null,
+        ),
+      );
+    }
   }
 
   @override
@@ -83,15 +136,233 @@ class _MemoryFormSheetState extends State<MemoryFormSheet> {
     _contentController.dispose();
     _locationController.dispose();
     _tagsController.dispose();
+    _recordTimer?.cancel();
+    if (_isRecording) {
+      _audioRecorder.cancel();
+    }
+    _audioRecorder.dispose();
     super.dispose();
   }
 
-  Future<void> _pickFile() async {
+  void _addPendingMedia(List<FormMediaItem> newItems) {
+    var addedCount = 0;
+    for (final item in newItems) {
+      final isDuplicate = _mediaItems.any((existing) =>
+          existing.fileName == item.fileName &&
+          existing.fileSize == item.fileSize);
+      if (!isDuplicate) {
+        _mediaItems.add(item);
+        addedCount++;
+      }
+    }
+    if (addedCount < newItems.length && mounted) {
+      showAppSnackBar(
+        context,
+        'Duplicate media items were skipped.',
+      );
+    }
+    setState(() {});
+  }
+
+  Future<void> _pickPhotos() async {
+    try {
+      final uploads = await _mediaPicker.pickPhotos();
+      if (uploads.isNotEmpty && mounted) {
+        final items = uploads
+            .map(
+              (u) => FormMediaItem.pending(
+                pendingUpload: u,
+                mediaType: MemoryMediaType.photo,
+                previewBytes: u.bytes,
+              ),
+            )
+            .toList();
+        _addPendingMedia(items);
+      }
+    } on PickedTooLarge catch (e) {
+      if (mounted) showAppSnackBar(context, e.toString(), isError: true);
+    } catch (_) {
+      if (mounted) {
+        showAppSnackBar(
+          context,
+          'Couldn\'t read the selected photo(s). Try another.',
+          isError: true,
+        );
+      }
+    }
+  }
+
+  Future<void> _pickVideo() async {
+    try {
+      final upload = await _mediaPicker.pickVideo();
+      if (upload != null && mounted) {
+        _addPendingMedia([
+          FormMediaItem.pending(
+            pendingUpload: upload,
+            mediaType: MemoryMediaType.video,
+          ),
+        ]);
+      }
+    } on PickedTooLarge catch (e) {
+      if (mounted) showAppSnackBar(context, e.toString(), isError: true);
+    } catch (_) {
+      if (mounted) {
+        showAppSnackBar(
+          context,
+          'Couldn\'t read the selected video. Try another.',
+          isError: true,
+        );
+      }
+    }
+  }
+
+  Future<void> _pickAudio() async {
+    try {
+      final upload = await _mediaPicker.pickAudio();
+      if (upload != null && mounted) {
+        _addPendingMedia([
+          FormMediaItem.pending(
+            pendingUpload: upload,
+            mediaType: MemoryMediaType.audio,
+          ),
+        ]);
+      }
+    } on PickedTooLarge catch (e) {
+      if (mounted) showAppSnackBar(context, e.toString(), isError: true);
+    } catch (_) {
+      if (mounted) {
+        showAppSnackBar(
+          context,
+          'Couldn\'t read the audio file. Try another.',
+          isError: true,
+        );
+      }
+    }
+  }
+
+  Future<void> _startRecording() async {
+    try {
+      final hasPerm = await _audioRecorder.hasPermission();
+      if (!hasPerm) {
+        if (mounted) {
+          showAppSnackBar(
+            context,
+            'Microphone permission is required to record audio.',
+            isError: true,
+          );
+        }
+        return;
+      }
+
+      await _audioRecorder.start();
+      if (mounted) {
+        setState(() {
+          _isRecording = true;
+          _recordDuration = 0;
+        });
+      }
+
+      _recordTimer?.cancel();
+      _recordTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+        if (mounted) {
+          setState(() => _recordDuration++);
+        }
+      });
+    } catch (_) {
+      if (mounted) {
+        showAppSnackBar(
+          context,
+          'Could not start audio recording.',
+          isError: true,
+        );
+      }
+    }
+  }
+
+  Future<void> _stopRecording() async {
+    _recordTimer?.cancel();
+    final duration = _recordDuration;
+    try {
+      final upload = await _audioRecorder.stop(durationSeconds: duration);
+      if (mounted) {
+        setState(() {
+          _isRecording = false;
+          _recordDuration = 0;
+        });
+      }
+
+      if (upload != null && mounted) {
+        _addPendingMedia([
+          FormMediaItem.pending(
+            pendingUpload: upload,
+            mediaType: MemoryMediaType.audio,
+            durationSeconds: duration > 0 ? duration : null,
+          ),
+        ]);
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _isRecording = false;
+          _recordDuration = 0;
+        });
+        showAppSnackBar(
+          context,
+          'Failed to complete audio recording.',
+          isError: true,
+        );
+      }
+    }
+  }
+
+  Future<void> _cancelRecording() async {
+    _recordTimer?.cancel();
+    await _audioRecorder.cancel();
+    if (mounted) {
+      setState(() {
+        _isRecording = false;
+        _recordDuration = 0;
+      });
+    }
+  }
+
+  void _moveMediaUp(int index) {
+    if (index > 0) {
+      setState(() {
+        final item = _mediaItems.removeAt(index);
+        _mediaItems.insert(index - 1, item);
+      });
+    }
+  }
+
+  void _moveMediaDown(int index) {
+    if (index < _mediaItems.length - 1) {
+      setState(() {
+        final item = _mediaItems.removeAt(index);
+        _mediaItems.insert(index + 1, item);
+      });
+    }
+  }
+
+  void _removeMediaItem(int index) {
+    setState(() {
+      _mediaItems.removeAt(index);
+    });
+  }
+
+  void _onCaptionChanged(int index, String? caption) {
+    if (index >= 0 && index < _mediaItems.length) {
+      _mediaItems[index].caption = caption;
+    }
+  }
+
+  Future<void> _pickLegacyFile() async {
     try {
       final upload = await pickDocument();
       if (upload != null && mounted) {
         setState(() {
-          _pendingUpload = upload;
+          _pendingLegacyUpload = upload;
+          _legacyAttachmentRemoved = false;
         });
       }
     } on PickedTooLarge catch (e) {
@@ -139,6 +410,7 @@ class _MemoryFormSheetState extends State<MemoryFormSheet> {
     setState(() {
       _saving = true;
       _errorMessage = null;
+      _uploadStatus = 'Saving details...';
     });
 
     final memoryProv = context.read<MemoryProvider>();
@@ -148,7 +420,7 @@ class _MemoryFormSheetState extends State<MemoryFormSheet> {
     final tags = _tagsController.text.trim();
 
     try {
-      bool success;
+      bool success = false;
       if (_isEditing) {
         final updated = widget.initialItem!.copyWith(
           title: title,
@@ -159,14 +431,75 @@ class _MemoryFormSheetState extends State<MemoryFormSheet> {
         );
         success = await memoryProv.updateMemory(updated);
 
-        // If a new attachment was picked while editing
-        if (success && _pendingUpload != null) {
-          success = await memoryProv.uploadAttachment(
+        if (!success) {
+          if (mounted) {
+            setState(() {
+              _errorMessage = memoryProv.error ?? 'Could not update $_label.';
+              _saving = false;
+            });
+          }
+          return;
+        }
+
+        // 1. Legacy attachment handling
+        if (_legacyAttachmentRemoved) {
+          await memoryProv.removeAttachment(widget.initialItem!.id);
+        } else if (_pendingLegacyUpload != null) {
+          await memoryProv.uploadAttachment(
             widget.initialItem!.id,
-            _pendingUpload!,
+            _pendingLegacyUpload!,
           );
         }
+
+        // 2. Delete removed existing media
+        final initialIds = widget.initialItem!.media.map((m) => m.id).toSet();
+        final currentExistingIds = _mediaItems
+            .where((item) => item.isExisting)
+            .map((item) => item.existingItem!.id)
+            .toSet();
+        final toDeleteIds = initialIds.difference(currentExistingIds);
+        for (final id in toDeleteIds) {
+          if (mounted) {
+            setState(() => _uploadStatus = 'Updating media...');
+          }
+          await memoryProv.deleteMedia(id);
+        }
+
+        // 3. Add newly picked pending media
+        final pendingItems =
+            _mediaItems.where((item) => item.isPending).toList();
+        for (var i = 0; i < pendingItems.length; i++) {
+          final item = pendingItems[i];
+          if (mounted) {
+            setState(() {
+              _uploadStatus =
+                  'Uploading media (${i + 1} of ${pendingItems.length})...';
+            });
+          }
+          await memoryProv.addMedia(
+            widget.initialItem!.id,
+            item.pendingUpload!,
+            caption: item.caption,
+            displayOrder: _mediaItems.indexOf(item),
+            durationSeconds: item.durationSeconds,
+          );
+        }
+
+        // 4. Update reordering for remaining existing media
+        final remainingExistingIds = _mediaItems
+            .where((item) => item.isExisting)
+            .map((item) => item.existingItem!.id)
+            .toList();
+        if (remainingExistingIds.isNotEmpty) {
+          await memoryProv.reorderMedia(
+            widget.initialItem!.id,
+            remainingExistingIds,
+          );
+        }
+
+        success = true;
       } else {
+        // Create Mode
         final newItem = MemoryItem(
           id: '',
           title: title,
@@ -176,10 +509,34 @@ class _MemoryFormSheetState extends State<MemoryFormSheet> {
           location: location.isEmpty ? null : location,
           tags: tags.isEmpty ? null : tags,
         );
-        success = await memoryProv.createMemory(
-          newItem,
-          upload: _pendingUpload,
-        );
+
+        final pendingItems =
+            _mediaItems.where((item) => item.isPending).toList();
+        if (pendingItems.isNotEmpty) {
+          final uploads =
+              pendingItems.map((item) => item.pendingUpload!).toList();
+          final captions =
+              pendingItems.map((item) => item.caption ?? '').toList();
+          final durations =
+              pendingItems.map((item) => item.durationSeconds).toList();
+
+          if (mounted) {
+            setState(() {
+              _uploadStatus = 'Uploading ${uploads.length} media items...';
+            });
+          }
+          success = await memoryProv.createMemoryWithMedia(
+            newItem,
+            uploads,
+            captions: captions,
+            durations: durations,
+          );
+        } else {
+          success = await memoryProv.createMemory(
+            newItem,
+            upload: _pendingLegacyUpload,
+          );
+        }
       }
 
       if (!mounted) return;
@@ -203,9 +560,11 @@ class _MemoryFormSheetState extends State<MemoryFormSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final hasPendingOrNewMedia =
+        _mediaItems.any((m) => m.isPending) || _pendingLegacyUpload != null;
     final submitText = _isEditing
         ? 'Save Changes'
-        : (_pendingUpload != null ? 'Upload & Save' : 'Save');
+        : (hasPendingOrNewMedia ? 'Upload & Save' : 'Save');
 
     return PopScope(
       canPop: !_saving,
@@ -271,7 +630,7 @@ class _MemoryFormSheetState extends State<MemoryFormSheet> {
                 const SizedBox(height: 14),
               ],
 
-              // Title field (first TextField for tests)
+              // Title field
               _FormFieldWrapper(
                 label: 'Title',
                 child: TextFormField(
@@ -419,12 +778,171 @@ class _MemoryFormSheetState extends State<MemoryFormSheet> {
                 const SizedBox(height: 14),
               ],
 
-              // Attachment / Photo section
+              // Legacy Attachment Card (if present)
+              if (_isEditing &&
+                  widget.initialItem?.hasAttachment == true &&
+                  !_legacyAttachmentRemoved) ...[
+                _FormFieldWrapper(
+                  label: 'Legacy Attachment',
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: AppColors.glassSurfaceRaised,
+                      borderRadius: AppRadius.radiusMD,
+                      border: Border.all(color: AppColors.glassBorder),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          widget.initialItem!.isPhotoAttachment
+                              ? Icons.photo_outlined
+                              : Icons.attach_file_rounded,
+                          color: AppColors.glassAccentPink,
+                          size: 20,
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            _pendingLegacyUpload != null
+                                ? 'Replacing with: ${_pendingLegacyUpload!.fileName}'
+                                : 'Existing attachment preserved',
+                            style: AppTextStyles.bodySmall.copyWith(
+                              color: AppColors.glassOnSurfaceMuted,
+                            ),
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: _saving ? null : _pickLegacyFile,
+                          child: const Text('Replace'),
+                        ),
+                        IconButton(
+                          tooltip: 'Remove legacy attachment',
+                          icon: const Icon(
+                            Icons.delete_outline_rounded,
+                            size: 18,
+                            color: AppColors.glassDestructive,
+                          ),
+                          onPressed: _saving
+                              ? null
+                              : () => setState(
+                                    () => _legacyAttachmentRemoved = true,
+                                  ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 14),
+              ],
+
+              // MEDIA Section
               _FormFieldWrapper(
-                label: 'Photo or Attachment (optional)',
-                child: _buildAttachmentPicker(),
+                label: 'MEDIA (Photos, Videos & Audio)',
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Action Buttons
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        _MediaActionButton(
+                          icon: Icons.add_photo_alternate_outlined,
+                          label: 'Add Photos',
+                          onPressed: _saving ? null : _pickPhotos,
+                        ),
+                        _MediaActionButton(
+                          icon: Icons.video_library_outlined,
+                          label: 'Add Video',
+                          onPressed: _saving ? null : _pickVideo,
+                        ),
+                        _MediaActionButton(
+                          icon: Icons.audio_file_outlined,
+                          label: 'Add Audio',
+                          onPressed: _saving ? null : _pickAudio,
+                        ),
+                        _MediaActionButton(
+                          icon: Icons.mic_none_rounded,
+                          label: 'Record Audio',
+                          onPressed:
+                              _saving || _isRecording ? null : _startRecording,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Voice Recording Panel
+                    if (_isRecording) ...[
+                      VoiceRecordingPanel(
+                        durationSeconds: _recordDuration,
+                        onStop: _stopRecording,
+                        onCancel: _cancelRecording,
+                      ),
+                      const SizedBox(height: 12),
+                    ],
+
+                    // Media Tray
+                    MemoryMediaTray(
+                      items: _mediaItems,
+                      onMoveUp: _moveMediaUp,
+                      onMoveDown: _moveMediaDown,
+                      onRemove: _removeMediaItem,
+                      onCaptionChanged: _onCaptionChanged,
+                      enabled: !_saving,
+                    ),
+                  ],
+                ),
               ),
               const SizedBox(height: 24),
+
+              // Upload / Save Progress
+              if (_saving && _uploadStatus != null) ...[
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppColors.glassSurfaceRaised,
+                    borderRadius: AppRadius.radiusMD,
+                    border: Border.all(
+                      color: AppColors.glassAccentPink.withValues(alpha: 0.3),
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: AppColors.glassAccentPink,
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              _uploadStatus!,
+                              style: AppTextStyles.bodySmall.copyWith(
+                                color: AppColors.glassOnSurface,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      const LinearProgressIndicator(
+                        backgroundColor: AppColors.glassSurface,
+                        color: AppColors.glassAccentPink,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
 
               // Submit Button
               GlassPrimaryButton(
@@ -434,111 +952,6 @@ class _MemoryFormSheetState extends State<MemoryFormSheet> {
             ],
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildAttachmentPicker() {
-    if (_pendingUpload != null) {
-      return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        decoration: BoxDecoration(
-          color: AppColors.glassSurfaceRaised,
-          borderRadius: AppRadius.radiusMD,
-          border: Border.all(
-            color: AppColors.glassAccentPink.withValues(alpha: 0.4),
-          ),
-        ),
-        child: Row(
-          children: [
-            const Icon(
-              Icons.attach_file_rounded,
-              color: AppColors.glassAccentPink,
-              size: 20,
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    _pendingUpload!.fileName,
-                    style: AppTextStyles.bodySmall.copyWith(
-                      color: AppColors.glassOnSurface,
-                      fontWeight: FontWeight.w600,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  Text(
-                    '${(_pendingUpload!.bytes.length / 1024).toStringAsFixed(1)} KB',
-                    style: AppTextStyles.bodySmall.copyWith(
-                      color: AppColors.glassOnSurfaceMuted,
-                      fontSize: 11,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            IconButton(
-              icon: const Icon(
-                Icons.close_rounded,
-                color: AppColors.glassOnSurfaceMuted,
-                size: 18,
-              ),
-              onPressed: _saving
-                  ? null
-                  : () => setState(() => _pendingUpload = null),
-            ),
-          ],
-        ),
-      );
-    }
-
-    if (_isEditing && widget.initialItem?.hasAttachment == true) {
-      return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        decoration: BoxDecoration(
-          color: AppColors.glassSurfaceRaised,
-          borderRadius: AppRadius.radiusMD,
-          border: Border.all(color: AppColors.glassBorder),
-        ),
-        child: Row(
-          children: [
-            Icon(
-              widget.initialItem!.isPhotoAttachment
-                  ? Icons.photo_outlined
-                  : Icons.attach_file_rounded,
-              color: AppColors.glassAccentPink,
-              size: 20,
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                'Existing attachment preserved',
-                style: AppTextStyles.bodySmall.copyWith(
-                  color: AppColors.glassOnSurfaceMuted,
-                ),
-              ),
-            ),
-            TextButton(
-              onPressed: _saving ? null : _pickFile,
-              child: const Text('Replace'),
-            ),
-          ],
-        ),
-      );
-    }
-
-    return OutlinedButton.icon(
-      onPressed: _saving ? null : _pickFile,
-      icon: const Icon(Icons.add_photo_alternate_outlined, size: 18),
-      label: const Text('Add photo or file'),
-      style: OutlinedButton.styleFrom(
-        foregroundColor: AppColors.glassOnSurface,
-        side: const BorderSide(color: AppColors.glassBorder),
-        shape: RoundedRectangleBorder(borderRadius: AppRadius.radiusMD),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       ),
     );
   }
@@ -571,6 +984,42 @@ class _MemoryFormSheetState extends State<MemoryFormSheet> {
       errorBorder: OutlineInputBorder(
         borderRadius: AppRadius.radiusMD,
         borderSide: const BorderSide(color: AppColors.glassDestructive),
+      ),
+    );
+  }
+}
+
+class _MediaActionButton extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback? onPressed;
+
+  const _MediaActionButton({
+    required this.icon,
+    required this.label,
+    required this.onPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return OutlinedButton.icon(
+      onPressed: onPressed,
+      icon: Icon(icon, size: 16, color: AppColors.glassAccentPink),
+      label: Text(
+        label,
+        style: AppTextStyles.bodySmall.copyWith(
+          color: onPressed != null
+              ? AppColors.glassOnSurface
+              : AppColors.glassOnSurfaceFaint,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+      style: OutlinedButton.styleFrom(
+        foregroundColor: AppColors.glassOnSurface,
+        side: const BorderSide(color: AppColors.glassBorder),
+        shape: RoundedRectangleBorder(borderRadius: AppRadius.radiusMD),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        visualDensity: VisualDensity.compact,
       ),
     );
   }

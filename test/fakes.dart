@@ -4,6 +4,7 @@ import 'package:everkeep/models/account_item.dart';
 import 'package:everkeep/models/document_item.dart';
 import 'package:everkeep/models/document_upload.dart';
 import 'package:everkeep/models/memory_item.dart';
+import 'package:everkeep/models/memory_media_item.dart';
 import 'package:everkeep/models/security_settings.dart';
 import 'package:everkeep/models/trusted_contact_item.dart';
 import 'package:everkeep/models/user.dart';
@@ -324,6 +325,120 @@ class FakeMemoryRepository with Failable implements MemoryRepository {
   Future<String> createDownloadUrl(String filePath) async {
     throwIfFailing();
     return 'https://example.test/signed/$filePath';
+  }
+
+  @override
+  Future<String> createSignedUrl(String filePath) async {
+    return createDownloadUrl(filePath);
+  }
+
+  @override
+  Future<MemoryItem> createMemoryWithMedia(
+    MemoryItem item,
+    List<DocumentUpload> uploads, {
+    List<String>? captions,
+    List<int>? durations,
+  }) async {
+    throwIfFailing();
+    final memoryId = item.id.isEmpty ? 'gen-${_nextId++}' : item.id;
+    final mediaList = <MemoryMediaItem>[];
+    for (var i = 0; i < uploads.length; i++) {
+      final upload = uploads[i];
+      final mediaType = MemoryMediaItem.fromLegacy(
+        filePath: 'user/memories/$memoryId/${upload.fileName}',
+        fileSize: upload.bytes.length,
+        mimeType: upload.mimeType,
+      ).mediaType;
+
+      mediaList.add(MemoryMediaItem(
+        id: 'med-$memoryId-$i',
+        memoryId: memoryId,
+        filePath: 'user/memories/$memoryId/${upload.fileName}',
+        mediaType: mediaType,
+        mimeType: upload.mimeType ?? 'application/octet-stream',
+        fileSize: upload.bytes.length,
+        displayOrder: i,
+        caption: (captions != null && i < captions.length) ? captions[i] : null,
+        durationSeconds: (durations != null && i < durations.length) ? durations[i] : null,
+        createdAt: DateTime.now(),
+      ));
+    }
+
+    final saved = item.copyWith(
+      id: memoryId,
+      media: mediaList,
+      createdAt: DateTime.now(),
+    );
+    items.insert(0, saved);
+    return saved;
+  }
+
+  @override
+  Future<MemoryMediaItem> addMedia(
+    String memoryId,
+    DocumentUpload upload, {
+    String? caption,
+    int? displayOrder,
+    int? durationSeconds,
+  }) async {
+    throwIfFailing();
+    final index = items.indexWhere((m) => m.id == memoryId);
+    if (index == -1) throw Exception('That item couldn\'t be found.');
+
+    final mediaType = MemoryMediaItem.fromLegacy(
+      filePath: 'user/memories/$memoryId/${upload.fileName}',
+      fileSize: upload.bytes.length,
+      mimeType: upload.mimeType,
+    ).mediaType;
+
+    final mediaItem = MemoryMediaItem(
+      id: 'med-$memoryId-${DateTime.now().millisecondsSinceEpoch}',
+      memoryId: memoryId,
+      filePath: 'user/memories/$memoryId/${upload.fileName}',
+      mediaType: mediaType,
+      mimeType: upload.mimeType ?? 'application/octet-stream',
+      fileSize: upload.bytes.length,
+      displayOrder: displayOrder ?? items[index].media.length,
+      caption: caption,
+      durationSeconds: durationSeconds,
+      createdAt: DateTime.now(),
+    );
+
+    final updatedMedia = List<MemoryMediaItem>.from(items[index].media)..add(mediaItem);
+    items[index] = items[index].copyWith(media: updatedMedia);
+    return mediaItem;
+  }
+
+  @override
+  Future<void> deleteMedia(String mediaId) async {
+    throwIfFailing();
+    for (var i = 0; i < items.length; i++) {
+      if (items[i].media.any((m) => m.id == mediaId)) {
+        final updated = items[i].media.where((m) => m.id != mediaId).toList();
+        items[i] = items[i].copyWith(media: updated);
+        return;
+      }
+    }
+  }
+
+  @override
+  Future<void> reorderMedia(
+    String memoryId,
+    List<String> orderedMediaIds,
+  ) async {
+    throwIfFailing();
+    final index = items.indexWhere((m) => m.id == memoryId);
+    if (index == -1) throw Exception('That item couldn\'t be found.');
+
+    final existing = {for (final m in items[index].media) m.id: m};
+    final reordered = <MemoryMediaItem>[];
+    for (var i = 0; i < orderedMediaIds.length; i++) {
+      final item = existing[orderedMediaIds[i]];
+      if (item != null) {
+        reordered.add(item.copyWith(displayOrder: i));
+      }
+    }
+    items[index] = items[index].copyWith(media: reordered);
   }
 }
 

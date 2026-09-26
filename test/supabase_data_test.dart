@@ -946,6 +946,53 @@ void main() {
       );
     });
 
+    test('update sends the fields and returns the updated row', () async {
+      supabase.route = (_) => jsonResponse([
+            contactRow(id: 'tc-1')
+              ..['name'] = 'Sarah Updated'
+              ..['relationship'] = 'Sister',
+          ]);
+
+      final updated = await service.updateContact(
+        const TrustedContactItem(
+          id: 'tc-1',
+          name: 'Sarah Updated',
+          relationship: 'Sister',
+          accessLevel: 'Full Access',
+          avatarUrl: '',
+        ),
+      );
+
+      final req = supabase.single('PATCH', '/rest/v1/trusted_contacts');
+      expect(req.query['id'], 'eq.tc-1');
+      expect(req.json, {
+        'name': 'Sarah Updated',
+        'relationship': 'Sister',
+        'access_level': 'Full Access',
+        'avatar_url': null,
+      });
+      expect(updated.name, 'Sarah Updated');
+      expect(updated.relationship, 'Sister');
+    });
+
+    test('update throws if no row matched', () async {
+      supabase.route = (_) => jsonResponse([]);
+
+      final error = await failureOf(
+        () => service.updateContact(
+          const TrustedContactItem(
+            id: 'tc-missing',
+            name: 'Ghost',
+            relationship: 'None',
+            accessLevel: 'View Only',
+            avatarUrl: '',
+          ),
+        ),
+      );
+
+      expect(error.toString(), contains('couldn\'t be found'));
+    });
+
     test('an offline failure is reported as such', () async {
       supabase.route = (_) => throw http.ClientException('offline');
 

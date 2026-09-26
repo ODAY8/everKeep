@@ -557,6 +557,14 @@ class FakeTrustedContactRepository
   }
 
   @override
+  Future<TrustedContactItem> updateContact(TrustedContactItem contact) async {
+    throwIfFailing();
+    final index = items.indexWhere((c) => c.id == contact.id);
+    if (index == -1) throw Exception('That item couldn\'t be found.');
+    return items[index] = contact;
+  }
+
+  @override
   Future<void> removeContact(String id) async {
     throwIfFailing();
     items.removeWhere((c) => c.id == id);

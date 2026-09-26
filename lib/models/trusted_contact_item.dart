@@ -39,6 +39,14 @@ class TrustedContactItem {
     'avatar_url': avatarUrl.isEmpty ? null : avatarUrl,
   };
 
+  /// The columns written when updating a contact.
+  Map<String, dynamic> toUpdateRow() => {
+    'name': name.trim(),
+    'relationship': relationship.trim(),
+    'access_level': accessLevel,
+    'avatar_url': avatarUrl.isEmpty ? null : avatarUrl,
+  };
+
   TrustedContactItem copyWith({
     String? id,
     String? name,

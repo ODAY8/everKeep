@@ -7,6 +7,7 @@ import '../models/trusted_contact_item.dart';
 abstract class TrustedContactService {
   Future<List<TrustedContactItem>> fetchContacts();
   Future<TrustedContactItem> addContact(TrustedContactItem contact);
+  Future<TrustedContactItem> updateContact(TrustedContactItem contact);
   Future<void> removeContact(String id);
 }
 
@@ -38,6 +39,19 @@ class TrustedContactServiceImpl implements TrustedContactService {
           .select()
           .single();
       return TrustedContactItem.fromRow(row);
+    });
+  }
+
+  @override
+  Future<TrustedContactItem> updateContact(TrustedContactItem contact) {
+    return guardBackend(() async {
+      final rows = await _client
+          .from('trusted_contacts')
+          .update(contact.toUpdateRow())
+          .eq('id', contact.id)
+          .select();
+      requireAffected(rows);
+      return TrustedContactItem.fromRow(rows.first);
     });
   }
 

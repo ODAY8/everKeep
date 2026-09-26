@@ -4,6 +4,7 @@ import '../services/trusted_contact_service.dart';
 abstract class TrustedContactRepository {
   Future<List<TrustedContactItem>> fetchContacts();
   Future<TrustedContactItem> addContact(TrustedContactItem contact);
+  Future<TrustedContactItem> updateContact(TrustedContactItem contact);
   Future<void> removeContact(String id);
 }
 
@@ -22,6 +23,11 @@ class TrustedContactRepositoryImpl implements TrustedContactRepository {
   @override
   Future<TrustedContactItem> addContact(TrustedContactItem contact) {
     return _trustedContactService.addContact(contact);
+  }
+
+  @override
+  Future<TrustedContactItem> updateContact(TrustedContactItem contact) {
+    return _trustedContactService.updateContact(contact);
   }
 
   @override

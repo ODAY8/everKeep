@@ -209,6 +209,127 @@ void main() {
       expect(repo.items.map((c) => c.name), contains('Jordan Lee'));
     });
 
+    testWidgets('tapping a contact opens action sheet with Edit action and emergency settings', (
+      tester,
+    ) async {
+      await pumpContacts(tester);
+
+      await tester.tap(find.text('Ada Lovelace'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Emergency access settings'), findsOneWidget);
+      expect(find.text('Edit trusted person'), findsOneWidget);
+      expect(find.text('Remove trusted person'), findsOneWidget);
+    });
+
+    testWidgets('editing a contact pre-populates values and saves successfully', (
+      tester,
+    ) async {
+      await pumpContacts(tester);
+
+      await tester.tap(find.text('Ada Lovelace'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Edit trusted person'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Edit Trusted Person'), findsOneWidget);
+      expect(find.widgetWithText(GlassPrimaryButton, 'Save Changes'), findsOneWidget);
+
+      final nameField = find.byType(TextField).at(0);
+      final relField = find.byType(TextField).at(1);
+
+      expect(tester.widget<TextField>(nameField).controller?.text, 'Ada Lovelace');
+      expect(tester.widget<TextField>(relField).controller?.text, 'Sibling');
+
+      await tester.enterText(nameField, 'Ada King');
+      await tester.enterText(relField, 'Daughter');
+      await tester.tap(find.text('Full Access'));
+      await tester.tap(find.widgetWithText(GlassPrimaryButton, 'Save Changes'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Trusted person updated'), findsOneWidget);
+      expect(find.text('Ada King'), findsOneWidget);
+      expect(find.text('Daughter'), findsOneWidget);
+      expect(find.text('Full Access'), findsOneWidget);
+      expect(contacts.contacts.first.name, 'Ada King');
+      expect(contacts.contacts.first.relationship, 'Daughter');
+      expect(contacts.contacts.first.accessLevel, 'Full Access');
+      expect(repo.items.first.name, 'Ada King');
+    });
+
+    testWidgets('editing validation prevents empty required fields', (
+      tester,
+    ) async {
+      await pumpContacts(tester);
+
+      await tester.tap(find.text('Ada Lovelace'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Edit trusted person'));
+      await tester.pumpAndSettle();
+
+      final nameField = find.byType(TextField).at(0);
+      final relField = find.byType(TextField).at(1);
+
+      await tester.enterText(nameField, '   ');
+      await tester.tap(find.widgetWithText(GlassPrimaryButton, 'Save Changes'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Full name is required'), findsOneWidget);
+      expect(find.widgetWithText(GlassPrimaryButton, 'Save Changes'), findsOneWidget);
+      expect(contacts.contacts.first.name, 'Ada Lovelace');
+
+      await tester.enterText(nameField, 'Ada Lovelace');
+      await tester.enterText(relField, '   ');
+      await tester.tap(find.widgetWithText(GlassPrimaryButton, 'Save Changes'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Relationship is required'), findsOneWidget);
+      expect(find.widgetWithText(GlassPrimaryButton, 'Save Changes'), findsOneWidget);
+      expect(contacts.contacts.first.relationship, 'Sibling');
+    });
+
+    testWidgets('edit failure keeps sheet open, preserves input, and displays error', (
+      tester,
+    ) async {
+      await pumpContacts(tester);
+      repo.failWith = 'Connection timeout';
+
+      await tester.tap(find.text('Ada Lovelace'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Edit trusted person'));
+      await tester.pumpAndSettle();
+
+      final nameField = find.byType(TextField).at(0);
+      await tester.enterText(nameField, 'Ada Countess');
+      await tester.tap(find.widgetWithText(GlassPrimaryButton, 'Save Changes'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Connection timeout'), findsOneWidget);
+      expect(find.widgetWithText(GlassPrimaryButton, 'Save Changes'), findsOneWidget);
+      expect(tester.widget<TextField>(nameField).controller?.text, 'Ada Countess');
+      expect(contacts.contacts.first.name, 'Ada Lovelace');
+    });
+
+    testWidgets('cancelling edit does not modify the contact', (
+      tester,
+    ) async {
+      await pumpContacts(tester);
+
+      await tester.tap(find.text('Ada Lovelace'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Edit trusted person'));
+      await tester.pumpAndSettle();
+
+      final nameField = find.byType(TextField).at(0);
+      await tester.enterText(nameField, 'Never Saved');
+      await tester.tapAt(const Offset(20, 20));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Ada Lovelace'), findsOneWidget);
+      expect(find.text('Never Saved'), findsNothing);
+      expect(contacts.contacts.first.name, 'Ada Lovelace');
+    });
+
     testWidgets('removing a contact asks first, then removes them', (
       tester,
     ) async {

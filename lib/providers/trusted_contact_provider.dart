@@ -68,6 +68,30 @@ class TrustedContactProvider extends ChangeNotifier with SessionScoped {
     }
   }
 
+  Future<bool> updateContact(TrustedContactItem contact) async {
+    final epoch = sessionEpoch;
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final saved = await _trustedContactRepository.updateContact(contact);
+      if (isStale(epoch)) return false;
+      final index = _contacts.indexWhere((c) => c.id == saved.id);
+      if (index != -1) _contacts[index] = saved;
+      return true;
+    } catch (e) {
+      if (isStale(epoch)) return false;
+      _error = errorMessage(e);
+      return false;
+    } finally {
+      if (!isStale(epoch)) {
+        _isLoading = false;
+        notifyListeners();
+      }
+    }
+  }
+
   Future<bool> removeContact(String id) async {
     final epoch = sessionEpoch;
     _isLoading = true;

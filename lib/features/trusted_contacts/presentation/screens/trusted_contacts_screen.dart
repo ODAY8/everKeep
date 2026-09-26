@@ -43,49 +43,79 @@ class _TrustedContactsScreenState extends State<TrustedContactsScreen> {
     });
   }
 
-  Future<void> _addContact() async {
+  Future<void> _showContactForm([TrustedContactItem? existing]) async {
     final contactProv = context.read<TrustedContactProvider>();
+    final isEditing = existing != null;
+    final initialAccessLevel = existing?.accessLevel ?? _accessLevels.first;
+    var initialAccessLevelIndex = _accessLevels.indexOf(initialAccessLevel);
+    if (initialAccessLevelIndex == -1) initialAccessLevelIndex = 0;
+
     final saved = await showGlassFormSheet(
       context,
-      title: 'Add Trusted Person',
-      subtitle: 'Choose someone you trust to carry out your wishes.',
-      submitLabel: 'Add Person',
-      fields: const [
+      title: isEditing ? 'Edit Trusted Person' : 'Add Trusted Person',
+      subtitle: isEditing
+          ? 'Update contact details or access level for this person.'
+          : 'Choose someone you trust to carry out your wishes.',
+      submitLabel: isEditing ? 'Save Changes' : 'Add Person',
+      fields: [
         GlassFormField(
           key: 'name',
           label: 'Full name',
           hint: 'e.g. Jordan Lee',
+          initialValue: existing?.name ?? '',
         ),
         GlassFormField(
           key: 'relationship',
           label: 'Relationship',
           hint: 'e.g. Sibling, Attorney',
+          initialValue: existing?.relationship ?? '',
         ),
       ],
-      choices: const [
+      choices: [
         GlassFormChoice(
           key: 'accessLevel',
           label: 'Access level',
           options: _accessLevels,
+          initialIndex: initialAccessLevelIndex,
         ),
       ],
       onSubmit: (values) async {
-        final added = await contactProv.addContact(
-          TrustedContactItem(
-            id: '', // assigned by the backend; the saved contact comes back with it
+        if (isEditing) {
+          final updated = existing.copyWith(
             name: values['name']!,
             relationship: values['relationship']!,
             accessLevel: values['accessLevel']!,
-            // No photo yet; the avatar falls back to a person icon.
-            avatarUrl: '',
-          ),
-        );
-        return added ? null : contactProv.error ?? 'Could not add this person.';
+          );
+          final ok = await contactProv.updateContact(updated);
+          return ok ? null : contactProv.error ?? 'Could not update this person.';
+        } else {
+          final added = await contactProv.addContact(
+            TrustedContactItem(
+              id: '', // assigned by the backend; the saved contact comes back with it
+              name: values['name']!,
+              relationship: values['relationship']!,
+              accessLevel: values['accessLevel']!,
+              // No photo yet; the avatar falls back to a person icon.
+              avatarUrl: '',
+            ),
+          );
+          return added ? null : contactProv.error ?? 'Could not add this person.';
+        }
       },
     );
 
-    if (saved && mounted) showAppSnackBar(context, 'Trusted person added');
+    if (saved && mounted) {
+      showAppSnackBar(
+        context,
+        isEditing ? 'Trusted person updated' : 'Trusted person added',
+      );
+    }
   }
+
+  Future<void> _addContact() => _showContactForm();
+
+  Future<void> _editContact(TrustedContactItem contact) =>
+      _showContactForm(contact);
 
   void _showActions(TrustedContactItem contact) {
     showGlassActionSheet(
@@ -98,6 +128,11 @@ class _TrustedContactsScreenState extends State<TrustedContactsScreen> {
           icon: Icons.warning_amber_rounded,
           onTap: () =>
               Navigator.of(context).pushNamed(AppRouter.emergencyAccess),
+        ),
+        GlassSheetAction(
+          label: 'Edit trusted person',
+          icon: Icons.edit_outlined,
+          onTap: () => _editContact(contact),
         ),
         GlassSheetAction(
           label: 'Remove trusted person',

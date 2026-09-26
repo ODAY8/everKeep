@@ -183,6 +183,48 @@ void main() {
       await contactProv.fetchContacts();
       expect(contactProv.contacts.length, 2);
     });
+
+    test('updateContact updates existing contact in place on success', () async {
+      final repo = FakeTrustedContactRepository();
+      final contactProv = TrustedContactProvider(trustedContactRepository: repo);
+      await contactProv.fetchContacts();
+      final original = contactProv.contacts.first;
+
+      final updated = original.copyWith(
+        name: 'Ada King',
+        relationship: 'Daughter',
+        accessLevel: 'Full Access',
+      );
+
+      final ok = await contactProv.updateContact(updated);
+
+      expect(ok, isTrue);
+      expect(contactProv.contacts.first.name, 'Ada King');
+      expect(contactProv.contacts.first.relationship, 'Daughter');
+      expect(contactProv.contacts.first.accessLevel, 'Full Access');
+      expect(contactProv.count, 2);
+      expect(contactProv.error, isNull);
+      expect(contactProv.isLoading, isFalse);
+    });
+
+    test('updateContact failure sets error and preserves contact', () async {
+      final repo = FakeTrustedContactRepository();
+      final contactProv = TrustedContactProvider(trustedContactRepository: repo);
+      await contactProv.fetchContacts();
+      final original = contactProv.contacts.first;
+
+      repo.failWith = 'Database update failed';
+
+      final ok = await contactProv.updateContact(
+        original.copyWith(name: 'Ada King'),
+      );
+
+      expect(ok, isFalse);
+      expect(contactProv.error, contains('Database update failed'));
+      expect(contactProv.contacts.first.name, 'Ada Lovelace');
+      expect(contactProv.count, 2);
+      expect(contactProv.isLoading, isFalse);
+    });
   });
 
   group('VaultProvider Tests', () {

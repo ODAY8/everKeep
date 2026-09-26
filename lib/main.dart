@@ -16,10 +16,21 @@ import 'providers/settings_provider.dart';
 import 'providers/trusted_contact_provider.dart';
 import 'providers/user_provider.dart';
 import 'providers/vault_provider.dart';
+import 'services/notification_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   configureFonts();
+
+  try {
+    await NotificationService.instance.initialize(
+      onDocumentTap: (documentId) {
+        NotificationService.instance.openDocumentById(documentId);
+      },
+    );
+  } catch (_) {
+    // Notification initialization is non-fatal if running on unsupported platform.
+  }
 
   // The backend is required: with no (or a bad) Supabase configuration there
   // is nothing real to show, so say so instead of running on fake data.

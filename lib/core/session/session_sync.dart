@@ -12,6 +12,7 @@ import '../../providers/settings_provider.dart';
 import '../../providers/trusted_contact_provider.dart';
 import '../../providers/user_provider.dart';
 import '../../providers/vault_provider.dart';
+import '../../services/notification_service.dart';
 
 /// Keeps the app's providers consistent with who is signed in.
 ///
@@ -100,7 +101,15 @@ class SessionCoordinator {
     unawaited(user.fetchUserProfile());
     unawaited(vault.fetchVaultSummary());
     unawaited(settings.fetchSecuritySettings());
-    unawaited(documents.fetchDocuments());
+    unawaited(
+      documents.fetchDocuments().then((_) {
+        final pendingId =
+            NotificationService.instance.consumePendingDocumentId();
+        if (pendingId != null) {
+          NotificationService.instance.openDocumentById(pendingId);
+        }
+      }),
+    );
     unawaited(memories.fetchMemories());
     unawaited(accounts.fetchAccounts());
     unawaited(contacts.fetchContacts());

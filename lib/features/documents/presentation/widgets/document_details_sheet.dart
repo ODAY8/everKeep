@@ -1,10 +1,73 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_radius.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../../core/utils/document_expiration.dart';
 import '../../../../models/document_item.dart';
+import '../../../../providers/document_provider.dart';
+import '../../../../widgets/feedback.dart';
 import '../../../../widgets/glass/glass_primary_button.dart';
+import '../../../../widgets/glass/glass_sheet.dart';
+import 'document_form_sheet.dart';
+
+/// Shows the document details bottom sheet with default or custom handlers.
+Future<void> showDocumentDetailsSheet(
+  BuildContext context, {
+  required DocumentItem document,
+  VoidCallback? onEdit,
+  VoidCallback? onDelete,
+  VoidCallback? onOpenFile,
+}) {
+  return showGlassSheet<void>(
+    context,
+    builder: (sheetContext) => DocumentDetailsSheet(
+      document: document,
+      onEdit: onEdit ??
+          () async {
+            Navigator.of(sheetContext).pop();
+            final saved =
+                await DocumentFormSheet.show(context, document: document);
+            if (saved == true && context.mounted) {
+              showAppSnackBar(context, 'Document updated');
+            }
+          },
+      onDelete: onDelete ??
+          () async {
+            Navigator.of(sheetContext).pop();
+            final confirmed = await confirmDestructive(
+              context,
+              title: 'Delete document?',
+              message:
+                  '"${document.title}" will be permanently removed from your vault.',
+              confirmLabel: 'Delete',
+            );
+            if (!confirmed || !context.mounted) return;
+            final docProv = context.read<DocumentProvider>();
+            final deleted = await docProv.deleteDocument(document.id);
+            if (!context.mounted) return;
+            showAppSnackBar(
+              context,
+              deleted
+                  ? 'Document deleted'
+                  : docProv.error ?? 'Could not delete the document.',
+              isError: !deleted,
+            );
+          },
+      onOpenFile: onOpenFile ??
+          (document.hasFile
+              ? () {
+                  final docProv = context.read<DocumentProvider>();
+                  openRemoteFile(
+                    context,
+                    fetchUrl: () => docProv.downloadUrlFor(document),
+                    errorMessage: () => docProv.error,
+                  );
+                }
+              : null),
+    ),
+  );
+}
 
 /// Polished bottom sheet displaying complete structured metadata, expiration
 /// status, attached files, and vault management actions for a [DocumentItem].

@@ -1,19 +1,26 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import '../models/document_item.dart';
 import '../models/document_upload.dart';
 import '../repositories/document_repository.dart';
+import '../services/notification_service.dart';
 import 'session_scoped.dart';
 
 class DocumentProvider extends ChangeNotifier with SessionScoped {
   final DocumentRepository _documentRepository;
+  final NotificationService? _notificationService;
 
   List<DocumentItem> _documents = [];
   bool _isLoading = false;
   String? _error;
   bool _hasFetched = false;
 
-  DocumentProvider({DocumentRepository? documentRepository})
-      : _documentRepository = documentRepository ?? DocumentRepositoryImpl();
+  DocumentProvider({
+    DocumentRepository? documentRepository,
+    NotificationService? notificationService,
+  })  : _documentRepository = documentRepository ?? DocumentRepositoryImpl(),
+        _notificationService =
+            notificationService ?? NotificationService.instance;
 
   List<DocumentItem> get documents => List.unmodifiable(_documents);
   int get count => _documents.length;
@@ -157,6 +164,7 @@ class DocumentProvider extends ChangeNotifier with SessionScoped {
       if (isStale(epoch)) return;
       _documents = fetched;
       _hasFetched = true;
+      unawaited(_notificationService?.reconcileDocumentReminders(_documents));
     } catch (e) {
       if (isStale(epoch)) return;
       _error = errorMessage(e);
@@ -186,6 +194,7 @@ class DocumentProvider extends ChangeNotifier with SessionScoped {
       );
       if (isStale(epoch)) return false;
       _documents.insert(0, added);
+      unawaited(_notificationService?.scheduleDocumentReminders(added));
       return true;
     } catch (e) {
       if (isStale(epoch)) return false;
@@ -213,6 +222,7 @@ class DocumentProvider extends ChangeNotifier with SessionScoped {
       if (index != -1) {
         _documents[index] = updated;
       }
+      unawaited(_notificationService?.scheduleDocumentReminders(updated));
       return true;
     } catch (e) {
       if (isStale(epoch)) return false;
@@ -236,6 +246,7 @@ class DocumentProvider extends ChangeNotifier with SessionScoped {
       await _documentRepository.deleteDocument(id);
       if (isStale(epoch)) return false;
       _documents.removeWhere((doc) => doc.id == id);
+      unawaited(_notificationService?.cancelDocumentReminders(id));
       return true;
     } catch (e) {
       if (isStale(epoch)) return false;
@@ -256,6 +267,7 @@ class DocumentProvider extends ChangeNotifier with SessionScoped {
     _isLoading = false;
     _error = null;
     _hasFetched = false;
+    unawaited(_notificationService?.cancelAll());
     notifyListeners();
   }
 }

@@ -1505,7 +1505,9 @@ void main() {
 
       await tester.tap(find.text('GitHub'));
       await tester.pumpAndSettle();
-      expect(find.text('ROUTE /accounts'), findsOneWidget);
+      // Tapping a search result opens the exact entity action sheet,
+      // not a generic list route.
+      expect(find.text('Edit account'), findsOneWidget);
     });
 
     testWidgets(

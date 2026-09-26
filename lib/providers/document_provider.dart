@@ -57,7 +57,7 @@ class DocumentProvider extends ChangeNotifier with SessionScoped {
       _documents.where((d) => !d.hasExpiryDate).toList();
 
   /// Checks whether [doc] matches the search [query].
-  bool _matchesQuery(DocumentItem doc, String query) {
+  bool matchesQuery(DocumentItem doc, String query) {
     return SearchMatcher.matchesDocument(doc, query: query);
   }
 

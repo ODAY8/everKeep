@@ -125,6 +125,9 @@ class TrustedContactProvider extends ChangeNotifier with SessionScoped {
     }
   }
 
+  /// Alias for [removeContact] to maintain consistent naming across providers.
+  Future<bool> deleteContact(String id) => removeContact(id);
+
   /// Drops everything held for the previous user (called on sign-out).
   void reset() {
     invalidateSession();

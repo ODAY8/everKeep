@@ -25,13 +25,6 @@ class TrustedContactsScreen extends StatefulWidget {
 }
 
 class _TrustedContactsScreenState extends State<TrustedContactsScreen> {
-  static const List<String> _accessLevels = [
-    'View Only',
-    'On Release',
-    'Full Access',
-    'Verification Role',
-  ];
-
   @override
   void initState() {
     super.initState();

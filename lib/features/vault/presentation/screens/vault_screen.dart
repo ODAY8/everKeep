@@ -55,7 +55,7 @@ class _VaultScreenState extends State<VaultScreen> {
       final contactProv = context.read<TrustedContactProvider>();
       if (!contactProv.hasFetched) contactProv.fetchContacts();
       final vaultProv = context.read<VaultProvider>();
-      if (!vaultProv.hasFetched) vaultProv.fetchVaultSummary();
+      vaultProv.fetchVaultSummary();
     });
   }
 
@@ -334,10 +334,12 @@ class _SearchResults extends StatelessWidget {
         },
         onOpenAttachment: mem.hasAttachment
             ? () {
-                final att = mem.attachmentUrl;
-                if (att != null) {
-                  openRemoteFile(context, fetchUrl: () async => att);
-                }
+                final memProv = context.read<MemoryProvider>();
+                openRemoteFile(
+                  context,
+                  fetchUrl: () => memProv.downloadUrlFor(mem),
+                  errorMessage: () => memProv.error,
+                );
               }
             : null,
       ),
@@ -413,8 +415,8 @@ class _SearchResults extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
             decoration: BoxDecoration(
-              color: AppColors.glassSurfaceOverlay,
-              borderRadius: AppRadius.radiusFull,
+              color: AppColors.glassSurfaceRaised,
+              borderRadius: AppRadius.radiusPill,
             ),
             child: Text(
               '$count',
@@ -512,7 +514,7 @@ class _SearchResults extends StatelessWidget {
                   : Icons.star_rounded,
               iconColor: mem.isMemory
                   ? AppColors.glassAccentPink
-                  : AppColors.glassAccentGold,
+                  : AppColors.glassWarningColor,
               title: mem.title,
               subtitle: mem.formattedDate != null
                   ? '${mem.typeLabel} · ${mem.formattedDate}'

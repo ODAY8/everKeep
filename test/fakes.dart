@@ -641,8 +641,18 @@ class FakeUserRepository with Failable implements UserRepository {
   bool avatarRemoved = false;
   bool accountDeleted = false;
   Map<String, dynamic> exportPayload = {
+    'exportVersion': '1.0.0',
+    'exportedAt': '2026-09-27T00:00:00.000Z',
+    'appName': 'Everkeep',
+    'appVersion': '1.1.0',
     'account': {'email': 'sarah.mitchell@example.com'},
+    'profile': {'full_name': 'Sarah Mitchell'},
     'documents': [],
+    'accounts': [],
+    'importantInformation': [],
+    'trustedContacts': [],
+    'memories': [],
+    'securitySettings': null,
   };
 
   @override

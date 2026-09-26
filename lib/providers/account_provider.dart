@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import '../core/utils/search_helper.dart';
 import '../models/account_item.dart';
 import '../repositories/account_repository.dart';
 import 'session_scoped.dart';
@@ -26,18 +27,16 @@ class AccountProvider extends ChangeNotifier with SessionScoped {
   bool get hasFetched => _hasFetched;
   bool get isEmpty => _accounts.isEmpty;
 
-  /// Accounts in [category] ("All" or empty for every category) whose name or
-  /// username contains [query] (ignoring case).
+  /// Accounts in [category] ("All" or empty for every category) whose metadata
+  /// matches [query] (ignoring case).
   List<AccountItem> filterByCategory(String category, {String query = ''}) {
-    final needle = query.trim().toLowerCase();
+    final tokens = SearchMatcher.tokenize(query);
     final anyCategory = category.isEmpty || category == 'All';
     return _accounts.where((acc) {
       if (!anyCategory && acc.category.toLowerCase() != category.toLowerCase()) {
         return false;
       }
-      if (needle.isEmpty) return true;
-      return acc.title.toLowerCase().contains(needle) ||
-          (acc.username?.toLowerCase().contains(needle) ?? false);
+      return SearchMatcher.matchesAccount(acc, tokens: tokens);
     }).toList();
   }
 

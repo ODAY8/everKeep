@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../core/utils/relative_time.dart';
+import '../core/utils/search_helper.dart';
 import 'memory_media_item.dart';
 
 /// A memory or wish saved in Everkeep.
@@ -169,22 +170,7 @@ class MemoryItem {
 
   /// Checks if this item matches a search query across title, content, tags, location, or date.
   bool matchesQuery(String query) {
-    final q = query.trim().toLowerCase();
-    if (q.isEmpty) return true;
-    if (title.toLowerCase().contains(q)) return true;
-    if (content.toLowerCase().contains(q)) return true;
-    if (location != null && location!.toLowerCase().contains(q)) return true;
-    if (tags != null && tags!.toLowerCase().contains(q)) return true;
-    if (formattedDate != null && formattedDate!.toLowerCase().contains(q)) return true;
-    if (date != null) {
-      if (date!.year.toString().contains(q)) return true;
-      const fullMonths = [
-        'january', 'february', 'march', 'april', 'may', 'june',
-        'july', 'august', 'september', 'october', 'november', 'december'
-      ];
-      if (fullMonths[date!.month - 1].contains(q)) return true;
-    }
-    return false;
+    return SearchMatcher.matchesMemory(this, query: query);
   }
 
   /// Checks whether this memory has a specific tag.

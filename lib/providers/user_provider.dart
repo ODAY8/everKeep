@@ -13,6 +13,8 @@ class UserProvider extends ChangeNotifier with SessionScoped {
   /// [setUser] (see SessionCoordinator), never assumed.
   User? _user;
   bool _isLoading = false;
+  bool _isExporting = false;
+  Map<String, dynamic>? _lastExportData;
   String? _error;
 
   UserProvider({UserRepository? userRepository})
@@ -23,6 +25,8 @@ class UserProvider extends ChangeNotifier with SessionScoped {
   String get displayEmail => _user?.email ?? '';
   String get firstName => displayName.split(' ').first;
   bool get isLoading => _isLoading;
+  bool get isExporting => _isExporting;
+  Map<String, dynamic>? get lastExportData => _lastExportData;
   String? get error => _error;
 
   Future<void> fetchUserProfile() async {
@@ -108,17 +112,27 @@ class UserProvider extends ChangeNotifier with SessionScoped {
   /// Everything the account holds, formatted as JSON text — or null (with
   /// [error] set) if it couldn't be gathered.
   Future<String?> exportData() async {
+    if (_isExporting) return null;
+
     final epoch = sessionEpoch;
+    _isExporting = true;
     _error = null;
+    notifyListeners();
+
     try {
       final data = await _userRepository.exportMyData();
       if (isStale(epoch)) return null;
+      _lastExportData = data;
       return const JsonEncoder.withIndent('  ').convert(data);
     } catch (e) {
       if (isStale(epoch)) return null;
       _error = errorMessage(e);
-      notifyListeners();
       return null;
+    } finally {
+      if (!isStale(epoch)) {
+        _isExporting = false;
+        notifyListeners();
+      }
     }
   }
 
@@ -152,6 +166,8 @@ class UserProvider extends ChangeNotifier with SessionScoped {
     invalidateSession();
     _user = null;
     _isLoading = false;
+    _isExporting = false;
+    _lastExportData = null;
     _error = null;
     notifyListeners();
   }

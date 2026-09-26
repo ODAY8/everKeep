@@ -7,6 +7,7 @@ import 'package:everkeep/core/routing/app_router.dart';
 import 'package:everkeep/core/session/sign_out.dart';
 import 'package:everkeep/core/theme/app_colors.dart';
 import 'package:everkeep/core/theme/app_text_styles.dart';
+import 'package:everkeep/core/utils/data_export_helper.dart';
 import 'package:everkeep/core/utils/external_link.dart';
 import 'package:everkeep/core/utils/validators.dart';
 import 'package:everkeep/providers/auth_provider.dart';
@@ -59,6 +60,8 @@ class SettingsScreen extends StatelessWidget {
 
   Future<void> _exportData(BuildContext context) async {
     final userProv = context.read<UserProvider>();
+    if (userProv.isExporting) return;
+
     showAppSnackBar(context, 'Gathering your data…');
 
     final json = await userProv.exportData();
@@ -68,6 +71,11 @@ class SettingsScreen extends StatelessWidget {
         context,
         userProv.error ?? 'Could not gather your data.',
         isError: true,
+        action: SnackBarAction(
+          label: 'Retry',
+          textColor: AppColors.glassAccentPink,
+          onPressed: () => _exportData(context),
+        ),
       );
       return;
     }
@@ -77,7 +85,31 @@ class SettingsScreen extends StatelessWidget {
     showAppSnackBar(
       context,
       'Copied to your clipboard. Paste it into a note or file to keep it safe.',
+      duration: const Duration(seconds: 6),
+      action: SnackBarAction(
+        label: 'Save File',
+        textColor: AppColors.glassAccentPink,
+        onPressed: () => _saveExportToFile(context, json),
+      ),
     );
+  }
+
+  Future<void> _saveExportToFile(BuildContext context, String json) async {
+    final result = await DataExportHelper.saveExportJson(json);
+    if (!context.mounted) return;
+
+    if (result.isSuccess) {
+      showAppSnackBar(context, 'Export saved successfully.');
+    } else if (result.isCancelled) {
+      showAppSnackBar(context, 'Export save cancelled.');
+    } else {
+      showAppSnackBar(
+        context,
+        result.message ??
+            'Could not save file. Your data remains safely copied to your clipboard.',
+        isError: true,
+      );
+    }
   }
 
   Future<void> _deleteAccount(BuildContext context) async {
@@ -169,8 +201,21 @@ class SettingsScreen extends StatelessWidget {
           _buildSection('YOUR DATA', [
             GlassListRow(
               label: 'Download My Data',
-              subtitle: 'Copy everything in your account as JSON',
-              onTap: () => _exportData(context),
+              subtitle: userProv.isExporting
+                  ? 'Gathering your data…'
+                  : 'Copy everything in your account as JSON',
+              trailing: userProv.isExporting
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: AppColors.glassAccentPink,
+                      ),
+                    )
+                  : null,
+              showChevron: !userProv.isExporting,
+              onTap: userProv.isExporting ? null : () => _exportData(context),
             ),
           ]),
           if (AppLinks.hasSupport) ...[

@@ -11,12 +11,15 @@ void showAppSnackBar(
   BuildContext context,
   String message, {
   bool isError = false,
+  SnackBarAction? action,
+  Duration duration = const Duration(seconds: 4),
 }) {
   ScaffoldMessenger.of(context)
-    ..hideCurrentSnackBar()
+    ..clearSnackBars()
     ..showSnackBar(
       SnackBar(
         behavior: SnackBarBehavior.floating,
+        duration: duration,
         backgroundColor: AppColors.glassSurface,
         shape: RoundedRectangleBorder(
           borderRadius: AppRadius.radiusLG,
@@ -24,6 +27,7 @@ void showAppSnackBar(
             color: isError ? AppColors.glassDestructive : AppColors.glassBorder,
           ),
         ),
+        action: action,
         content: Text(
           message,
           style: AppTextStyles.bodyMedium.copyWith(

@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import '../core/utils/search_helper.dart';
 import '../models/trusted_contact_item.dart';
 import '../repositories/trusted_contact_repository.dart';
 import 'session_scoped.dart';
@@ -22,6 +23,15 @@ class TrustedContactProvider extends ChangeNotifier with SessionScoped {
   String? get error => _error;
   bool get hasFetched => _hasFetched;
   bool get isEmpty => _contacts.isEmpty;
+
+  /// Contacts whose name, relationship, or access level matches [query] (ignoring case).
+  List<TrustedContactItem> filterContacts({String query = ''}) {
+    final tokens = SearchMatcher.tokenize(query);
+    if (tokens.isEmpty) return List.unmodifiable(_contacts);
+    return _contacts
+        .where((c) => SearchMatcher.matchesContact(c, tokens: tokens))
+        .toList();
+  }
 
   Future<void> fetchContacts() async {
     final epoch = sessionEpoch;

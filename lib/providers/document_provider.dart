@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
+import '../core/utils/search_helper.dart';
 import '../models/document_item.dart';
 import '../models/document_upload.dart';
 import '../repositories/document_repository.dart';
@@ -55,36 +56,15 @@ class DocumentProvider extends ChangeNotifier with SessionScoped {
   List<DocumentItem> get noExpiryDocuments =>
       _documents.where((d) => !d.hasExpiryDate).toList();
 
-  /// Checks whether [doc] matches the search [needle].
-  bool _matchesQuery(DocumentItem doc, String needle) {
-    if (needle.isEmpty) return true;
-    if (doc.title.toLowerCase().contains(needle)) return true;
-    if (doc.displayType.toLowerCase().contains(needle)) return true;
-    if (doc.documentType != null &&
-        doc.documentType!.toLowerCase().contains(needle)) {
-      return true;
-    }
-    if (doc.documentNumber != null &&
-        doc.documentNumber!.toLowerCase().contains(needle)) {
-      return true;
-    }
-    if (doc.country != null && doc.country!.toLowerCase().contains(needle)) {
-      return true;
-    }
-    if (doc.institution != null &&
-        doc.institution!.toLowerCase().contains(needle)) {
-      return true;
-    }
-    if (doc.notes != null && doc.notes!.toLowerCase().contains(needle)) {
-      return true;
-    }
-    return false;
+  /// Checks whether [doc] matches the search [query].
+  bool _matchesQuery(DocumentItem doc, String query) {
+    return SearchMatcher.matchesDocument(doc, query: query);
   }
 
   /// Documents in [category] ("All" or empty for every category) whose metadata
   /// matches [query] (ignoring case).
   List<DocumentItem> filterByCategory(String category, {String query = ''}) {
-    final needle = query.trim().toLowerCase();
+    final tokens = SearchMatcher.tokenize(query);
     final anyCategory = category.isEmpty || category == 'All';
     return _documents.where((doc) {
       if (!anyCategory &&
@@ -92,7 +72,7 @@ class DocumentProvider extends ChangeNotifier with SessionScoped {
           doc.displayType.toLowerCase() != category.toLowerCase()) {
         return false;
       }
-      return _matchesQuery(doc, needle);
+      return SearchMatcher.matchesDocument(doc, tokens: tokens);
     }).toList();
   }
 
@@ -103,7 +83,7 @@ class DocumentProvider extends ChangeNotifier with SessionScoped {
     String? documentType,
     String query = '',
   }) {
-    final needle = query.trim().toLowerCase();
+    final tokens = SearchMatcher.tokenize(query);
     return _documents.where((doc) {
       switch (filter) {
         case 'All':
@@ -132,7 +112,7 @@ class DocumentProvider extends ChangeNotifier with SessionScoped {
         if (!matchesType) return false;
       }
 
-      return _matchesQuery(doc, needle);
+      return SearchMatcher.matchesDocument(doc, tokens: tokens);
     }).toList();
   }
 

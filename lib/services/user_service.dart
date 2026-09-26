@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart' as supa;
 import '../core/supabase/app_supabase.dart';
 import '../core/supabase/client_extensions.dart';
 import '../core/supabase/supabase_errors.dart';
+import '../core/utils/data_export_helper.dart';
 import '../models/document_upload.dart';
 import '../models/user.dart';
 
@@ -150,19 +151,40 @@ class UserServiceImpl implements UserService {
             .select()
             .eq('user_id', authUser.id)
             .maybeSingle(),
+        _fetchMemoriesForExport(),
       ]);
 
-      return {
-        'exportedAt': DateTime.now().toUtc().toIso8601String(),
-        'account': {'id': authUser.id, 'email': authUser.email},
-        'profile': results[0],
-        // File contents aren't included; each document lists its `file_path`.
-        'documents': results[1],
-        'accounts': results[2],
-        'trustedContacts': results[3],
-        'securitySettings': results[4],
-      };
+      return DataExportHelper.buildExportPayload(
+        userId: authUser.id,
+        userEmail: authUser.email,
+        profile: results[0] as Map<String, dynamic>?,
+        documents: (results[1] as List?) ?? const [],
+        accounts: (results[2] as List?) ?? const [],
+        trustedContacts: (results[3] as List?) ?? const [],
+        securitySettings: results[4] as Map<String, dynamic>?,
+        memories: (results[5] as List?) ?? const [],
+      );
     });
+  }
+
+  Future<List<Map<String, dynamic>>> _fetchMemoriesForExport() async {
+    try {
+      final rows = await _client
+          .from('memories_wishes')
+          .select('*, memory_media(*)')
+          .order('created_at');
+      return (rows as List).cast<Map<String, dynamic>>();
+    } catch (_) {
+      try {
+        final rows = await _client
+            .from('memories_wishes')
+            .select()
+            .order('created_at');
+        return (rows as List).cast<Map<String, dynamic>>();
+      } catch (_) {
+        return const [];
+      }
+    }
   }
 
   @override

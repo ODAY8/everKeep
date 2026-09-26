@@ -8,6 +8,9 @@ import '../../core/theme/app_text_styles.dart';
 class GlassSearchBar extends StatelessWidget {
   final String hintText;
   final ValueChanged<String>? onChanged;
+  final ValueChanged<String>? onSubmitted;
+  final TextEditingController? controller;
+  final VoidCallback? onClear;
 
   /// Open the keyboard as soon as the bar appears (for a search that was just
   /// asked for).
@@ -17,11 +20,16 @@ class GlassSearchBar extends StatelessWidget {
     super.key,
     required this.hintText,
     this.onChanged,
+    this.onSubmitted,
+    this.controller,
+    this.onClear,
     this.autofocus = false,
   });
 
   @override
   Widget build(BuildContext context) {
+    final hasText = controller?.text.isNotEmpty ?? false;
+
     return Container(
       height: 50,
       padding: const EdgeInsets.symmetric(horizontal: 14),
@@ -32,13 +40,19 @@ class GlassSearchBar extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Icon(Icons.search_rounded, color: AppColors.glassOnSurfaceFaint, size: 20),
+          const Icon(
+            Icons.search_rounded,
+            color: AppColors.glassOnSurfaceFaint,
+            size: 20,
+          ),
           const SizedBox(width: 10),
           Expanded(
             child: TextField(
+              controller: controller,
               autofocus: autofocus,
               textInputAction: TextInputAction.search,
               onChanged: onChanged,
+              onSubmitted: onSubmitted,
               style: AppTextStyles.bodyMedium.copyWith(
                 color: AppColors.glassOnSurface,
               ),
@@ -53,6 +67,23 @@ class GlassSearchBar extends StatelessWidget {
               ),
             ),
           ),
+          if (hasText || onClear != null)
+            GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () {
+                controller?.clear();
+                onChanged?.call('');
+                onClear?.call();
+              },
+              child: const Padding(
+                padding: EdgeInsets.only(left: 6),
+                child: Icon(
+                  Icons.close_rounded,
+                  color: AppColors.glassOnSurfaceFaint,
+                  size: 18,
+                ),
+              ),
+            ),
         ],
       ),
     );

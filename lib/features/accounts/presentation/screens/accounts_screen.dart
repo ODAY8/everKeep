@@ -12,6 +12,7 @@ import 'package:everkeep/widgets/glass/glass_page_header.dart';
 import 'package:everkeep/widgets/glass/glass_scaffold.dart';
 import 'package:everkeep/widgets/glass/glass_search_bar.dart';
 import 'package:everkeep/widgets/glass/glass_sheet.dart';
+import '../widgets/account_form_sheet.dart';
 
 class AccountsScreen extends StatefulWidget {
   const AccountsScreen({super.key});
@@ -39,93 +40,8 @@ class _AccountsScreenState extends State<AccountsScreen> {
     });
   }
 
-  Future<void> _showAccountForm([AccountItem? existing]) async {
-    final accProv = context.read<AccountProvider>();
-    final isEditing = existing != null;
-    final initialCategory = existing?.category ?? _categories.first;
-    var initialCategoryIndex = _categories.indexOf(initialCategory);
-    if (initialCategoryIndex == -1) initialCategoryIndex = 0;
-
-    final saved = await showGlassFormSheet(
-      context,
-      title: isEditing ? 'Edit Account' : 'Add Account',
-      subtitle: isEditing
-          ? 'Update login details or category for this account.'
-          : 'Save a login so your trusted people can find it later.',
-      submitLabel: isEditing ? 'Save Changes' : 'Add Account',
-      fields: [
-        GlassFormField(
-          key: 'title',
-          label: 'Account name',
-          hint: 'e.g. Netflix',
-          initialValue: existing?.title ?? '',
-        ),
-        GlassFormField(
-          key: 'username',
-          label: 'Username or email',
-          hint: 'Optional',
-          required: false,
-          keyboardType: TextInputType.emailAddress,
-          initialValue: existing?.username ?? '',
-        ),
-      ],
-      choices: [
-        GlassFormChoice(
-          key: 'category',
-          label: 'Category',
-          options: _categories,
-          initialIndex: initialCategoryIndex,
-        ),
-      ],
-      onSubmit: (values) async {
-        final category = values['category']!;
-        final username = values['username']!.trim();
-        final (icon, color) = AccountItem.styleFor(category);
-
-        if (isEditing) {
-          final prefix = existing.subtitle.contains(' · ')
-              ? existing.subtitle.split(' · ').first
-              : existing.subtitle;
-          final updatedSubtitle = username.isEmpty
-              ? prefix
-              : '$prefix · $username';
-
-          final updated = existing.copyWith(
-            title: values['title']!,
-            username: username.isEmpty ? null : username,
-            category: category,
-            icon: icon,
-            color: color,
-            subtitle: updatedSubtitle,
-          );
-          final ok = await accProv.updateAccount(updated);
-          return ok ? null : accProv.error ?? 'Could not update the account.';
-        } else {
-          // The id and the "Added ..." subtitle are assigned by the backend;
-          // the saved account comes back with both.
-          final added = await accProv.addAccount(
-            AccountItem(
-              id: '',
-              title: values['title']!,
-              subtitle: '',
-              category: category,
-              icon: icon,
-              color: color,
-              username: username.isEmpty ? null : username,
-            ),
-          );
-          return added ? null : accProv.error ?? 'Could not add the account.';
-        }
-      },
-    );
-
-    if (saved && mounted) {
-      showAppSnackBar(
-        context,
-        isEditing ? 'Account updated' : 'Account added',
-      );
-    }
-  }
+  Future<void> _showAccountForm([AccountItem? existing]) =>
+      showAccountFormSheet(context, existing: existing);
 
   Future<void> _addAccount() => _showAccountForm();
 

@@ -183,6 +183,11 @@ class DataExportHelper {
   static Map<String, dynamic> _sanitizeMap(Map<String, dynamic> source) {
     const sensitiveKeys = {
       'password',
+      'encrypted_password',
+      'encryptedpassword',
+      'vault_key',
+      'encryption_key',
+      'master_key',
       'access_token',
       'refresh_token',
       'token',

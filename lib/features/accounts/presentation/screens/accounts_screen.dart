@@ -1,10 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:everkeep/core/routing/app_router.dart';
+import 'package:everkeep/core/security/clipboard_safety_manager.dart';
 import 'package:everkeep/core/theme/app_colors.dart';
+import 'package:everkeep/core/theme/app_radius.dart';
 import 'package:everkeep/core/theme/app_text_styles.dart';
 import 'package:everkeep/models/account_item.dart';
 import 'package:everkeep/providers/account_provider.dart';
+import 'package:everkeep/providers/auth_provider.dart';
 import 'package:everkeep/widgets/feedback.dart';
+import 'package:everkeep/widgets/glass/glass_card.dart';
 import 'package:everkeep/widgets/glass/glass_fab.dart';
 import 'package:everkeep/widgets/glass/glass_filter_chips.dart';
 import 'package:everkeep/widgets/glass/glass_item_row.dart';
@@ -78,6 +83,29 @@ class _AccountsScreenState extends State<AccountsScreen> {
           icon: Icons.edit_outlined,
           onTap: () => _editAccount(account),
         ),
+        if (account.hasPassword)
+          GlassSheetAction(
+            label: 'Copy password',
+            icon: Icons.key_rounded,
+            onTap: () async {
+              final auth = context.read<AuthProvider>();
+              final userId = auth.currentUser?.id ?? '';
+              final accProv = context.read<AccountProvider>();
+              final plainPassword =
+                  await accProv.getDecryptedPassword(account, userId: userId);
+              if (plainPassword != null &&
+                  plainPassword.isNotEmpty &&
+                  mounted) {
+                await ClipboardSafetyManager.instance
+                    .copySensitiveText(plainPassword);
+                if (!mounted) return;
+                showAppSnackBar(
+                  context,
+                  'Password copied. Clipboard auto-clearing in 30s.',
+                );
+              }
+            },
+          ),
         GlassSheetAction(
           label: 'Delete account',
           icon: Icons.delete_outline_rounded,
@@ -132,6 +160,53 @@ class _AccountsScreenState extends State<AccountsScreen> {
           GlassSearchBar(
             hintText: 'Search accounts...',
             onChanged: (value) => setState(() => _query = value),
+          ),
+          const SizedBox(height: 14),
+          GlassCard(
+            onTap: () =>
+                Navigator.of(context).pushNamed(AppRouter.passwordVault),
+            child: Row(
+              children: [
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: AppColors.glassAccentBlue.withValues(alpha: 0.16),
+                    borderRadius: AppRadius.radiusMD,
+                  ),
+                  child: const Icon(
+                    Icons.lock_rounded,
+                    color: AppColors.glassAccentBlue,
+                    size: 18,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Password Vault',
+                        style: AppTextStyles.titleSmall.copyWith(
+                          color: AppColors.glassOnSurface,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      Text(
+                        'Manage encrypted credentials & passwords',
+                        style: AppTextStyles.bodySmall.copyWith(
+                          color: AppColors.glassOnSurfaceMuted,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const Icon(
+                  Icons.chevron_right_rounded,
+                  color: AppColors.glassOnSurfaceFaint,
+                ),
+              ],
+            ),
           ),
           const SizedBox(height: 14),
           GlassFilterChips(

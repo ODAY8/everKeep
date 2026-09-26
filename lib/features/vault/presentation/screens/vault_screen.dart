@@ -171,7 +171,7 @@ class _Categories extends StatelessWidget {
             iconColor: AppColors.glassAccentBlue,
             label: 'Passwords',
             count: summary.passwordsCount,
-            route: AppRouter.accounts,
+            route: AppRouter.passwordVault,
           ),
           _VaultCategory(
             icon: Icons.description_rounded,

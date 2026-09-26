@@ -9,6 +9,7 @@ import 'package:everkeep/features/documents/presentation/screens/documents_scree
 import 'package:everkeep/features/emergency_access/presentation/screens/emergency_access_screen.dart';
 import 'package:everkeep/features/shell/main_shell.dart';
 import 'package:everkeep/features/onboarding/presentation/screens/onboarding_screen.dart';
+import 'package:everkeep/features/accounts/presentation/screens/password_vault_screen.dart';
 import 'package:everkeep/features/profile/presentation/screens/profile_screen.dart';
 import 'package:everkeep/features/security/presentation/screens/security_screen.dart';
 import 'package:everkeep/features/settings/presentation/screens/settings_screen.dart';
@@ -35,6 +36,7 @@ class AppRouter {
   static const String vault = '/vault';
   static const String documents = '/documents';
   static const String accounts = '/accounts';
+  static const String passwordVault = '/password-vault';
   static const String wishes = '/wishes';
   static const String trustedContacts = '/trusted-contacts';
   static const String emergencyAccess = '/emergency-access';
@@ -58,6 +60,7 @@ class AppRouter {
       AppRouter.vault => _guarded(const VaultScreen()),
       AppRouter.documents => _guarded(const DocumentsScreen()),
       AppRouter.accounts => _guarded(const AccountsScreen()),
+      AppRouter.passwordVault => _guarded(const PasswordVaultScreen()),
       AppRouter.wishes => _guarded(const WishesScreen()),
       AppRouter.trustedContacts => _guarded(const TrustedContactsScreen()),
       AppRouter.emergencyAccess => _guarded(const EmergencyAccessScreen()),

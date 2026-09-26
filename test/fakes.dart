@@ -460,6 +460,11 @@ class FakeAccountRepository with Failable implements AccountRepository {
     String id,
     String title, {
     bool favorite = false,
+    String? username,
+    String? website,
+    String? notes,
+    String? encryptedPassword,
+    String category = 'Other',
   }) => AccountItem(
     id: id,
     title: title,
@@ -467,6 +472,11 @@ class FakeAccountRepository with Failable implements AccountRepository {
     icon: Icons.key_rounded,
     color: Colors.blue,
     isFavorite: favorite,
+    username: username,
+    website: website,
+    notes: notes,
+    encryptedPassword: encryptedPassword,
+    category: category,
   );
 
   @override

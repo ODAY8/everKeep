@@ -158,6 +158,8 @@ class SearchMatcher {
       acc.title,
       acc.category,
       acc.username,
+      acc.website,
+      acc.notes,
       acc.subtitle,
     ];
 

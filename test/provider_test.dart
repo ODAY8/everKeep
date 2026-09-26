@@ -134,6 +134,45 @@ void main() {
       // The provider sends the new value explicitly rather than "flip it".
       expect(repo.lastFavorite, (firstId, !initialFav));
     });
+
+    test('updateAccount updates the account in place', () async {
+      final repo = FakeAccountRepository();
+      final accProv = AccountProvider(accountRepository: repo);
+      await accProv.fetchAccounts();
+
+      final target = accProv.accounts.first;
+      final updated = target.copyWith(
+        title: 'Updated Title',
+        username: 'updated@example.com',
+        category: 'Work',
+      );
+
+      final ok = await accProv.updateAccount(updated);
+      expect(ok, isTrue);
+      expect(accProv.error, isNull);
+
+      final inList = accProv.accounts.firstWhere((a) => a.id == target.id);
+      expect(inList.title, 'Updated Title');
+      expect(inList.username, 'updated@example.com');
+      expect(inList.category, 'Work');
+    });
+
+    test('updateAccount failure sets error and returns false', () async {
+      final repo = FakeAccountRepository();
+      final accProv = AccountProvider(accountRepository: repo);
+      await accProv.fetchAccounts();
+
+      repo.failWith = 'Network error while updating';
+      final target = accProv.accounts.first;
+      final updated = target.copyWith(title: 'Failed Update');
+
+      final ok = await accProv.updateAccount(updated);
+      expect(ok, isFalse);
+      expect(accProv.error, 'Network error while updating');
+
+      final inList = accProv.accounts.firstWhere((a) => a.id == target.id);
+      expect(inList.title, target.title);
+    });
   });
 
   group('TrustedContactProvider Tests', () {

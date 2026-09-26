@@ -39,18 +39,26 @@ class _AccountsScreenState extends State<AccountsScreen> {
     });
   }
 
-  Future<void> _addAccount() async {
+  Future<void> _showAccountForm([AccountItem? existing]) async {
     final accProv = context.read<AccountProvider>();
+    final isEditing = existing != null;
+    final initialCategory = existing?.category ?? _categories.first;
+    var initialCategoryIndex = _categories.indexOf(initialCategory);
+    if (initialCategoryIndex == -1) initialCategoryIndex = 0;
+
     final saved = await showGlassFormSheet(
       context,
-      title: 'Add Account',
-      subtitle: 'Save a login so your trusted people can find it later.',
-      submitLabel: 'Add Account',
-      fields: const [
+      title: isEditing ? 'Edit Account' : 'Add Account',
+      subtitle: isEditing
+          ? 'Update login details or category for this account.'
+          : 'Save a login so your trusted people can find it later.',
+      submitLabel: isEditing ? 'Save Changes' : 'Add Account',
+      fields: [
         GlassFormField(
           key: 'title',
           label: 'Account name',
           hint: 'e.g. Netflix',
+          initialValue: existing?.title ?? '',
         ),
         GlassFormField(
           key: 'username',
@@ -58,38 +66,70 @@ class _AccountsScreenState extends State<AccountsScreen> {
           hint: 'Optional',
           required: false,
           keyboardType: TextInputType.emailAddress,
+          initialValue: existing?.username ?? '',
         ),
       ],
-      choices: const [
+      choices: [
         GlassFormChoice(
           key: 'category',
           label: 'Category',
           options: _categories,
+          initialIndex: initialCategoryIndex,
         ),
       ],
       onSubmit: (values) async {
         final category = values['category']!;
-        final username = values['username']!;
+        final username = values['username']!.trim();
         final (icon, color) = AccountItem.styleFor(category);
-        // The id and the "Added ..." subtitle are assigned by the backend;
-        // the saved account comes back with both.
-        final added = await accProv.addAccount(
-          AccountItem(
-            id: '',
+
+        if (isEditing) {
+          final prefix = existing.subtitle.contains(' · ')
+              ? existing.subtitle.split(' · ').first
+              : existing.subtitle;
+          final updatedSubtitle = username.isEmpty
+              ? prefix
+              : '$prefix · $username';
+
+          final updated = existing.copyWith(
             title: values['title']!,
-            subtitle: '',
+            username: username.isEmpty ? null : username,
             category: category,
             icon: icon,
             color: color,
-            username: username.isEmpty ? null : username,
-          ),
-        );
-        return added ? null : accProv.error ?? 'Could not add the account.';
+            subtitle: updatedSubtitle,
+          );
+          final ok = await accProv.updateAccount(updated);
+          return ok ? null : accProv.error ?? 'Could not update the account.';
+        } else {
+          // The id and the "Added ..." subtitle are assigned by the backend;
+          // the saved account comes back with both.
+          final added = await accProv.addAccount(
+            AccountItem(
+              id: '',
+              title: values['title']!,
+              subtitle: '',
+              category: category,
+              icon: icon,
+              color: color,
+              username: username.isEmpty ? null : username,
+            ),
+          );
+          return added ? null : accProv.error ?? 'Could not add the account.';
+        }
       },
     );
 
-    if (saved && mounted) showAppSnackBar(context, 'Account added');
+    if (saved && mounted) {
+      showAppSnackBar(
+        context,
+        isEditing ? 'Account updated' : 'Account added',
+      );
+    }
   }
+
+  Future<void> _addAccount() => _showAccountForm();
+
+  Future<void> _editAccount(AccountItem account) => _showAccountForm(account);
 
   Future<void> _toggleFavorite(AccountItem account) async {
     final accProv = context.read<AccountProvider>();
@@ -116,6 +156,11 @@ class _AccountsScreenState extends State<AccountsScreen> {
               ? Icons.favorite_border_rounded
               : Icons.favorite_rounded,
           onTap: () => _toggleFavorite(account),
+        ),
+        GlassSheetAction(
+          label: 'Edit account',
+          icon: Icons.edit_outlined,
+          onTap: () => _editAccount(account),
         ),
         GlassSheetAction(
           label: 'Delete account',

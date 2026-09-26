@@ -23,6 +23,7 @@ import 'package:everkeep/providers/user_provider.dart';
 import 'package:everkeep/providers/vault_provider.dart';
 import 'package:everkeep/widgets/app_network_image.dart';
 import 'package:everkeep/widgets/glass/glass_primary_button.dart';
+import 'package:everkeep/widgets/glass/glass_text_field.dart';
 import 'package:everkeep/widgets/glass/security_score_card.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -1283,6 +1284,200 @@ void main() {
       await accounts.fetchAccounts();
       await pump(tester, const AccountsScreen());
       expect(find.text('See All'), findsNothing);
+    });
+
+    testWidgets('Accounts: tapping an account opens action sheet with Edit account', (tester) async {
+      accRepo.items
+        ..clear()
+        ..add(
+          FakeAccountRepository.account('a1', 'Netflix').copyWith(
+            username: 'user@netflix.com',
+            category: 'Social',
+          ),
+        );
+      await accounts.fetchAccounts();
+      await pump(tester, const AccountsScreen());
+
+      await tester.tap(find.text('Netflix'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Add to favorites'), findsOneWidget);
+      expect(find.text('Edit account'), findsOneWidget);
+      expect(find.text('Delete account'), findsOneWidget);
+    });
+
+    testWidgets('Accounts: editing an account pre-populates values and saves successfully', (tester) async {
+      accRepo.items
+        ..clear()
+        ..add(
+          FakeAccountRepository.account('a1', 'Netflix').copyWith(
+            username: 'user@netflix.com',
+            category: 'Social',
+          ),
+        );
+      await accounts.fetchAccounts();
+      await pump(tester, const AccountsScreen());
+
+      await tester.tap(find.text('Netflix'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Edit account'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Edit Account'), findsOneWidget);
+      expect(find.widgetWithText(GlassPrimaryButton, 'Save Changes'), findsOneWidget);
+
+      final nameField = find.descendant(
+        of: find.byWidgetPredicate((w) => w is GlassTextField && w.label == 'Account name'),
+        matching: find.byType(TextField),
+      );
+      final userField = find.descendant(
+        of: find.byWidgetPredicate((w) => w is GlassTextField && w.label == 'Username or email'),
+        matching: find.byType(TextField),
+      );
+
+      final nameController = tester.widget<TextField>(nameField).controller;
+      final userController = tester.widget<TextField>(userField).controller;
+      expect(nameController?.text, 'Netflix');
+      expect(userController?.text, 'user@netflix.com');
+
+      await tester.enterText(nameField, 'Netflix Premium');
+      await tester.enterText(userField, 'prime@netflix.com');
+      await tester.tap(find.widgetWithText(GlassPrimaryButton, 'Save Changes'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Account updated'), findsOneWidget);
+      expect(find.text('Netflix Premium'), findsWidgets);
+      expect(accounts.accounts.first.title, 'Netflix Premium');
+      expect(accounts.accounts.first.username, 'prime@netflix.com');
+    });
+
+    testWidgets('Accounts: editing validation prevents empty account name', (tester) async {
+      accRepo.items
+        ..clear()
+        ..add(FakeAccountRepository.account('a1', 'Netflix'));
+      await accounts.fetchAccounts();
+      await pump(tester, const AccountsScreen());
+
+      await tester.tap(find.text('Netflix'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Edit account'));
+      await tester.pumpAndSettle();
+
+      final nameField = find.descendant(
+        of: find.byWidgetPredicate((w) => w is GlassTextField && w.label == 'Account name'),
+        matching: find.byType(TextField),
+      );
+
+      await tester.enterText(nameField, '   ');
+      await tester.tap(find.widgetWithText(GlassPrimaryButton, 'Save Changes'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Account name is required'), findsOneWidget);
+      expect(find.widgetWithText(GlassPrimaryButton, 'Save Changes'), findsOneWidget);
+      expect(accounts.accounts.first.title, 'Netflix');
+    });
+
+    testWidgets('Accounts: edit failure keeps sheet open and displays error', (tester) async {
+      accRepo.items
+        ..clear()
+        ..add(FakeAccountRepository.account('a1', 'Netflix'));
+      await accounts.fetchAccounts();
+      await pump(tester, const AccountsScreen());
+
+      accRepo.failWith = 'Connection timeout';
+
+      await tester.tap(find.text('Netflix'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Edit account'));
+      await tester.pumpAndSettle();
+
+      final nameField = find.descendant(
+        of: find.byWidgetPredicate((w) => w is GlassTextField && w.label == 'Account name'),
+        matching: find.byType(TextField),
+      );
+
+      await tester.enterText(nameField, 'Netflix 4K');
+      await tester.tap(find.widgetWithText(GlassPrimaryButton, 'Save Changes'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Connection timeout'), findsOneWidget);
+      expect(find.widgetWithText(GlassPrimaryButton, 'Save Changes'), findsOneWidget);
+      expect(accounts.accounts.first.title, 'Netflix');
+    });
+
+    testWidgets('Accounts: cancelling edit does not modify the account', (tester) async {
+      accRepo.items
+        ..clear()
+        ..add(FakeAccountRepository.account('a1', 'Netflix'));
+      await accounts.fetchAccounts();
+      await pump(tester, const AccountsScreen());
+
+      await tester.tap(find.text('Netflix'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Edit account'));
+      await tester.pumpAndSettle();
+
+      final nameField = find.descendant(
+        of: find.byWidgetPredicate((w) => w is GlassTextField && w.label == 'Account name'),
+        matching: find.byType(TextField),
+      );
+
+      await tester.enterText(nameField, 'Should Not Save');
+      await tester.tapAt(const Offset(20, 20));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Netflix'), findsWidgets);
+      expect(find.text('Should Not Save'), findsNothing);
+      expect(accounts.accounts.first.title, 'Netflix');
+    });
+
+    testWidgets('Accounts: adding an account works through the form sheet', (tester) async {
+      accRepo.items.clear();
+      await accounts.fetchAccounts();
+      await pump(tester, const AccountsScreen());
+
+      await tester.tap(find.text('Add Account'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Add Account'), findsWidgets);
+      expect(find.widgetWithText(GlassPrimaryButton, 'Add Account'), findsOneWidget);
+
+      final nameField = find.descendant(
+        of: find.byWidgetPredicate((w) => w is GlassTextField && w.label == 'Account name'),
+        matching: find.byType(TextField),
+      );
+      final userField = find.descendant(
+        of: find.byWidgetPredicate((w) => w is GlassTextField && w.label == 'Username or email'),
+        matching: find.byType(TextField),
+      );
+
+      await tester.enterText(nameField, 'Hulu');
+      await tester.enterText(userField, 'hulu@user.com');
+      await tester.tap(find.widgetWithText(GlassPrimaryButton, 'Add Account'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Account added'), findsOneWidget);
+      expect(find.text('Hulu'), findsWidgets);
+    });
+
+    testWidgets('Accounts: deleting an account asks for confirmation and deletes', (tester) async {
+      accRepo.items
+        ..clear()
+        ..add(FakeAccountRepository.account('a1', 'Netflix'));
+      await accounts.fetchAccounts();
+      await pump(tester, const AccountsScreen());
+
+      await tester.tap(find.text('Netflix'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Delete account'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Delete account?'), findsOneWidget);
+      await tester.tap(find.text('Delete'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Account deleted'), findsOneWidget);
+      expect(find.text('Netflix'), findsNothing);
     });
 
     testWidgets('Vault: search finds documents and accounts together', (

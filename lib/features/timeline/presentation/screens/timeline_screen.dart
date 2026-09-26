@@ -1,17 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../../../core/routing/app_router.dart';
-import '../../../../core/theme/app_colors.dart';
-import '../../../../core/theme/app_radius.dart';
-import '../../../../core/theme/app_text_styles.dart';
-import '../../../../models/document_item.dart';
-import '../../../../models/memory_item.dart';
-import '../../../../providers/document_provider.dart';
-import '../../../../providers/memory_provider.dart';
-import '../../../../widgets/fade_slide_in.dart';
-import '../../../../widgets/glass/glass_card.dart';
-import '../../../../widgets/glass/glass_page_header.dart';
-import '../../../../widgets/glass/glass_scaffold.dart';
+import 'package:everkeep/core/theme/app_colors.dart';
+import 'package:everkeep/core/theme/app_radius.dart';
+import 'package:everkeep/core/theme/app_text_styles.dart';
+import 'package:everkeep/features/documents/presentation/widgets/document_details_sheet.dart';
+import 'package:everkeep/features/documents/presentation/widgets/document_form_sheet.dart';
+import 'package:everkeep/features/wishes/presentation/widgets/memory_details_sheet.dart';
+import 'package:everkeep/features/wishes/presentation/widgets/memory_form_sheet.dart';
+import 'package:everkeep/models/document_item.dart';
+import 'package:everkeep/models/memory_item.dart';
+import 'package:everkeep/providers/document_provider.dart';
+import 'package:everkeep/providers/memory_provider.dart';
+import 'package:everkeep/widgets/fade_slide_in.dart';
+import 'package:everkeep/widgets/feedback.dart';
+import 'package:everkeep/widgets/glass/glass_card.dart';
+import 'package:everkeep/widgets/glass/glass_page_header.dart';
+import 'package:everkeep/widgets/glass/glass_scaffold.dart';
+import 'package:everkeep/widgets/glass/glass_sheet.dart';
 
 enum TimelineEventKind { memory, document }
 
@@ -38,10 +43,11 @@ class TimelineEvent {
 }
 
 /// The unified Life Timeline combining memories and documents across years.
-class TimelineScreen extends StatelessWidget {
+class TimelineScreen extends StatefulWidget {
   const TimelineScreen({super.key});
 
-  List<TimelineEvent> _buildTimelineEvents({
+  /// Builds a sorted list of timeline events from memories and documents.
+  static List<TimelineEvent> buildTimelineEvents({
     required List<DocumentItem> documents,
     required List<MemoryItem> memories,
   }) {
@@ -91,7 +97,8 @@ class TimelineScreen extends StatelessWidget {
     return events;
   }
 
-  Map<int, List<TimelineEvent>> _groupByYear(List<TimelineEvent> events) {
+  /// Groups timeline events by year in a map.
+  static Map<int, List<TimelineEvent>> groupByYear(List<TimelineEvent> events) {
     final map = <int, List<TimelineEvent>>{};
     for (final e in events) {
       map.putIfAbsent(e.date.year, () => []).add(e);
@@ -99,21 +106,196 @@ class TimelineScreen extends StatelessWidget {
     return map;
   }
 
+  @override
+  State<TimelineScreen> createState() => _TimelineScreenState();
+}
+
+class _TimelineScreenState extends State<TimelineScreen> {
+  bool _isOpening = false;
+
   static const List<String> _months = [
     'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
     'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
   ];
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final docProv = context.read<DocumentProvider>();
+      if (!docProv.hasFetched) {
+        docProv.fetchDocuments();
+      }
+      final memProv = context.read<MemoryProvider>();
+      if (!memProv.hasFetched) {
+        memProv.fetchMemories();
+      }
+    });
+  }
+
+  void _onEventTap(TimelineEvent event) {
+    if (_isOpening) return;
+
+    switch (event.kind) {
+      case TimelineEventKind.memory:
+        _openMemoryDetails(event.id);
+        break;
+      case TimelineEventKind.document:
+        _openDocumentDetails(event.id);
+        break;
+    }
+  }
+
+  void _openMemoryDetails(String memoryId) {
+    final memProv = context.read<MemoryProvider>();
+    final memory = memProv.items.where((m) => m.id == memoryId).firstOrNull;
+    if (memory == null) {
+      showAppSnackBar(context, 'That memory couldn\'t be found.', isError: true);
+      return;
+    }
+
+    _isOpening = true;
+    showGlassSheet<void>(
+      context,
+      builder: (sheetContext) => MemoryDetailsSheet(
+        item: memory,
+        onEdit: () {
+          Navigator.of(sheetContext).pop();
+          _showMemoryEditForm(memory);
+        },
+        onDelete: () {
+          Navigator.of(sheetContext).pop();
+          _confirmDeleteMemory(memory);
+        },
+        onOpenAttachment:
+            memory.hasAttachment ? () => _openMemoryAttachment(memory) : null,
+      ),
+    ).whenComplete(() {
+      if (mounted) _isOpening = false;
+    });
+  }
+
+  void _openDocumentDetails(String documentId) {
+    final docProv = context.read<DocumentProvider>();
+    final document =
+        docProv.documents.where((d) => d.id == documentId).firstOrNull;
+    if (document == null) {
+      showAppSnackBar(context, 'That document couldn\'t be found.', isError: true);
+      return;
+    }
+
+    _isOpening = true;
+    showGlassSheet<void>(
+      context,
+      builder: (sheetContext) => DocumentDetailsSheet(
+        document: document,
+        onEdit: () {
+          Navigator.of(sheetContext).pop();
+          _showDocumentEditForm(document);
+        },
+        onDelete: () {
+          Navigator.of(sheetContext).pop();
+          _confirmDeleteDocument(document);
+        },
+        onOpenFile:
+            document.hasFile ? () => _openDocumentFile(document) : null,
+      ),
+    ).whenComplete(() {
+      if (mounted) _isOpening = false;
+    });
+  }
+
+  Future<void> _showMemoryEditForm(MemoryItem item) async {
+    final label = item.typeLabel;
+    final saved = await MemoryFormSheet.show(context, item: item);
+    if (!mounted) return;
+    if (saved == true) {
+      showAppSnackBar(context, '$label updated');
+    }
+  }
+
+  Future<void> _confirmDeleteMemory(MemoryItem item) async {
+    final confirmed = await confirmDestructive(
+      context,
+      title: 'Delete ${item.typeLabel.toLowerCase()}?',
+      message: '"${item.title}" will be permanently removed.',
+      confirmLabel: 'Delete',
+    );
+    if (!confirmed || !mounted) return;
+
+    final memoryProv = context.read<MemoryProvider>();
+    final deleted = await memoryProv.deleteMemory(item.id);
+    if (!mounted) return;
+
+    showAppSnackBar(
+      context,
+      deleted
+          ? '${item.typeLabel} deleted'
+          : memoryProv.error ?? 'Could not delete it.',
+      isError: !deleted,
+    );
+  }
+
+  Future<void> _openMemoryAttachment(MemoryItem item) {
+    final memoryProv = context.read<MemoryProvider>();
+    return openRemoteFile(
+      context,
+      fetchUrl: () => memoryProv.downloadUrlFor(item),
+      errorMessage: () => memoryProv.error,
+    );
+  }
+
+  Future<void> _showDocumentEditForm(DocumentItem document) async {
+    final saved = await DocumentFormSheet.show(context, document: document);
+    if (!mounted) return;
+    if (saved == true) {
+      showAppSnackBar(context, 'Document updated');
+    }
+  }
+
+  Future<void> _confirmDeleteDocument(DocumentItem document) async {
+    final confirmed = await confirmDestructive(
+      context,
+      title: 'Delete document?',
+      message:
+          '"${document.title}" will be permanently removed from your vault.',
+      confirmLabel: 'Delete',
+    );
+    if (!confirmed || !mounted) return;
+
+    final docProv = context.read<DocumentProvider>();
+    final deleted = await docProv.deleteDocument(document.id);
+    if (!mounted) return;
+
+    showAppSnackBar(
+      context,
+      deleted
+          ? 'Document deleted'
+          : docProv.error ?? 'Could not delete the document.',
+      isError: !deleted,
+    );
+  }
+
+  Future<void> _openDocumentFile(DocumentItem document) {
+    final docProv = context.read<DocumentProvider>();
+    return openRemoteFile(
+      context,
+      fetchUrl: () => docProv.downloadUrlFor(document),
+      errorMessage: () => docProv.error,
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
     final docProv = context.watch<DocumentProvider>();
     final memProv = context.watch<MemoryProvider>();
 
-    final events = _buildTimelineEvents(
+    final events = TimelineScreen.buildTimelineEvents(
       documents: docProv.documents,
       memories: memProv.items,
     );
-    final grouped = _groupByYear(events);
+    final grouped = TimelineScreen.groupByYear(events);
     final sortedYears = grouped.keys.toList()..sort((a, b) => b.compareTo(a));
 
     return GlassScaffold(
@@ -181,6 +363,7 @@ class TimelineScreen extends StatelessWidget {
                     event: grouped[year]![i],
                     isLast: i == grouped[year]!.length - 1,
                     monthLabel: _months[grouped[year]![i].date.month - 1],
+                    onTap: () => _onEventTap(grouped[year]![i]),
                   ),
                 ),
               ],
@@ -228,11 +411,13 @@ class _TimelineRow extends StatelessWidget {
   final TimelineEvent event;
   final bool isLast;
   final String monthLabel;
+  final VoidCallback onTap;
 
   const _TimelineRow({
     required this.event,
     required this.isLast,
     required this.monthLabel,
+    required this.onTap,
   });
 
   @override
@@ -293,13 +478,7 @@ class _TimelineRow extends StatelessWidget {
             child: Padding(
               padding: const EdgeInsets.only(bottom: 14),
               child: GlassCard(
-                onTap: () {
-                  if (event.kind == TimelineEventKind.document) {
-                    Navigator.of(context).pushNamed(AppRouter.documents);
-                  } else {
-                    Navigator.of(context).pushNamed(AppRouter.wishes);
-                  }
-                },
+                onTap: onTap,
                 padding: const EdgeInsets.all(12),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,

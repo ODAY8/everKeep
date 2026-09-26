@@ -55,15 +55,12 @@ void main() {
       );
     });
 
-    testWidgets('Verify real Android plugin initialization and permissions', (tester) async {
+    testWidgets('Verify real Android plugin initialization, scheduling, system tray posting, tap navigation, and lifecycle', (tester) async {
       expect(service.isInitialized, isTrue);
 
       final permissionGranted = await service.requestPermissionsIfNeeded();
       debugPrint('Real Android permission status: $permissionGranted');
       expect(permissionGranted, isTrue);
-    });
-
-    testWidgets('Verify real plugin scheduling, system tray posting, tap navigation, and lifecycle', (tester) async {
       final docId = 'real-android-doc-${DateTime.now().millisecondsSinceEpoch}';
       final testDoc = DocumentItem(
         id: docId,

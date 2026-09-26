@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:provider/provider.dart';
 import 'package:timezone/data/latest_all.dart' as tz;
@@ -151,7 +152,29 @@ class FlutterLocalNotificationsAdapter implements NotificationPluginAdapter {
         androidScheduleMode: androidScheduleMode,
         payload: payload,
       );
-    } catch (_) {}
+    } on PlatformException catch (e) {
+      if (e.code == 'exact_alarms_not_permitted') {
+        // Fall back gracefully to inexact scheduling on Android 13/14+ without requiring special system permission
+        try {
+          await _plugin.zonedSchedule(
+            id,
+            title,
+            body,
+            scheduledDate,
+            notificationDetails,
+            uiLocalNotificationDateInterpretation: uiLocalNotificationDateInterpretation,
+            androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+            payload: payload,
+          );
+        } catch (inner) {
+          debugPrint('zonedSchedule fallback error: $inner');
+        }
+      } else {
+        debugPrint('zonedSchedule PlatformException: $e');
+      }
+    } catch (e, stack) {
+      debugPrint('zonedSchedule error: $e\n$stack');
+    }
   }
 
   @override
@@ -523,7 +546,7 @@ class NotificationService {
         notificationDetails,
         uiLocalNotificationDateInterpretation:
             UILocalNotificationDateInterpretation.absoluteTime,
-        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
         payload: reminder.payload,
       );
     }

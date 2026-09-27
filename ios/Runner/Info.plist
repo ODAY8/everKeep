@@ -26,6 +26,8 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>Everkeep needs camera access to scan physical documents directly into your secure vault.</string>
 	<key>NSFaceIDUsageDescription</key>
 	<string>EverKeep uses Face ID to securely unlock your vault.</string>
 	<key>UIApplicationSceneManifest</key>

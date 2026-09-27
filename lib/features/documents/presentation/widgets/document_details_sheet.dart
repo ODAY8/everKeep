@@ -11,6 +11,7 @@ import '../../../../widgets/feedback.dart';
 import '../../../../widgets/glass/glass_primary_button.dart';
 import '../../../../widgets/glass/glass_sheet.dart';
 import 'document_form_sheet.dart';
+import 'ocr/ocr_section.dart';
 
 /// Shows the document details bottom sheet with default or custom handlers.
 Future<void> showDocumentDetailsSheet(
@@ -20,61 +21,76 @@ Future<void> showDocumentDetailsSheet(
   VoidCallback? onDelete,
   VoidCallback? onOpenFile,
 }) {
+  DocumentProvider? docProv;
+  try {
+    docProv = Provider.of<DocumentProvider>(context, listen: false);
+  } catch (_) {}
+
   return showGlassSheet<void>(
     context,
-    builder: (sheetContext) => DocumentDetailsSheet(
-      document: document,
-      onEdit: onEdit ??
-          () async {
-            Navigator.of(sheetContext).pop();
-            final saved =
-                await DocumentFormSheet.show(context, document: document);
-            if (saved == true && context.mounted) {
-              showAppSnackBar(context, 'Document updated');
-            }
-          },
-      onDelete: onDelete ??
-          () async {
-            Navigator.of(sheetContext).pop();
-            final confirmed = await confirmDestructive(
-              context,
-              title: 'Delete document?',
-              message:
-                  '"${document.title}" will be permanently removed from your vault.',
-              confirmLabel: 'Delete',
-            );
-            if (!confirmed || !context.mounted) return;
-            final docProv = context.read<DocumentProvider>();
-            final deleted = await docProv.deleteDocument(document.id);
-            if (!context.mounted) return;
-            showAppSnackBar(
-              context,
-              deleted
-                  ? 'Document deleted'
-                  : docProv.error ?? 'Could not delete the document.',
-              isError: !deleted,
-            );
-          },
-      onOpenFile: onOpenFile ??
-          (document.hasFile
-              ? () {
-                  if (document.isPdf) {
-                    Navigator.of(sheetContext).pop();
-                    Navigator.of(context).pushNamed(
-                      AppRouter.pdfViewer,
-                      arguments: document,
-                    );
-                  } else {
-                    final docProv = context.read<DocumentProvider>();
-                    openRemoteFile(
-                      context,
-                      fetchUrl: () => docProv.downloadUrlFor(document),
-                      errorMessage: () => docProv.error,
-                    );
+    builder: (sheetContext) {
+      final sheet = DocumentDetailsSheet(
+        document: document,
+        onEdit: onEdit ??
+            () async {
+              Navigator.of(sheetContext).pop();
+              final saved =
+                  await DocumentFormSheet.show(context, document: document);
+              if (saved == true && context.mounted) {
+                showAppSnackBar(context, 'Document updated');
+              }
+            },
+        onDelete: onDelete ??
+            () async {
+              Navigator.of(sheetContext).pop();
+              final confirmed = await confirmDestructive(
+                context,
+                title: 'Delete document?',
+                message:
+                    '"${document.title}" will be permanently removed from your vault.',
+                confirmLabel: 'Delete',
+              );
+              if (!confirmed || !context.mounted) return;
+              final p = docProv ?? context.read<DocumentProvider>();
+              final deleted = await p.deleteDocument(document.id);
+              if (!context.mounted) return;
+              showAppSnackBar(
+                context,
+                deleted
+                    ? 'Document deleted'
+                    : p.error ?? 'Could not delete the document.',
+                isError: !deleted,
+              );
+            },
+        onOpenFile: onOpenFile ??
+            (document.hasFile
+                ? () {
+                    if (document.isPdf) {
+                      Navigator.of(sheetContext).pop();
+                      Navigator.of(context).pushNamed(
+                        AppRouter.pdfViewer,
+                        arguments: document,
+                      );
+                    } else {
+                      final p = docProv ?? context.read<DocumentProvider>();
+                      openRemoteFile(
+                        context,
+                        fetchUrl: () => p.downloadUrlFor(document),
+                        errorMessage: () => p.error,
+                      );
+                    }
                   }
-                }
-              : null),
-    ),
+                : null),
+      );
+
+      if (docProv != null) {
+        return ChangeNotifierProvider<DocumentProvider>.value(
+          value: docProv,
+          child: sheet,
+        );
+      }
+      return sheet;
+    },
   );
 }
 
@@ -104,7 +120,18 @@ class DocumentDetailsSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final status = document.expirationStatus;
+    DocumentProvider? docProv;
+    try {
+      docProv = Provider.of<DocumentProvider>(context, listen: true);
+    } catch (_) {}
+
+    final effectiveDoc = (docProv != null)
+        ? docProv.documents.firstWhere(
+            (d) => d.id == document.id,
+            orElse: () => document,
+          )
+        : document;
+    final status = effectiveDoc.expirationStatus;
     final statusColor = DocumentExpirationHelper.colorFor(status);
     final statusBg = DocumentExpirationHelper.backgroundColorFor(status);
 
@@ -361,6 +388,11 @@ class DocumentDetailsSheet extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 16),
+              ],
+
+              // OCR section
+              if (effectiveDoc.hasFile) ...[
+                OcrSection(document: effectiveDoc),
               ],
 
               // Notes section

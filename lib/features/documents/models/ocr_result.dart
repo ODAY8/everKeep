@@ -1,5 +1,3 @@
-import 'dart:convert';
-
 /// Represents the OCR result for an individual document page.
 class OcrPageResult {
   final int pageNumber;
@@ -73,6 +71,7 @@ class OcrDocumentResult {
   int get pageCount => pages.length;
   bool get isEmpty => combinedText.trim().isEmpty;
   bool get isNotEmpty => !isEmpty;
+  bool get hasText => isNotEmpty;
 
   /// Creates a structured result from a list of page results, automatically
   /// formatting [combinedText] with page separators if there is more than 1 page.
@@ -211,9 +210,14 @@ class OcrDocumentResult {
     DateTime? processedAt,
     bool? isUserEdited,
   }) {
+    final effectivePages = pages ?? this.pages;
+    final effectiveCombinedText = combinedText ??
+        (pages != null
+            ? OcrDocumentResult.fromPages(pages).combinedText
+            : this.combinedText);
     return OcrDocumentResult(
-      pages: pages ?? this.pages,
-      combinedText: combinedText ?? this.combinedText,
+      pages: effectivePages,
+      combinedText: effectiveCombinedText,
       processedAt: processedAt ?? this.processedAt,
       isUserEdited: isUserEdited ?? this.isUserEdited,
     );

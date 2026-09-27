@@ -276,16 +276,38 @@ class MlKitOcrService implements OcrService {
   static String normalizeExtractedText(String input) {
     if (input.trim().isEmpty) return '';
 
-    return input
+    final lines = input
         .replaceAll('\r\n', '\n')
         .replaceAll('\r', '\n')
-        // Replace 3+ consecutive newlines with 2 newlines
-        .replaceAll(RegExp(r'\n{3,}'), '\n\n')
-        // Trim each line
         .split('\n')
-        .map((line) => line.trimRight())
-        .join('\n')
-        .trim();
+        .map((line) => line.trim())
+        .toList();
+
+    final result = <String>[];
+    var consecutiveBlanks = 0;
+    for (final line in lines) {
+      if (line.isEmpty) {
+        consecutiveBlanks++;
+        if (consecutiveBlanks <= 1) {
+          result.add('');
+        }
+      } else {
+        consecutiveBlanks = 0;
+        result.add(line);
+      }
+    }
+    return result.join('\n').trim();
+  }
+
+  /// Checks whether a given file path has an image or PDF extension supported for OCR.
+  static bool isSupportedFile(String? path) {
+    if (path == null) return false;
+    final lower = path.toLowerCase();
+    return lower.endsWith('.jpg') ||
+        lower.endsWith('.jpeg') ||
+        lower.endsWith('.png') ||
+        lower.endsWith('.webp') ||
+        lower.endsWith('.pdf');
   }
 
   @override

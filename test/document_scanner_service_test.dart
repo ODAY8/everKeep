@@ -32,9 +32,10 @@ void main() {
 
       final decoded = img.decodeImage(processed);
       expect(decoded, isNotNull);
+      final nonNullDecoded = decoded!;
       // 80x40 rotated 90 degrees becomes 40x80
-      expect(decoded!.width, 40);
-      expect(decoded!.height, 80);
+      expect(nonNullDecoded.width, 40);
+      expect(nonNullDecoded.height, 80);
     });
 
     test('processPage applies crop correctly', () async {
@@ -47,9 +48,10 @@ void main() {
 
       final decoded = img.decodeImage(processed);
       expect(decoded, isNotNull);
+      final nonNullDecoded = decoded!;
       // 50% of 100x100 is 50x50
-      expect(decoded!.width, 50);
-      expect(decoded!.height, 50);
+      expect(nonNullDecoded.width, 50);
+      expect(nonNullDecoded.height, 50);
     });
 
     test('processPage applies grayscale and document high contrast filters', () async {
@@ -81,17 +83,17 @@ void main() {
         rawBytes: inputBytes,
         rotationDegrees: 180,
       );
-      final decoded180 = img.decodeImage(rot180);
-      expect(decoded180!.width, 80);
-      expect(decoded180!.height, 40);
+      final decoded180 = img.decodeImage(rot180)!;
+      expect(decoded180.width, 80);
+      expect(decoded180.height, 40);
 
       final rot270 = await service.processPage(
         rawBytes: inputBytes,
         rotationDegrees: 270,
       );
-      final decoded270 = img.decodeImage(rot270);
-      expect(decoded270!.width, 40);
-      expect(decoded270!.height, 80);
+      final decoded270 = img.decodeImage(rot270)!;
+      expect(decoded270.width, 40);
+      expect(decoded270.height, 80);
     });
   });
 

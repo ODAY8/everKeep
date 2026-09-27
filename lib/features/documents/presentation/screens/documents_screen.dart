@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../../../core/routing/app_router.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_radius.dart';
 import '../../../../core/theme/app_text_styles.dart';
@@ -73,6 +74,11 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
       subtitle: 'Store a file securely, or just keep a record of it.',
       actions: [
         GlassSheetAction(
+          label: 'Scan document',
+          icon: Icons.document_scanner_rounded,
+          onTap: _scanThenAdd,
+        ),
+        GlassSheetAction(
           label: 'Choose a file',
           icon: Icons.upload_file_rounded,
           onTap: _pickThenAdd,
@@ -84,6 +90,13 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
         ),
       ],
     );
+  }
+
+  Future<void> _scanThenAdd() async {
+    final scanned = await Navigator.of(context).pushNamed(AppRouter.documentScanner);
+    if (scanned is DocumentItem && mounted) {
+      // Document scanned and saved; already reported and opened details.
+    }
   }
 
   Future<void> _pickThenAdd() async {

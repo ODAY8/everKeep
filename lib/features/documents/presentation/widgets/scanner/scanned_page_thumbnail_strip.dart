@@ -54,6 +54,7 @@ class ScannedPageThumbnailStrip extends StatelessWidget {
                 shrinkWrap: true,
                 physics: const ClampingScrollPhysics(),
                 itemCount: pages.length,
+                // ignore: deprecated_member_use
                 onReorder: onReorder,
                 itemBuilder: (context, index) {
                   final page = pages[index];

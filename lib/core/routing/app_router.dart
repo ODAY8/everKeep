@@ -5,6 +5,7 @@ import 'package:everkeep/features/auth/presentation/screens/reset_password_scree
 import 'package:everkeep/features/auth/presentation/screens/sign_in_screen.dart';
 import 'package:everkeep/features/auth/presentation/screens/sign_up_screen.dart';
 import 'package:everkeep/features/auth/presentation/screens/welcome_screen.dart';
+import 'package:everkeep/features/documents/presentation/screens/document_scanner_screen.dart';
 import 'package:everkeep/features/documents/presentation/screens/documents_screen.dart';
 import 'package:everkeep/features/documents/presentation/screens/pdf_viewer_screen.dart';
 import 'package:everkeep/features/emergency_access/presentation/screens/emergency_access_screen.dart';
@@ -49,6 +50,7 @@ class AppRouter {
   static const String timeline = '/timeline';
   static const String appLock = '/app-lock';
   static const String pdfViewer = '/pdf-viewer';
+  static const String documentScanner = '/document-scanner';
 
   /// Public screens (splash, onboarding, auth) are built as-is; everything
   /// else is wrapped in an [AuthGuard] so it can't be reached signed out.
@@ -74,6 +76,7 @@ class AppRouter {
       AppRouter.security => _guarded(const SecurityScreen()),
       AppRouter.settings => _guarded(const SettingsScreen()),
       AppRouter.timeline => _guarded(const TimelineScreen()),
+      AppRouter.documentScanner => _guarded(const DocumentScannerScreen()),
       AppRouter.pdfViewer => settings.arguments is DocumentItem
           ? _guarded(
               PdfViewerScreen(document: settings.arguments! as DocumentItem),

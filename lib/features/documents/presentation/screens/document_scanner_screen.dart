@@ -2,19 +2,17 @@ import 'dart:async';
 import 'dart:typed_data';
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
+import 'package:image/image.dart' as img;
 import 'package:image_picker/image_picker.dart' as img_picker;
 import 'package:provider/provider.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_radius.dart';
 import '../../../../core/theme/app_text_styles.dart';
-import '../../../../models/document_item.dart';
-import '../../../../models/document_upload.dart';
 import '../../../../providers/app_lock_provider.dart';
 import '../../../../providers/document_provider.dart';
 import '../../../../widgets/feedback.dart';
 import '../../../../widgets/glass/glass_primary_button.dart';
-import '../../../../widgets/glass/glass_scaffold.dart';
 import '../../models/scanned_page.dart';
 import '../../services/document_scanner_service.dart';
 import '../../services/scanner_permission_service.dart';
@@ -34,6 +32,7 @@ class DocumentScannerScreen extends StatefulWidget {
   final DocumentScannerService? scannerService;
   final CameraController? testCameraController;
   final List<CameraDescription>? testCameras;
+  final bool returnUploadDirectly;
 
   const DocumentScannerScreen({
     super.key,
@@ -41,6 +40,7 @@ class DocumentScannerScreen extends StatefulWidget {
     this.scannerService,
     this.testCameraController,
     this.testCameras,
+    this.returnUploadDirectly = false,
   });
 
   @override
@@ -154,7 +154,11 @@ class _DocumentScannerScreenState extends State<DocumentScannerScreen>
       if (widget.testCameras != null) {
         _cameras = widget.testCameras!;
       } else {
-        _cameras = await availableCameras();
+        try {
+          _cameras = await availableCameras();
+        } catch (_) {
+          _cameras = [];
+        }
       }
 
       if (_cameras.isEmpty) {
@@ -305,34 +309,27 @@ class _DocumentScannerScreenState extends State<DocumentScannerScreen>
   }
 
   Uint8List _generateFallbackImageBytes() {
-    // 1x1 placeholder byte array for mock/fallback capture
-    return Uint8List.fromList([
-      0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46, 0x49, 0x46, 0x00, 0x01,
-      0x01, 0x01, 0x00, 0x48, 0x00, 0x48, 0x00, 0x00, 0xFF, 0xDB, 0x00, 0x43,
-      0x00, 0x08, 0x06, 0x06, 0x07, 0x06, 0x05, 0x08, 0x07, 0x07, 0x07, 0x09,
-      0x09, 0x08, 0x0A, 0x0C, 0x14, 0x0D, 0x0C, 0x0B, 0x0B, 0x0C, 0x19, 0x12,
-      0x13, 0x0F, 0x14, 0x1D, 0x1A, 0x1F, 0x1E, 0x1D, 0x1A, 0x1C, 0x1C, 0x20,
-      0x24, 0x2E, 0x27, 0x20, 0x22, 0x2C, 0x23, 0x1C, 0x1C, 0x28, 0x37, 0x29,
-      0x2C, 0x30, 0x31, 0x34, 0x34, 0x34, 0x1F, 0x27, 0x39, 0x3D, 0x38, 0x32,
-      0x3C, 0x2E, 0x33, 0x34, 0x32, 0xFF, 0xC0, 0x00, 0x0B, 0x08, 0x00, 0x01,
-      0x00, 0x01, 0x01, 0x01, 0x11, 0x00, 0xFF, 0xC4, 0x00, 0x1F, 0x00, 0x00,
-      0x01, 0x05, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x00, 0x00, 0x00, 0x00,
-      0x00, 0x00, 0x00, 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
-      0x09, 0x0A, 0x0B, 0xFF, 0xDA, 0x00, 0x08, 0x01, 0x01, 0x00, 0x00, 0x3F,
-      0x00, 0xBF, 0x00, 0xFF, 0xD9,
-    ]);
+    final image = img.Image(width: 200, height: 280);
+    img.fill(image, color: img.ColorRgb8(245, 245, 245));
+    return Uint8List.fromList(img.encodeJpg(image));
   }
 
   Future<void> _handleSaveFromPreview(List<ScannedPage> pages) async {
     if (pages.isEmpty) return;
 
-    // 1. Generate appropriate DocumentUpload output (PDF for multi-page or preferred, JPG for single)
     final upload = await _scannerService.createDocumentUpload(
       pages: pages,
       preferPdfForSinglePage: true,
     );
 
     if (!mounted) return;
+
+    if (widget.returnUploadDirectly) {
+      await _scannerService.cleanupTempFiles();
+      if (!mounted) return;
+      Navigator.of(context).pop(upload);
+      return;
+    }
 
     // 2. Open DocumentFormSheet pre-populated with the scanned file
     final saved = await DocumentFormSheet.show(
@@ -363,6 +360,7 @@ class _DocumentScannerScreenState extends State<DocumentScannerScreen>
   Widget build(BuildContext context) {
     if (_viewMode == _ScannerViewMode.preview && _capturedPages.isNotEmpty) {
       return ScannedDocumentPreviewView(
+        key: ValueKey('preview_${_capturedPages.length}'),
         initialPages: _capturedPages,
         scannerService: _scannerService,
         onAddAnotherPage: () => setState(() => _viewMode = _ScannerViewMode.camera),

@@ -105,6 +105,7 @@ class SearchMatcher {
       doc.institution,
       doc.notes,
       doc.description,
+      doc.ocrText,
       fileName,
     ];
 

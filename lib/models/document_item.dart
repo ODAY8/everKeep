@@ -30,6 +30,9 @@ class DocumentItem {
   /// Size of the file attachment in bytes, if available.
   final int? fileSize;
 
+  /// Extracted and potentially user-corrected text from OCR processing.
+  final String? ocrText;
+
   const DocumentItem({
     required this.id,
     required this.title,
@@ -48,10 +51,14 @@ class DocumentItem {
     this.filePath,
     this.mimeType,
     this.fileSize,
+    this.ocrText,
   });
 
   /// Alias for notes to preserve existing call sites.
   String? get description => notes;
+
+  /// True if this document has non-empty OCR extracted text.
+  bool get hasOcrText => ocrText != null && ocrText!.trim().isNotEmpty;
 
   /// Structured type information derived from [documentType] or [category].
   DocumentType get typeInfo => DocumentType.fromCode(documentType ?? category);
@@ -143,6 +150,7 @@ class DocumentItem {
       filePath: row['file_path'] as String?,
       mimeType: row['mime_type'] as String?,
       fileSize: (row['file_size'] as num?)?.toInt(),
+      ocrText: (row['ocr_text'] as String?) ?? (row['extracted_text'] as String?),
     );
   }
 
@@ -167,6 +175,9 @@ class DocumentItem {
     if (notes != null && notes!.trim().isNotEmpty) {
       row['notes'] = notes!.trim();
       row['description'] = notes!.trim();
+    }
+    if (ocrText != null && ocrText!.trim().isNotEmpty) {
+      row['ocr_text'] = ocrText!.trim();
     }
     if (issueDate != null) {
       row['issue_date'] = _formatIsoDate(issueDate!);
@@ -202,6 +213,9 @@ class DocumentItem {
       row['institution'] =
           institution!.trim().isEmpty ? null : institution!.trim();
     }
+    if (ocrText != null) {
+      row['ocr_text'] = ocrText!.trim().isEmpty ? null : ocrText!.trim();
+    }
     return row;
   }
 
@@ -230,6 +244,7 @@ class DocumentItem {
     String? filePath,
     String? mimeType,
     int? fileSize,
+    String? ocrText,
   }) {
     return DocumentItem(
       id: id ?? this.id,
@@ -249,6 +264,7 @@ class DocumentItem {
       filePath: filePath ?? this.filePath,
       mimeType: mimeType ?? this.mimeType,
       fileSize: fileSize ?? this.fileSize,
+      ocrText: ocrText ?? this.ocrText,
     );
   }
 }

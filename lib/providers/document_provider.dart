@@ -1,6 +1,9 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
 import '../core/utils/search_helper.dart';
+import '../features/documents/models/ocr_result.dart';
+import '../features/documents/services/ocr_service.dart';
 import '../models/document_item.dart';
 import '../models/document_upload.dart';
 import '../repositories/document_repository.dart';
@@ -10,18 +13,26 @@ import 'session_scoped.dart';
 class DocumentProvider extends ChangeNotifier with SessionScoped {
   final DocumentRepository _documentRepository;
   final NotificationService? _notificationService;
+  final OcrService _ocrService;
 
   List<DocumentItem> _documents = [];
   bool _isLoading = false;
   String? _error;
   bool _hasFetched = false;
 
+  final Set<String> _processingOcrDocIds = {};
+  final Map<String, double> _ocrProgress = {};
+  final Map<String, String> _ocrStatus = {};
+  final Map<String, String> _ocrErrors = {};
+
   DocumentProvider({
     DocumentRepository? documentRepository,
     NotificationService? notificationService,
+    OcrService? ocrService,
   })  : _documentRepository = documentRepository ?? DocumentRepositoryImpl(),
         _notificationService =
-            notificationService ?? NotificationService.instance;
+            notificationService ?? NotificationService.instance,
+        _ocrService = ocrService ?? MlKitOcrService();
 
   List<DocumentItem> get documents => List.unmodifiable(_documents);
   int get count => _documents.length;
@@ -29,6 +40,17 @@ class DocumentProvider extends ChangeNotifier with SessionScoped {
   String? get error => _error;
   bool get hasFetched => _hasFetched;
   bool get isEmpty => _documents.isEmpty;
+
+  bool isOcrProcessing(String docId) => _processingOcrDocIds.contains(docId);
+  double getOcrProgress(String docId) => _ocrProgress[docId] ?? 0.0;
+  String? getOcrStatusMessage(String docId) => _ocrStatus[docId];
+  String? getOcrError(String docId) => _ocrErrors[docId];
+
+  void clearOcrError(String docId) {
+    if (_ocrErrors.remove(docId) != null) {
+      notifyListeners();
+    }
+  }
 
   /// Documents that expire soon (within 90 days) and are not expired yet.
   List<DocumentItem> get expiringSoonDocuments =>
@@ -272,10 +294,115 @@ class DocumentProvider extends ChangeNotifier with SessionScoped {
     }
   }
 
+  /// Performs OCR on [document], either using provided in-memory [rawBytes] (e.g. from
+  /// a freshly captured scan) or by downloading its stored file from Storage.
+  ///
+  /// Updates document.ocrText and saves the record in the vault.
+  Future<OcrDocumentResult?> extractTextForDocument(
+    DocumentItem document, {
+    Uint8List? rawBytes,
+  }) async {
+    if (_processingOcrDocIds.contains(document.id)) {
+      return null; // Prevent duplicate concurrent runs
+    }
+
+    final epoch = sessionEpoch;
+    _processingOcrDocIds.add(document.id);
+    _ocrErrors.remove(document.id);
+    _ocrProgress[document.id] = 0.05;
+    _ocrStatus[document.id] = 'Preparing document...';
+    notifyListeners();
+
+    try {
+      Uint8List bytes;
+      if (rawBytes != null && rawBytes.isNotEmpty) {
+        bytes = rawBytes;
+      } else {
+        if (!document.hasFile) {
+          throw const OcrException('This document has no attached file to scan.');
+        }
+        _ocrStatus[document.id] = 'Fetching document...';
+        notifyListeners();
+
+        final url = await downloadUrlFor(document);
+        if (isStale(epoch)) return null;
+        if (url == null || url.isEmpty) {
+          throw OcrException(_error ?? 'Could not obtain secure link to document.');
+        }
+
+        final response = await http.get(Uri.parse(url));
+        if (response.statusCode != 200) {
+          throw OcrException('Failed to download document bytes (HTTP ${response.statusCode}).');
+        }
+        bytes = response.bodyBytes;
+      }
+
+      if (isStale(epoch)) return null;
+
+      final OcrDocumentResult result;
+      if (document.isPdf) {
+        result = await _ocrService.processPdfBytes(
+          bytes,
+          onProgress: (p, s) {
+            if (isStale(epoch)) return;
+            _ocrProgress[document.id] = p;
+            _ocrStatus[document.id] = s;
+            notifyListeners();
+          },
+        );
+      } else {
+        result = await _ocrService.processImageBytes(
+          bytes,
+          onProgress: (p, s) {
+            if (isStale(epoch)) return;
+            _ocrProgress[document.id] = p;
+            _ocrStatus[document.id] = s;
+            notifyListeners();
+          },
+        );
+      }
+
+      if (isStale(epoch)) return null;
+
+      // Save the extracted text to document
+      final updated = document.copyWith(
+        ocrText: result.combinedText,
+      );
+      final saved = await updateDocument(updated);
+      if (!saved) {
+        throw OcrException(_error ?? 'Failed to save extracted OCR text to document.');
+      }
+
+      return result;
+    } catch (e) {
+      if (!isStale(epoch)) {
+        _ocrErrors[document.id] = errorMessage(e);
+      }
+      return null;
+    } finally {
+      if (!isStale(epoch)) {
+        _processingOcrDocIds.remove(document.id);
+        _ocrProgress.remove(document.id);
+        _ocrStatus.remove(document.id);
+        notifyListeners();
+      }
+    }
+  }
+
+  /// Saves user-corrected OCR text for [document].
+  Future<bool> saveOcrText(DocumentItem document, String newText) async {
+    final updated = document.copyWith(ocrText: newText.trim());
+    return updateDocument(updated);
+  }
+
   /// Drops everything held for the previous user (called on sign-out).
   void reset() {
     invalidateSession();
     _signedUrlCache.clear();
+    _processingOcrDocIds.clear();
+    _ocrProgress.clear();
+    _ocrStatus.clear();
+    _ocrErrors.clear();
     _documents = [];
     _isLoading = false;
     _error = null;

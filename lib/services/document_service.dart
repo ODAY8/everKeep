@@ -102,13 +102,32 @@ class DocumentServiceImpl implements DocumentService {
   Future<DocumentItem> updateDocument(DocumentItem document) {
     return guardBackend(() async {
       final row = document.toUpdateRow();
-      final updated = await _client
-          .from('documents')
-          .update(row)
-          .eq('id', document.id)
-          .select()
-          .single();
-      return DocumentItem.fromRow(updated);
+      try {
+        final updated = await _client
+            .from('documents')
+            .update(row)
+            .eq('id', document.id)
+            .select()
+            .single();
+        return DocumentItem.fromRow(updated);
+      } catch (e) {
+        // If the remote backend does not yet have the ocr_text column,
+        // retry without it and preserve local OCR text on the returned item.
+        if (row.containsKey('ocr_text') &&
+            e.toString().toLowerCase().contains('ocr_text')) {
+          row.remove('ocr_text');
+          final fallbackUpdated = await _client
+              .from('documents')
+              .update(row)
+              .eq('id', document.id)
+              .select()
+              .single();
+          return DocumentItem.fromRow(fallbackUpdated).copyWith(
+            ocrText: document.ocrText,
+          );
+        }
+        rethrow;
+      }
     });
   }
 

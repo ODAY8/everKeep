@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../../../../../core/theme/app_colors.dart';
-import '../../../../../core/theme/app_radius.dart';
 import '../../../../../core/theme/app_text_styles.dart';
 
 /// Top bar with back, flash toggle, and camera flip controls.
@@ -133,6 +132,7 @@ class ScannerBottomBar extends StatelessWidget {
 
             // Central Shutter Button
             GestureDetector(
+              key: const Key('scanner_shutter_button'),
               onTap: isCapturing ? null : onCapture,
               child: Container(
                 width: 76,

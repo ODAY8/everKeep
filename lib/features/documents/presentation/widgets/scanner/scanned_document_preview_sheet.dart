@@ -1,4 +1,3 @@
-import 'dart:typed_data';
 import 'package:flutter/material.dart';
 
 import '../../../../../core/theme/app_colors.dart';
@@ -45,6 +44,16 @@ class _ScannedDocumentPreviewViewState extends State<ScannedDocumentPreviewView>
   void initState() {
     super.initState();
     _pages = List.from(widget.initialPages);
+    _currentIndex = _pages.isNotEmpty ? _pages.length - 1 : 0;
+  }
+
+  @override
+  void didUpdateWidget(ScannedDocumentPreviewView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.initialPages.length != _pages.length) {
+      _pages = List.from(widget.initialPages);
+      _currentIndex = _pages.isNotEmpty ? _pages.length - 1 : 0;
+    }
   }
 
   ScannedPage? get _currentPage =>

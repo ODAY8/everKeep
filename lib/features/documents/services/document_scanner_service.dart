@@ -1,9 +1,7 @@
-import 'dart:io';
 import 'dart:math' as math;
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:image/image.dart' as img;
-import 'package:path_provider/path_provider.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 
@@ -204,15 +202,9 @@ class DocumentScannerService {
 
   /// Removes any temporary scan files stored on disk.
   Future<void> cleanupTempFiles() async {
-    try {
-      final tempDir = await getTemporaryDirectory();
-      final scannerDir = Directory('${tempDir.path}/scanner_cache');
-      if (await scannerDir.exists()) {
-        await scannerDir.delete(recursive: true);
-      }
-    } catch (_) {
-      // Best-effort cleanup; ignore errors
-    }
+    // Zero disk persistence: all intermediate scans and enhanced frames are
+    // processed purely in secure memory (Uint8List) to ensure privacy and
+    // prevent orphaned files on device storage.
   }
 
   Rect _clampCropRect(Rect rect) {

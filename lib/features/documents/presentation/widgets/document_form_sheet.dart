@@ -12,6 +12,8 @@ import '../../../../models/document_upload.dart';
 import '../../../../providers/document_provider.dart';
 import '../../../../widgets/feedback.dart';
 import '../../../../widgets/glass/glass_primary_button.dart';
+import '../../../../widgets/glass/glass_sheet.dart';
+import '../screens/document_scanner_screen.dart';
 
 /// Modal bottom sheet for creating or editing a document in the vault.
 ///
@@ -121,6 +123,42 @@ class _DocumentFormSheetState extends State<DocumentFormSheet> {
         );
       }
     }
+  }
+
+  Future<void> _scanDocument() async {
+    final upload = await Navigator.of(context).push<DocumentUpload>(
+      MaterialPageRoute(
+        builder: (_) => const DocumentScannerScreen(returnUploadDirectly: true),
+      ),
+    );
+    if (upload != null && mounted) {
+      setState(() {
+        _upload = upload;
+        if (_titleController.text.trim().isEmpty) {
+          _titleController.text = upload.fileName.replaceAll('.pdf', '').replaceAll('.jpg', '');
+        }
+      });
+    }
+  }
+
+  void _chooseFileOrScan() {
+    showGlassActionSheet(
+      context,
+      title: 'Attach File',
+      subtitle: 'Upload a file or scan a document with your camera.',
+      actions: [
+        GlassSheetAction(
+          label: 'Scan document',
+          icon: Icons.document_scanner_rounded,
+          onTap: _scanDocument,
+        ),
+        GlassSheetAction(
+          label: 'Choose a file',
+          icon: Icons.upload_file_rounded,
+          onTap: _pickFile,
+        ),
+      ],
+    );
   }
 
   Future<void> _pickDate({
@@ -781,7 +819,7 @@ class _DocumentFormSheetState extends State<DocumentFormSheet> {
               ),
             ),
             TextButton(
-              onPressed: _pickFile,
+              onPressed: _chooseFileOrScan,
               child: Text(
                 'Replace',
                 style: AppTextStyles.labelSmall.copyWith(
@@ -796,7 +834,7 @@ class _DocumentFormSheetState extends State<DocumentFormSheet> {
     }
 
     return InkWell(
-      onTap: _pickFile,
+      onTap: _chooseFileOrScan,
       borderRadius: AppRadius.radiusMD,
       child: Container(
         width: double.infinity,
@@ -813,13 +851,13 @@ class _DocumentFormSheetState extends State<DocumentFormSheet> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             const Icon(
-              Icons.upload_file_rounded,
+              Icons.document_scanner_rounded,
               size: 18,
               color: AppColors.glassAccentPink,
             ),
             const SizedBox(width: 8),
             Text(
-              'Upload file (PDF, image, document)',
+              'Upload or scan document',
               style: AppTextStyles.bodySmall.copyWith(
                 color: AppColors.glassAccentPink,
                 fontWeight: FontWeight.w600,

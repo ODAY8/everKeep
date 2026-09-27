@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../../../core/routing/app_router.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_radius.dart';
 import '../../../../core/theme/app_text_styles.dart';
@@ -57,12 +58,20 @@ Future<void> showDocumentDetailsSheet(
       onOpenFile: onOpenFile ??
           (document.hasFile
               ? () {
-                  final docProv = context.read<DocumentProvider>();
-                  openRemoteFile(
-                    context,
-                    fetchUrl: () => docProv.downloadUrlFor(document),
-                    errorMessage: () => docProv.error,
-                  );
+                  if (document.isPdf) {
+                    Navigator.of(sheetContext).pop();
+                    Navigator.of(context).pushNamed(
+                      AppRouter.pdfViewer,
+                      arguments: document,
+                    );
+                  } else {
+                    final docProv = context.read<DocumentProvider>();
+                    openRemoteFile(
+                      context,
+                      fetchUrl: () => docProv.downloadUrlFor(document),
+                      errorMessage: () => docProv.error,
+                    );
+                  }
                 }
               : null),
     ),
@@ -341,7 +350,7 @@ class DocumentDetailsSheet extends StatelessWidget {
                         TextButton(
                           onPressed: onOpenFile,
                           child: Text(
-                            'Open',
+                            document.isPdf ? 'Open PDF' : 'Open',
                             style: AppTextStyles.labelSmall.copyWith(
                               color: AppColors.glassAccentPink,
                               fontWeight: FontWeight.w600,
@@ -388,7 +397,7 @@ class DocumentDetailsSheet extends StatelessWidget {
               // Action Buttons
               if (document.hasFile && onOpenFile != null) ...[
                 GlassPrimaryButton(
-                  text: 'Open File',
+                  text: document.isPdf ? 'Open PDF' : 'Open File',
                   onPressed: onOpenFile,
                 ),
                 const SizedBox(height: 10),

@@ -24,6 +24,12 @@ class DocumentItem {
   /// a document that only has metadata.
   final String? filePath;
 
+  /// Stored MIME type of the document attachment, if available (e.g. "application/pdf").
+  final String? mimeType;
+
+  /// Size of the file attachment in bytes, if available.
+  final int? fileSize;
+
   const DocumentItem({
     required this.id,
     required this.title,
@@ -40,6 +46,8 @@ class DocumentItem {
     this.isVerified = false,
     this.dateAdded,
     this.filePath,
+    this.mimeType,
+    this.fileSize,
   });
 
   /// Alias for notes to preserve existing call sites.
@@ -56,6 +64,17 @@ class DocumentItem {
 
   /// True if the document has a stored file attachment.
   bool get hasFile => filePath != null && filePath!.isNotEmpty;
+
+  /// True if the attachment is a PDF document based on MIME type or file extension.
+  bool get isPdf {
+    if (!hasFile) return false;
+    if (mimeType != null && mimeType!.trim().toLowerCase() == 'application/pdf') {
+      return true;
+    }
+    final path = filePath!.toLowerCase();
+    final cleanPath = path.split('?').first.trim();
+    return cleanPath.endsWith('.pdf');
+  }
 
   /// True if an expiry date is set.
   bool get hasExpiryDate => expiryDate != null;
@@ -122,6 +141,8 @@ class DocumentItem {
       isVerified: row['is_verified'] as bool? ?? false,
       dateAdded: createdAt,
       filePath: row['file_path'] as String?,
+      mimeType: row['mime_type'] as String?,
+      fileSize: (row['file_size'] as num?)?.toInt(),
     );
   }
 
@@ -207,6 +228,8 @@ class DocumentItem {
     bool? isVerified,
     DateTime? dateAdded,
     String? filePath,
+    String? mimeType,
+    int? fileSize,
   }) {
     return DocumentItem(
       id: id ?? this.id,
@@ -224,6 +247,8 @@ class DocumentItem {
       isVerified: isVerified ?? this.isVerified,
       dateAdded: dateAdded ?? this.dateAdded,
       filePath: filePath ?? this.filePath,
+      mimeType: mimeType ?? this.mimeType,
+      fileSize: fileSize ?? this.fileSize,
     );
   }
 }

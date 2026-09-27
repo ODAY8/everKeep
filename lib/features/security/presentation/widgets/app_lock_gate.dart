@@ -64,7 +64,6 @@ class _AppLockGateState extends State<AppLockGate> with WidgetsBindingObserver {
       return;
     }
 
-    if (lockProv == null || authProv == null) return;
     if (!authProv.isAuthenticated || !lockProv.isEnabled) return;
 
     if (state == AppLifecycleState.paused) {

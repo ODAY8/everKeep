@@ -6,6 +6,7 @@ import 'package:everkeep/features/auth/presentation/screens/sign_in_screen.dart'
 import 'package:everkeep/features/auth/presentation/screens/sign_up_screen.dart';
 import 'package:everkeep/features/auth/presentation/screens/welcome_screen.dart';
 import 'package:everkeep/features/documents/presentation/screens/documents_screen.dart';
+import 'package:everkeep/features/documents/presentation/screens/pdf_viewer_screen.dart';
 import 'package:everkeep/features/emergency_access/presentation/screens/emergency_access_screen.dart';
 import 'package:everkeep/features/shell/main_shell.dart';
 import 'package:everkeep/features/onboarding/presentation/screens/onboarding_screen.dart';
@@ -19,6 +20,7 @@ import 'package:everkeep/features/timeline/presentation/screens/timeline_screen.
 import 'package:everkeep/features/trusted_contacts/presentation/screens/trusted_contacts_screen.dart';
 import 'package:everkeep/features/vault/presentation/screens/vault_screen.dart';
 import 'package:everkeep/features/wishes/presentation/screens/wishes_screen.dart';
+import 'package:everkeep/models/document_item.dart';
 import 'package:flutter/material.dart';
 
 class AppRouter {
@@ -46,6 +48,7 @@ class AppRouter {
   static const String settings = '/settings';
   static const String timeline = '/timeline';
   static const String appLock = '/app-lock';
+  static const String pdfViewer = '/pdf-viewer';
 
   /// Public screens (splash, onboarding, auth) are built as-is; everything
   /// else is wrapped in an [AuthGuard] so it can't be reached signed out.
@@ -71,6 +74,11 @@ class AppRouter {
       AppRouter.security => _guarded(const SecurityScreen()),
       AppRouter.settings => _guarded(const SettingsScreen()),
       AppRouter.timeline => _guarded(const TimelineScreen()),
+      AppRouter.pdfViewer => settings.arguments is DocumentItem
+          ? _guarded(
+              PdfViewerScreen(document: settings.arguments! as DocumentItem),
+            )
+          : _guarded(const DocumentsScreen()),
       _ => _guarded(const MainShell()),
     };
 

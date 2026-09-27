@@ -116,20 +116,52 @@ class DocumentProvider extends ChangeNotifier with SessionScoped {
     }).toList();
   }
 
+  final Map<String, (String url, DateTime expiresAt)> _signedUrlCache = {};
+
   /// A short-lived link to view [document]'s stored file, or null (with
   /// [error] set) if it has no file or the link couldn't be made.
-  Future<String?> downloadUrlFor(DocumentItem document) async {
+  ///
+  /// Caches the signed URL for the session to prevent redundant network trips.
+  /// Set [forceRefresh] to true to bypass cache and fetch a fresh signed URL.
+  Future<String?> downloadUrlFor(
+    DocumentItem document, {
+    bool forceRefresh = false,
+  }) async {
     final path = document.filePath;
     if (path == null) return null;
     final epoch = sessionEpoch;
+
+    if (!forceRefresh) {
+      final cached = _signedUrlCache[path];
+      if (cached != null &&
+          DateTime.now().isBefore(cached.$2.subtract(const Duration(seconds: 30)))) {
+        return cached.$1;
+      }
+    }
+
     try {
       final url = await _documentRepository.createDownloadUrl(path);
-      return isStale(epoch) ? null : url;
+      if (isStale(epoch)) return null;
+      _signedUrlCache[path] = (
+        url,
+        DateTime.now().add(const Duration(seconds: 270)),
+      );
+      return url;
     } catch (e) {
+      _signedUrlCache.remove(path);
       if (isStale(epoch)) return null;
       _error = errorMessage(e);
       notifyListeners();
       return null;
+    }
+  }
+
+  /// Invalidates the cached signed URL for [filePath] or wipes the whole cache if omitted.
+  void invalidateSignedUrlCache([String? filePath]) {
+    if (filePath != null) {
+      _signedUrlCache.remove(filePath);
+    } else {
+      _signedUrlCache.clear();
     }
   }
 
@@ -243,6 +275,7 @@ class DocumentProvider extends ChangeNotifier with SessionScoped {
   /// Drops everything held for the previous user (called on sign-out).
   void reset() {
     invalidateSession();
+    _signedUrlCache.clear();
     _documents = [];
     _isLoading = false;
     _error = null;

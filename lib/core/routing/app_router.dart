@@ -11,6 +11,7 @@ import 'package:everkeep/features/shell/main_shell.dart';
 import 'package:everkeep/features/onboarding/presentation/screens/onboarding_screen.dart';
 import 'package:everkeep/features/accounts/presentation/screens/password_vault_screen.dart';
 import 'package:everkeep/features/profile/presentation/screens/profile_screen.dart';
+import 'package:everkeep/features/security/presentation/screens/app_lock_screen.dart';
 import 'package:everkeep/features/security/presentation/screens/security_screen.dart';
 import 'package:everkeep/features/settings/presentation/screens/settings_screen.dart';
 import 'package:everkeep/features/splash/presentation/screens/splash_screen.dart';
@@ -44,6 +45,7 @@ class AppRouter {
   static const String security = '/security';
   static const String settings = '/settings';
   static const String timeline = '/timeline';
+  static const String appLock = '/app-lock';
 
   /// Public screens (splash, onboarding, auth) are built as-is; everything
   /// else is wrapped in an [AuthGuard] so it can't be reached signed out.
@@ -56,6 +58,7 @@ class AppRouter {
       AppRouter.signUp => const SignUpScreen(),
       AppRouter.forgotPassword => const ForgotPasswordScreen(),
       AppRouter.resetPassword => const ResetPasswordScreen(),
+      AppRouter.appLock => const AppLockScreen(),
       AppRouter.home => _guarded(const MainShell()),
       AppRouter.vault => _guarded(const VaultScreen()),
       AppRouter.documents => _guarded(const DocumentsScreen()),

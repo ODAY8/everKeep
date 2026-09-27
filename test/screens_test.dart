@@ -31,6 +31,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:phone_numbers_parser/phone_numbers_parser.dart';
 import 'package:provider/provider.dart';
 
+import 'package:everkeep/core/security/biometric_auth_service.dart';
+import 'package:everkeep/core/security/biometric_lock_storage.dart';
+import 'package:everkeep/providers/app_lock_provider.dart';
+
 import 'fakes.dart';
 
 /// Every screen against fake repositories: nothing on them is made up, and every
@@ -51,6 +55,7 @@ void main() {
   late MemoryProvider memories;
   late AccountProvider accounts;
   late TrustedContactProvider contacts;
+  late AppLockProvider appLock;
 
   setUp(() {
     authRepo = FakeAuthRepository();
@@ -66,6 +71,10 @@ void main() {
     memories = MemoryProvider(memoryRepository: memoryRepo);
     accounts = AccountProvider(accountRepository: accRepo);
     contacts = TrustedContactProvider(trustedContactRepository: contactRepo);
+    appLock = AppLockProvider(
+      authService: FakeBiometricAuthService(),
+      storage: InMemoryBiometricLockStorage(),
+    );
   });
 
   /// A tall screen, so long pages don't need scrolling to reach their bottom.
@@ -89,6 +98,7 @@ void main() {
           ChangeNotifierProvider<MemoryProvider>.value(value: memories),
           ChangeNotifierProvider<AccountProvider>.value(value: accounts),
           ChangeNotifierProvider<TrustedContactProvider>.value(value: contacts),
+          ChangeNotifierProvider<AppLockProvider>.value(value: appLock),
           ChangeNotifierProvider<SettingsProvider>(
             create: (_) =>
                 SettingsProvider(settingsRepository: FakeSettingsRepository()),
@@ -293,7 +303,9 @@ void main() {
       expect(find.text('Security: Good — 67/100'), findsOneWidget);
       expect(find.text('Confirmed email'), findsOneWidget);
       expect(find.text('Done'), findsNWidgets(2)); // email + a trusted person
-      expect(find.text('Coming soon'), findsNWidgets(2)); // 2FA + biometric
+      expect(find.text('Coming soon'), findsOneWidget); // 2FA
+      expect(find.text('Biometric Lock'), findsOneWidget);
+      expect(find.text('Disabled'), findsOneWidget);
       // No switch that does nothing, no fake "recovery key".
       expect(find.byType(Switch), findsNothing);
       expect(find.text('Recovery Key'), findsNothing);

@@ -8,7 +8,9 @@ import 'core/session/session_sync.dart';
 import 'core/supabase/app_supabase.dart';
 import 'core/theme/app_fonts.dart';
 import 'core/theme/app_theme.dart';
+import 'features/security/presentation/widgets/app_lock_gate.dart';
 import 'providers/account_provider.dart';
+import 'providers/app_lock_provider.dart';
 import 'providers/auth_provider.dart';
 import 'providers/document_provider.dart';
 import 'providers/memory_provider.dart';
@@ -73,6 +75,7 @@ Future<void> main() async {
         ChangeNotifierProvider(create: (_) => AccountProvider()),
         ChangeNotifierProvider(create: (_) => TrustedContactProvider()),
         ChangeNotifierProvider(create: (_) => SettingsProvider()),
+        ChangeNotifierProvider(create: (_) => AppLockProvider()),
       ],
       child: const SessionSync(child: EverkeepApp()),
     ),
@@ -93,6 +96,9 @@ class EverkeepApp extends StatelessWidget {
       themeMode: ThemeMode.system,
       initialRoute: AppRouter.splash,
       onGenerateRoute: AppRouter.generateRoute,
+      builder: (context, child) => AppLockGate(
+        child: child ?? const SizedBox.shrink(),
+      ),
     );
   }
 }

@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 
 import '../routing/app_router.dart';
 import '../../providers/account_provider.dart';
+import '../../providers/app_lock_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/document_provider.dart';
 import '../../providers/memory_provider.dart';
@@ -34,6 +35,7 @@ class SessionCoordinator {
   final AccountProvider accounts;
   final TrustedContactProvider contacts;
   final SettingsProvider settings;
+  final AppLockProvider? appLock;
 
   /// Called once when the user arrives from a password-reset email link, so the
   /// app can show the "choose a new password" screen.
@@ -51,6 +53,7 @@ class SessionCoordinator {
     required this.accounts,
     required this.contacts,
     required this.settings,
+    this.appLock,
     this.onPasswordRecovery,
   }) : _wasAuthenticated = auth.isAuthenticated {
     auth.addListener(_onAuthChanged);
@@ -113,6 +116,7 @@ class SessionCoordinator {
     unawaited(memories.fetchMemories());
     unawaited(accounts.fetchAccounts());
     unawaited(contacts.fetchContacts());
+    appLock?.updateAccountProvider(accounts);
   }
 
   void _onSignedOut() {
@@ -123,6 +127,7 @@ class SessionCoordinator {
     accounts.reset();
     contacts.reset();
     settings.reset();
+    appLock?.onSignOut();
   }
 
   void _syncVaultCounts() {
@@ -153,6 +158,13 @@ class _SessionSyncState extends State<SessionSync> {
   @override
   void initState() {
     super.initState();
+    AppLockProvider? appLock;
+    try {
+      appLock = context.read<AppLockProvider>();
+    } catch (_) {
+      // Optional in test widget harnesses where AppLockProvider is not mounted
+    }
+
     _coordinator = SessionCoordinator(
       auth: context.read<AuthProvider>(),
       user: context.read<UserProvider>(),
@@ -162,6 +174,7 @@ class _SessionSyncState extends State<SessionSync> {
       accounts: context.read<AccountProvider>(),
       contacts: context.read<TrustedContactProvider>(),
       settings: context.read<SettingsProvider>(),
+      appLock: appLock,
       onPasswordRecovery: () => AppRouter.navigatorKey.currentState?.pushNamed(
         AppRouter.resetPassword,
       ),

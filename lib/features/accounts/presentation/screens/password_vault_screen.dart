@@ -9,6 +9,7 @@ import '../../../../core/theme/app_radius.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../../models/account_item.dart';
 import '../../../../providers/account_provider.dart';
+import '../../../../providers/app_lock_provider.dart';
 import '../../../../providers/auth_provider.dart';
 import '../../../../widgets/feedback.dart';
 import '../../../../widgets/glass/glass_card.dart';
@@ -57,6 +58,19 @@ class _PasswordVaultScreenState extends State<PasswordVaultScreen> {
         accProv.fetchAccounts();
       }
     });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    try {
+      final lockProv = Provider.of<AppLockProvider>(context);
+      if (lockProv.isLocked && _revealedCredentialIds.isNotEmpty) {
+        _revealedCredentialIds.clear();
+      }
+    } catch (_) {
+      // In isolated tests where AppLockProvider is omitted from provider scope
+    }
   }
 
   @override

@@ -6,8 +6,10 @@ import 'package:everkeep/core/theme/app_radius.dart';
 import 'package:everkeep/core/theme/app_text_styles.dart';
 import 'package:everkeep/features/settings/presentation/widgets/change_password_sheet.dart';
 import 'package:everkeep/models/vault_summary.dart';
+import 'package:everkeep/providers/app_lock_provider.dart';
 import 'package:everkeep/providers/auth_provider.dart';
 import 'package:everkeep/providers/vault_provider.dart';
+import '../widgets/biometric_lock_sheet.dart';
 import 'package:everkeep/widgets/fade_slide_in.dart';
 import 'package:everkeep/widgets/feedback.dart';
 import 'package:everkeep/widgets/glass/glass_card.dart';
@@ -102,10 +104,19 @@ class SecurityScreen extends StatelessWidget {
             badge: const StatusBadge.neutral('Coming soon'),
           ),
           const SizedBox(height: 12),
-          _buildStatusRow(
-            title: 'Biometric Lock',
-            description: 'Face ID or fingerprint to open the app',
-            badge: const StatusBadge.neutral('Coming soon'),
+          Consumer<AppLockProvider>(
+            builder: (context, lockProv, _) {
+              final isEnabled = lockProv.isEnabled;
+              return _buildStatusRow(
+                title: 'Biometric Lock',
+                description:
+                    'Require ${lockProv.biometricName} when opening EverKeep',
+                badge: isEnabled
+                    ? const StatusBadge.success('Enabled')
+                    : const StatusBadge.neutral('Disabled'),
+                onTap: () => showBiometricLockSheet(context),
+              );
+            },
           ),
           const SizedBox(height: 26),
           _sectionLabel('ACCOUNT'),

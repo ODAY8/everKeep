@@ -163,6 +163,10 @@ class AccountProvider extends ChangeNotifier with SessionScoped {
     }
   }
 
+  /// Returns the cached decrypted password if currently in memory, or null otherwise.
+  String? getCachedDecryptedPassword(String accountId) =>
+      _cryptoService.getCachedDecryptedPassword(accountId);
+
   /// Creates and saves a new credential with client-side encrypted password.
   Future<bool> addCredential({
     required String title,
@@ -347,6 +351,13 @@ class AccountProvider extends ChangeNotifier with SessionScoped {
         notifyListeners();
       }
     }
+  }
+
+  /// Wipes all in-memory decrypted passwords from the cache without clearing accounts.
+  /// Called when the app is locked to protect sensitive credentials.
+  void clearDecryptedPasswordCache() {
+    _cryptoService.clearCache();
+    notifyListeners();
   }
 
   /// Drops everything held for the previous user (called on sign-out).

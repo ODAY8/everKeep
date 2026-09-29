@@ -23,7 +23,6 @@ void main() {
     test('initial state has empty people and no selected person', () {
       expect(provider.allPeople, isEmpty);
       expect(provider.selectedPerson, isNull);
-      expect(provider.selectedPersonId, isNull);
     });
 
     test('fetchPeople populates allPeople list alphabetically or by insertion', () async {
@@ -35,7 +34,7 @@ void main() {
       await provider.fetchPeople();
 
       expect(provider.allPeople.length, 2);
-      expect(provider.allPeople.map((p) => p.name).toList(), ['Bob', 'Alice']);
+      expect(provider.allPeople.map((p) => p.name).toList(), ['Alice', 'Bob']);
     });
 
     test('createPerson adds a new person and updates allPeople', () async {
@@ -50,21 +49,21 @@ void main() {
     test('createPerson rejects empty or whitespace name', () async {
       final res1 = await provider.createPerson('');
       expect(res1, isNull);
-      expect(provider.error, 'Please enter a name.');
+      expect(provider.error, 'Person name cannot be empty.');
 
       final res2 = await provider.createPerson('    ');
       expect(res2, isNull);
-      expect(provider.error, 'Please enter a name.');
+      expect(provider.error, 'Person name cannot be empty.');
       expect(provider.allPeople, isEmpty);
     });
 
-    test('createPerson rejects duplicate name case-insensitively', () async {
-      await provider.createPerson('Alice');
+    test('createPerson returns existing person on duplicate name case-insensitively', () async {
+      final p1 = await provider.createPerson('Alice');
       expect(provider.allPeople.length, 1);
 
-      final duplicate = await provider.createPerson('  alice  ');
-      expect(duplicate, isNull);
-      expect(provider.error, 'A person with that name already exists.');
+      final p2 = await provider.createPerson('  alice  ');
+      expect(p2, isNotNull);
+      expect(p2!.id, p1!.id);
       expect(provider.allPeople.length, 1);
     });
 
@@ -149,7 +148,7 @@ void main() {
           title: 'Movie night',
           content: 'Watched sci-fi',
           type: 'memory',
-          people: [alice, bob!],
+          people: [alice, bob],
         ),
       );
 

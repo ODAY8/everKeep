@@ -444,52 +444,55 @@ class _PersonListTile extends StatelessWidget {
               : AppColors.glassBorder,
         ),
       ),
-      child: ListTile(
-        onTap: onToggle,
-        dense: true,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12),
-        leading: CircleAvatar(
-          radius: 16,
-          backgroundColor: isSelected
-              ? AppColors.glassAccentPink
-              : AppColors.glassSurfaceRaised,
-          child: Text(
-            person.name.isNotEmpty ? person.name[0].toUpperCase() : '?',
-            style: AppTextStyles.labelSmall.copyWith(
-              color: isSelected ? Colors.white : AppColors.glassOnSurface,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ),
-        title: Text(
-          person.name,
-          style: AppTextStyles.bodyMedium.copyWith(
-            color: AppColors.glassOnSurface,
-            fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-          ),
-        ),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            IconButton(
-              icon: const Icon(
-                Icons.edit_outlined,
-                size: 16,
-                color: AppColors.glassOnSurfaceMuted,
+      child: Material(
+        color: Colors.transparent,
+        child: ListTile(
+          onTap: onToggle,
+          dense: true,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+          leading: CircleAvatar(
+            radius: 16,
+            backgroundColor: isSelected
+                ? AppColors.glassAccentPink
+                : AppColors.glassSurfaceRaised,
+            child: Text(
+              person.name.isNotEmpty ? person.name[0].toUpperCase() : '?',
+              style: AppTextStyles.labelSmall.copyWith(
+                color: isSelected ? Colors.white : AppColors.glassOnSurface,
+                fontWeight: FontWeight.w700,
               ),
-              tooltip: 'Edit name',
-              onPressed: onEdit,
             ),
-            Icon(
-              isSelected
-                  ? Icons.check_circle_rounded
-                  : Icons.radio_button_unchecked_rounded,
-              color: isSelected
-                  ? AppColors.glassAccentPink
-                  : AppColors.glassOnSurfaceFaint,
-              size: 20,
+          ),
+          title: Text(
+            person.name,
+            style: AppTextStyles.bodyMedium.copyWith(
+              color: AppColors.glassOnSurface,
+              fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
             ),
-          ],
+          ),
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              IconButton(
+                icon: const Icon(
+                  Icons.edit_outlined,
+                  size: 16,
+                  color: AppColors.glassOnSurfaceMuted,
+                ),
+                tooltip: 'Edit name',
+                onPressed: onEdit,
+              ),
+              Icon(
+                isSelected
+                    ? Icons.check_circle_rounded
+                    : Icons.radio_button_unchecked_rounded,
+                color: isSelected
+                    ? AppColors.glassAccentPink
+                    : AppColors.glassOnSurfaceFaint,
+                size: 20,
+              ),
+            ],
+          ),
         ),
       ),
     );

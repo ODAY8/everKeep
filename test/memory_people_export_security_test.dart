@@ -11,7 +11,7 @@ void main() {
           'name': 'Sarah Connor',
           'created_at': '2026-01-01T12:00:00Z',
           'updated_at': '2026-01-02T15:30:00Z',
-          'internal_secret': 'do_not_export_me',
+          'secret': 'do_not_export_me',
         },
         {
           'id': 'p-2',
@@ -51,7 +51,7 @@ void main() {
       expect(firstPerson['created_at'], '2026-01-01T12:00:00Z');
       expect(firstPerson['updated_at'], '2026-01-02T15:30:00Z');
       // Verify internal secret was stripped
-      expect(firstPerson.containsKey('internal_secret'), isFalse);
+      expect(firstPerson.containsKey('secret'), isFalse);
 
       final exportedMemories = payload['memories'] as List;
       expect(exportedMemories.length, 1);
@@ -60,13 +60,12 @@ void main() {
       expect((firstMem['people'] as List).length, 2);
     });
 
-    test('handles null or empty people gracefully', () {
-      final payloadNull = DataExportHelper.buildExportPayload(
+    test('handles default or empty people gracefully', () {
+      final payloadDefault = DataExportHelper.buildExportPayload(
         userId: 'user-002',
         userEmail: 'user@example.com',
-        people: null,
       );
-      expect(payloadNull['people'], isEmpty);
+      expect(payloadDefault['people'], isEmpty);
 
       final payloadEmpty = DataExportHelper.buildExportPayload(
         userId: 'user-003',

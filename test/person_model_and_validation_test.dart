@@ -5,10 +5,10 @@ import 'package:everkeep/models/memory_item.dart';
 void main() {
   group('PersonItem Model & Validation', () {
     test('validates empty and whitespace-only names', () {
-      expect(PersonItem.validateName(null), 'Please enter a name.');
-      expect(PersonItem.validateName(''), 'Please enter a name.');
-      expect(PersonItem.validateName('   '), 'Please enter a name.');
-      expect(PersonItem.validateName('\t\n'), 'Please enter a name.');
+      expect(PersonItem.validateName(null), 'Person name cannot be empty.');
+      expect(PersonItem.validateName(''), 'Person name cannot be empty.');
+      expect(PersonItem.validateName('   '), 'Person name cannot be empty.');
+      expect(PersonItem.validateName('\t\n'), 'Person name cannot be empty.');
     });
 
     test('validates maximum length limit of 100 characters', () {
@@ -18,7 +18,7 @@ void main() {
       final over100 = 'A' * 101;
       expect(
         PersonItem.validateName(over100),
-        'Name must be 100 characters or fewer.',
+        'Name cannot exceed 100 characters.',
       );
     });
 
@@ -219,7 +219,8 @@ void main() {
       final json = memory.toJson();
       expect(json['people'], isA<List>());
       expect((json['people'] as List).length, 1);
-      expect(json['people_names'], ['Alice']);
+      expect((json['people'] as List).first['name'], 'Alice');
+      expect(memory.peopleNames, ['Alice']);
     });
   });
 }

@@ -109,11 +109,11 @@ void main() {
         ),
       );
 
-      expect(find.text('PEOPLE'), findsOneWidget);
+      expect(find.byIcon(Icons.person_rounded), findsOneWidget);
       expect(find.text('Charlie'), findsOneWidget);
     });
 
-    testWidgets('omits PEOPLE section when no people are tagged', (tester) async {
+    testWidgets('omits tagged people chips when no people are tagged', (tester) async {
       final item = MemoryItem(
         id: 'mem-4',
         title: 'Stargazing',
@@ -132,7 +132,7 @@ void main() {
         ),
       );
 
-      expect(find.text('PEOPLE'), findsNothing);
+      expect(find.byIcon(Icons.person_rounded), findsNothing);
     });
   });
 
@@ -226,7 +226,7 @@ void main() {
 
       await tester.pumpAndSettle();
 
-      expect(find.text('PEOPLE'), findsOneWidget);
+      expect(find.byKey(const ValueKey('tag_people_button')), findsOneWidget);
       expect(find.text('Tag People'), findsOneWidget);
     });
   });

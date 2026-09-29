@@ -26,10 +26,11 @@ abstract class PeopleService {
 }
 
 class PeopleServiceImpl implements PeopleService {
-  final SupabaseClient _client;
+  final SupabaseClient? _clientOverride;
 
-  PeopleServiceImpl({SupabaseClient? client})
-      : _client = client ?? AppSupabase.client;
+  PeopleServiceImpl({SupabaseClient? client}) : _clientOverride = client;
+
+  SupabaseClient get _client => _clientOverride ?? AppSupabase.client;
 
   @override
   Future<List<PersonItem>> fetchPeople() {

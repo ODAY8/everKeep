@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../core/utils/relative_time.dart';
 import '../core/utils/search_helper.dart';
 import 'memory_media_item.dart';
+import 'person_item.dart';
 
 /// A memory or wish saved in Everkeep.
 class MemoryItem {
@@ -18,6 +19,7 @@ class MemoryItem {
   final int? fileSize;
   final String? mimeType;
   final List<MemoryMediaItem> media;
+  final List<PersonItem> people;
   final DateTime? createdAt;
   final DateTime? updatedAt;
 
@@ -34,6 +36,7 @@ class MemoryItem {
     this.fileSize,
     this.mimeType,
     this.media = const [],
+    this.people = const [],
     this.createdAt,
     this.updatedAt,
   });
@@ -93,6 +96,17 @@ class MemoryItem {
       .map((t) => t.trim())
       .where((t) => t.isNotEmpty)
       .toList();
+
+  /// List of person names associated with this memory.
+  List<String> get peopleNames => people.map((p) => p.name).toList();
+
+  /// Checks whether a specific person is tagged in this memory by ID or name (case-insensitive).
+  bool hasPerson(String nameOrId) {
+    final target = nameOrId.trim().toLowerCase();
+    return people.any(
+      (p) => p.id == nameOrId || p.name.trim().toLowerCase() == target,
+    );
+  }
 
   /// True if attachment is likely an image.
   bool get isPhotoAttachment {
@@ -199,6 +213,30 @@ class MemoryItem {
         ..sort((a, b) => a.displayOrder.compareTo(b.displayOrder));
     }
 
+    List<PersonItem> parsedPeople = const [];
+    if (row['memory_people'] is List) {
+      final rawPeople = row['memory_people'] as List;
+      parsedPeople = rawPeople
+          .whereType<Map<String, dynamic>>()
+          .map((mp) {
+            if (mp['people'] is Map<String, dynamic>) {
+              return PersonItem.fromRow(mp['people'] as Map<String, dynamic>);
+            }
+            if (mp['person'] is Map<String, dynamic>) {
+              return PersonItem.fromRow(mp['person'] as Map<String, dynamic>);
+            }
+            return null;
+          })
+          .whereType<PersonItem>()
+          .toList();
+    } else if (row['people'] is List) {
+      final rawPeople = row['people'] as List;
+      parsedPeople = rawPeople
+          .whereType<Map<String, dynamic>>()
+          .map(PersonItem.fromRow)
+          .toList();
+    }
+
     return MemoryItem(
       id: row['id'] as String,
       userId: row['user_id'] as String?,
@@ -212,6 +250,7 @@ class MemoryItem {
       fileSize: (row['file_size'] as num?)?.toInt(),
       mimeType: row['mime_type'] as String?,
       media: parsedMedia,
+      people: parsedPeople,
       createdAt: parseDate(row['created_at']),
       updatedAt: parseDate(row['updated_at']),
     );
@@ -282,6 +321,7 @@ class MemoryItem {
     int? fileSize,
     String? mimeType,
     List<MemoryMediaItem>? media,
+    List<PersonItem>? people,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -298,8 +338,30 @@ class MemoryItem {
       fileSize: fileSize ?? this.fileSize,
       mimeType: mimeType ?? this.mimeType,
       media: media ?? this.media,
+      people: people ?? this.people,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );
+  }
+
+  /// Full serialization for export and caching.
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      if (userId != null) 'user_id': userId,
+      'title': title,
+      'content': content,
+      'type': type,
+      if (date != null) 'date': date!.toIso8601String(),
+      if (location != null) 'location': location,
+      if (tags != null) 'tags': tags,
+      if (filePath != null) 'file_path': filePath,
+      if (fileSize != null) 'file_size': fileSize,
+      if (mimeType != null) 'mime_type': mimeType,
+      'media': media.map((m) => m.toJson()).toList(),
+      'people': people.map((p) => p.toJson()).toList(),
+      if (createdAt != null) 'created_at': createdAt!.toIso8601String(),
+      if (updatedAt != null) 'updated_at': updatedAt!.toIso8601String(),
+    };
   }
 }

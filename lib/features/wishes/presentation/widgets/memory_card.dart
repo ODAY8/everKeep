@@ -199,6 +199,54 @@ class MemoryCard extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
             ),
           ],
+          if (item.people.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 5,
+              runSpacing: 4,
+              children: [
+                for (final person in item.people.take(3))
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: AppColors.glassAccentPink.withValues(alpha: 0.12),
+                      borderRadius: AppRadius.radiusSM,
+                      border: Border.all(
+                        color: AppColors.glassAccentPink.withValues(alpha: 0.3),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.person_rounded,
+                          size: 11,
+                          color: AppColors.glassAccentPink,
+                        ),
+                        const SizedBox(width: 3),
+                        Text(
+                          person.name,
+                          style: AppTextStyles.labelSmall.copyWith(
+                            color: AppColors.glassAccentPink,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                if (item.people.length > 3)
+                  Text(
+                    '+${item.people.length - 3}',
+                    style: AppTextStyles.labelSmall.copyWith(
+                      color: AppColors.glassAccentPink,
+                      fontSize: 10,
+                    ),
+                  ),
+              ],
+            ),
+          ],
           if (item.tagList.isNotEmpty) ...[
             const SizedBox(height: 10),
             Wrap(

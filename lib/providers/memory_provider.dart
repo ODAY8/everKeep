@@ -2,7 +2,9 @@ import 'package:flutter/foundation.dart';
 import '../models/document_upload.dart';
 import '../models/memory_item.dart';
 import '../models/memory_media_item.dart';
+import '../models/person_item.dart';
 import '../repositories/memory_repository.dart';
+import '../repositories/people_repository.dart';
 import 'session_scoped.dart';
 
 enum MemorySortOption {
@@ -23,8 +25,11 @@ class _CachedUrl {
 
 class MemoryProvider extends ChangeNotifier with SessionScoped {
   final MemoryRepository _memoryRepository;
+  final PeopleRepository _peopleRepository;
 
   List<MemoryItem> _items = [];
+  List<PersonItem> _allPeople = [];
+  PersonItem? _selectedPerson;
   bool _isLoading = false;
   String? _error;
   bool _hasFetched = false;
@@ -32,10 +37,15 @@ class MemoryProvider extends ChangeNotifier with SessionScoped {
   /// Cache of signed URLs keyed by filePath with a 240s validity window.
   final Map<String, _CachedUrl> _signedUrlCache = {};
 
-  MemoryProvider({MemoryRepository? memoryRepository})
-      : _memoryRepository = memoryRepository ?? MemoryRepositoryImpl();
+  MemoryProvider({
+    MemoryRepository? memoryRepository,
+    PeopleRepository? peopleRepository,
+  })  : _memoryRepository = memoryRepository ?? MemoryRepositoryImpl(),
+        _peopleRepository = peopleRepository ?? PeopleRepositoryImpl();
 
   List<MemoryItem> get items => List.unmodifiable(_items);
+  List<PersonItem> get allPeople => List.unmodifiable(_allPeople);
+  PersonItem? get selectedPerson => _selectedPerson;
   List<MemoryItem> get memories =>
       List.unmodifiable(_items.where((item) => item.isMemory));
   List<MemoryItem> get wishes =>
@@ -75,15 +85,17 @@ class MemoryProvider extends ChangeNotifier with SessionScoped {
     }).toList();
   }
 
-  /// Advanced search & filter matching query, optional tag, and sort order.
+  /// Advanced search & filter matching query, optional tag, person, and sort order.
   List<MemoryItem> getFilteredMemories({
     String query = '',
     String? tag,
+    PersonItem? person,
     MemorySortOption sort = MemorySortOption.memoryDateDesc,
     String type = 'memory',
   }) {
     final q = query.trim().toLowerCase();
     final selectedTag = tag?.trim().toLowerCase().replaceAll('#', '');
+    final targetPerson = person ?? _selectedPerson;
 
     final filtered = _items.where((item) {
       if (item.type.toLowerCase() != type.toLowerCase()) return false;
@@ -92,6 +104,12 @@ class MemoryProvider extends ChangeNotifier with SessionScoped {
           selectedTag.isNotEmpty &&
           selectedTag != 'all') {
         if (!item.hasTag(selectedTag)) return false;
+      }
+      if (targetPerson != null) {
+        if (!item.hasPerson(targetPerson.id) &&
+            !item.hasPerson(targetPerson.name)) {
+          return false;
+        }
       }
       return true;
     }).toList();
@@ -133,6 +151,8 @@ class MemoryProvider extends ChangeNotifier with SessionScoped {
       if (isStale(epoch)) return;
       _items = fetched;
       _hasFetched = true;
+      // Also fetch and cache people in background
+      await fetchPeople();
     } catch (e) {
       if (isStale(epoch)) return;
       _error = errorMessage(e);
@@ -142,6 +162,118 @@ class MemoryProvider extends ChangeNotifier with SessionScoped {
         notifyListeners();
       }
     }
+  }
+
+  /// Fetches all people for the current user and caches them in state.
+  Future<void> fetchPeople() async {
+    final epoch = sessionEpoch;
+    try {
+      final fetched = await _peopleRepository.fetchPeople();
+      if (isStale(epoch)) return;
+      _allPeople = fetched;
+      notifyListeners();
+    } catch (_) {
+      // Graceful fallback
+    }
+  }
+
+  /// Creates a person or returns existing match.
+  Future<PersonItem?> createPerson(String name) async {
+    final epoch = sessionEpoch;
+    try {
+      final created = await _peopleRepository.createPerson(name);
+      if (isStale(epoch)) return null;
+      final existingIndex = _allPeople.indexWhere((p) => p.id == created.id);
+      if (existingIndex == -1) {
+        _allPeople.add(created);
+        _allPeople.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+      } else {
+        _allPeople[existingIndex] = created;
+      }
+      notifyListeners();
+      return created;
+    } catch (e) {
+      if (isStale(epoch)) return null;
+      _error = errorMessage(e);
+      notifyListeners();
+      return null;
+    }
+  }
+
+  /// Renames an existing person and updates all memories referencing them in state.
+  Future<PersonItem?> updatePerson(String id, String newName) async {
+    final epoch = sessionEpoch;
+    try {
+      final updated = await _peopleRepository.updatePerson(id, newName);
+      if (isStale(epoch)) return null;
+
+      final pIndex = _allPeople.indexWhere((p) => p.id == id);
+      if (pIndex != -1) {
+        _allPeople[pIndex] = updated;
+        _allPeople.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+      }
+
+      for (var i = 0; i < _items.length; i++) {
+        if (_items[i].people.any((p) => p.id == id)) {
+          final updatedPeople = _items[i].people
+              .map((p) => p.id == id ? updated : p)
+              .toList();
+          _items[i] = _items[i].copyWith(people: updatedPeople);
+        }
+      }
+
+      if (_selectedPerson?.id == id) {
+        _selectedPerson = updated;
+      }
+      notifyListeners();
+      return updated;
+    } catch (e) {
+      if (isStale(epoch)) return null;
+      _error = errorMessage(e);
+      notifyListeners();
+      return null;
+    }
+  }
+
+  /// Deletes a person and detaches them from any loaded memories in state.
+  Future<bool> deletePerson(String id) async {
+    final epoch = sessionEpoch;
+    try {
+      await _peopleRepository.deletePerson(id);
+      if (isStale(epoch)) return false;
+
+      _allPeople.removeWhere((p) => p.id == id);
+
+      for (var i = 0; i < _items.length; i++) {
+        if (_items[i].people.any((p) => p.id == id)) {
+          final updatedPeople = _items[i].people.where((p) => p.id != id).toList();
+          _items[i] = _items[i].copyWith(people: updatedPeople);
+        }
+      }
+
+      if (_selectedPerson?.id == id) {
+        _selectedPerson = null;
+      }
+      notifyListeners();
+      return true;
+    } catch (e) {
+      if (isStale(epoch)) return false;
+      _error = errorMessage(e);
+      notifyListeners();
+      return false;
+    }
+  }
+
+  /// Sets the active person filter.
+  void setSelectedPerson(PersonItem? person) {
+    _selectedPerson = person;
+    notifyListeners();
+  }
+
+  /// Clears any active person filter.
+  void clearPersonFilter() {
+    _selectedPerson = null;
+    notifyListeners();
   }
 
   /// Saves a memory or wish with optional legacy single-attachment upload.
@@ -473,6 +605,8 @@ class MemoryProvider extends ChangeNotifier with SessionScoped {
     invalidateSession();
     _signedUrlCache.clear();
     _items = [];
+    _allPeople = [];
+    _selectedPerson = null;
     _isLoading = false;
     _error = null;
     _hasFetched = false;

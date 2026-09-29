@@ -80,16 +80,24 @@ class MemoryServiceImpl implements MemoryService {
       try {
         final rows = await _client
             .from('memories_wishes')
-            .select('*, memory_media(*)')
+            .select('*, memory_media(*), memory_people(*, people(*))')
             .order('created_at', ascending: false);
         return rows.map(MemoryItem.fromRow).toList();
       } catch (_) {
-        // Fallback for when memory_media migration has not been applied remotely yet
-        final rows = await _client
-            .from('memories_wishes')
-            .select()
-            .order('created_at', ascending: false);
-        return rows.map(MemoryItem.fromRow).toList();
+        try {
+          final rows = await _client
+              .from('memories_wishes')
+              .select('*, memory_media(*)')
+              .order('created_at', ascending: false);
+          return rows.map(MemoryItem.fromRow).toList();
+        } catch (_) {
+          // Fallback if neither child table exists remotely yet
+          final rows = await _client
+              .from('memories_wishes')
+              .select()
+              .order('created_at', ascending: false);
+          return rows.map(MemoryItem.fromRow).toList();
+        }
       }
     });
   }
@@ -100,16 +108,24 @@ class MemoryServiceImpl implements MemoryService {
       try {
         final rows = await _client
             .from('memories_wishes')
-            .select('*, memory_media(*)')
+            .select('*, memory_media(*), memory_people(*, people(*))')
             .eq('id', id);
         requireAffected(rows);
         return MemoryItem.fromRow(rows.first);
       } catch (_) {
-        // Fallback if memory_media table doesn't exist remotely yet
-        final rows =
-            await _client.from('memories_wishes').select().eq('id', id);
-        requireAffected(rows);
-        return MemoryItem.fromRow(rows.first);
+        try {
+          final rows = await _client
+              .from('memories_wishes')
+              .select('*, memory_media(*)')
+              .eq('id', id);
+          requireAffected(rows);
+          return MemoryItem.fromRow(rows.first);
+        } catch (_) {
+          final rows =
+              await _client.from('memories_wishes').select().eq('id', id);
+          requireAffected(rows);
+          return MemoryItem.fromRow(rows.first);
+        }
       }
     });
   }
@@ -143,7 +159,20 @@ class MemoryServiceImpl implements MemoryService {
             .insert(row)
             .select()
             .single();
-        return MemoryItem.fromRow(inserted);
+
+        if (item.people.isNotEmpty) {
+          final memoryId = inserted['id'] as String;
+          try {
+            final pRows = item.people.map((p) => {
+              'memory_id': memoryId,
+              'person_id': p.id,
+              'user_id': _client.requireUser.id,
+            }).toList();
+            await _client.from('memory_people').insert(pRows);
+          } catch (_) {}
+        }
+
+        return MemoryItem.fromRow(inserted).copyWith(people: item.people);
       } catch (_) {
         if (uploadedPath != null) {
           try {
@@ -235,7 +264,21 @@ class MemoryServiceImpl implements MemoryService {
           createdMedia.add(MemoryMediaItem.fromRow(mediaRow));
         }
 
-        return MemoryItem.fromRow(insertedMemory).copyWith(media: createdMedia);
+        if (item.people.isNotEmpty) {
+          try {
+            final pRows = item.people.map((p) => {
+              'memory_id': memoryId,
+              'person_id': p.id,
+              'user_id': user.id,
+            }).toList();
+            await _client.from('memory_people').insert(pRows);
+          } catch (_) {}
+        }
+
+        return MemoryItem.fromRow(insertedMemory).copyWith(
+          media: createdMedia,
+          people: item.people,
+        );
       } catch (e) {
         // Rollback: delete newly uploaded storage objects and inserted parent memory
         if (uploadedPaths.isNotEmpty) {
@@ -419,7 +462,30 @@ class MemoryServiceImpl implements MemoryService {
           .eq('id', item.id)
           .select();
       requireAffected(rows);
-      return MemoryItem.fromRow(rows.first);
+
+      // Sync memory_people associations
+      try {
+        await _client
+            .from('memory_people')
+            .delete()
+            .eq('memory_id', item.id);
+
+        if (item.people.isNotEmpty) {
+          final pRows = item.people.map((p) => {
+            'memory_id': item.id,
+            'person_id': p.id,
+            'user_id': _client.requireUser.id,
+          }).toList();
+          await _client.from('memory_people').insert(pRows);
+        }
+      } catch (_) {
+        // Fallback if table doesn't exist remotely yet
+      }
+
+      return MemoryItem.fromRow(rows.first).copyWith(
+        media: item.media,
+        people: item.people,
+      );
     });
   }
 

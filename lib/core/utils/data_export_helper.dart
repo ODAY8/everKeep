@@ -102,6 +102,7 @@ class DataExportHelper {
     List<dynamic> accounts = const [],
     List<dynamic> trustedContacts = const [],
     List<dynamic> memories = const [],
+    List<dynamic> people = const [],
     Map<String, dynamic>? securitySettings,
     DateTime? exportedAt,
   }) {
@@ -112,6 +113,7 @@ class DataExportHelper {
     final cleanAccounts = accounts.map(_sanitizeItem).toList();
     final cleanTrustedContacts = trustedContacts.map(_sanitizeItem).toList();
     final cleanMemories = memories.map(_sanitizeItem).toList();
+    final cleanPeople = people.map(_sanitizeItem).toList();
     final cleanSecuritySettings =
         securitySettings != null ? _sanitizeMap(securitySettings) : null;
 
@@ -130,6 +132,7 @@ class DataExportHelper {
       'importantInformation': cleanAccounts,
       'trustedContacts': cleanTrustedContacts,
       'memories': cleanMemories,
+      'people': cleanPeople,
       'securitySettings': cleanSecuritySettings,
     };
   }

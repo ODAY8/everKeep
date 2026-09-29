@@ -9,6 +9,7 @@ import '../../../../core/utils/pick_upload.dart';
 import '../../../../models/document_upload.dart';
 import '../../../../models/memory_item.dart';
 import '../../../../models/memory_media_item.dart';
+import '../../../../models/person_item.dart';
 import '../../../../providers/memory_provider.dart';
 import '../../../../services/memory_service.dart';
 import '../../../../widgets/feedback.dart';
@@ -17,6 +18,7 @@ import '../../../../widgets/glass/glass_sheet.dart';
 import '../services/memory_media_picker.dart';
 import 'audio_recorder_adapter.dart';
 import 'memory_media_tray.dart';
+import 'people_selector_sheet.dart';
 
 /// A polished glass bottom sheet for creating or editing a Memory or Wish.
 /// Validates required fields, provides saving/loading states, handles errors
@@ -79,6 +81,7 @@ class _MemoryFormSheetState extends State<MemoryFormSheet> {
   bool _legacyAttachmentRemoved = false;
 
   final List<FormMediaItem> _mediaItems = [];
+  final List<PersonItem> _selectedPeople = [];
   bool _saving = false;
   String? _uploadStatus;
   String? _errorMessage;
@@ -108,10 +111,15 @@ class _MemoryFormSheetState extends State<MemoryFormSheet> {
     final factory = widget.recorderFactory ?? () => DefaultAudioRecorderAdapter();
     _audioRecorder = factory();
 
-    // Populate existing media if editing
-    if (item != null && item.media.isNotEmpty) {
-      for (final m in item.media) {
-        _mediaItems.add(FormMediaItem.existing(m));
+    // Populate existing media and people if editing
+    if (item != null) {
+      if (item.media.isNotEmpty) {
+        for (final m in item.media) {
+          _mediaItems.add(FormMediaItem.existing(m));
+        }
+      }
+      if (item.people.isNotEmpty) {
+        _selectedPeople.addAll(item.people);
       }
     }
 
@@ -356,6 +364,25 @@ class _MemoryFormSheetState extends State<MemoryFormSheet> {
     }
   }
 
+  Future<void> _openPeopleSelector() async {
+    final result = await PeopleSelectorSheet.show(
+      context,
+      selected: _selectedPeople,
+    );
+    if (result != null && mounted) {
+      setState(() {
+        _selectedPeople.clear();
+        _selectedPeople.addAll(result);
+      });
+    }
+  }
+
+  void _removePerson(PersonItem person) {
+    setState(() {
+      _selectedPeople.removeWhere((p) => p.id == person.id);
+    });
+  }
+
   Future<void> _pickLegacyFile() async {
     try {
       final upload = await pickDocument();
@@ -428,6 +455,7 @@ class _MemoryFormSheetState extends State<MemoryFormSheet> {
           date: _selectedDate,
           location: location.isEmpty ? null : location,
           tags: tags.isEmpty ? null : tags,
+          people: _selectedPeople,
         );
         success = await memoryProv.updateMemory(updated);
 
@@ -508,6 +536,7 @@ class _MemoryFormSheetState extends State<MemoryFormSheet> {
           date: _selectedDate,
           location: location.isEmpty ? null : location,
           tags: tags.isEmpty ? null : tags,
+          people: _selectedPeople,
         );
 
         final pendingItems =
@@ -777,6 +806,90 @@ class _MemoryFormSheetState extends State<MemoryFormSheet> {
                 ),
                 const SizedBox(height: 14),
               ],
+
+              // PEOPLE Section
+              _FormFieldWrapper(
+                label: 'People in this $_label.toLowerCase() (optional)',
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (_selectedPeople.isNotEmpty) ...[
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 6,
+                        children: [
+                          for (final person in _selectedPeople)
+                            Container(
+                              padding: const EdgeInsets.fromLTRB(10, 5, 6, 5),
+                              decoration: BoxDecoration(
+                                color: AppColors.glassSurfaceRaised,
+                                borderRadius: AppRadius.radiusPill,
+                                border: Border.all(
+                                  color: AppColors.glassAccentPink.withValues(alpha: 0.4),
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(
+                                    Icons.person_rounded,
+                                    size: 14,
+                                    color: AppColors.glassAccentPink,
+                                  ),
+                                  const SizedBox(width: 5),
+                                  Text(
+                                    person.name,
+                                    style: AppTextStyles.labelSmall.copyWith(
+                                      color: AppColors.glassOnSurface,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  GestureDetector(
+                                    key: ValueKey('remove_person_${person.id}'),
+                                    onTap: _saving ? null : () => _removePerson(person),
+                                    behavior: HitTestBehavior.opaque,
+                                    child: const Padding(
+                                      padding: EdgeInsets.all(2.0),
+                                      child: Icon(
+                                        Icons.close_rounded,
+                                        size: 14,
+                                        color: AppColors.glassOnSurfaceMuted,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                    ],
+                    OutlinedButton.icon(
+                      key: const ValueKey('tag_people_button'),
+                      onPressed: _saving ? null : _openPeopleSelector,
+                      icon: const Icon(Icons.person_add_alt_1_outlined, size: 16),
+                      label: Text(
+                        _selectedPeople.isEmpty ? 'Tag People' : 'Edit Tagged People',
+                        style: AppTextStyles.labelSmall.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppColors.glassAccentPink,
+                        side: BorderSide(
+                          color: AppColors.glassAccentPink.withValues(alpha: 0.45),
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: AppRadius.radiusMD,
+                        ),
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 14),
 
               // Legacy Attachment Card (if present)
               if (_isEditing &&

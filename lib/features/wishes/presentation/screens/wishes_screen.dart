@@ -341,10 +341,13 @@ class _WishesScreenState extends State<WishesScreen> {
           GlassFilterChips(
             labels: _tabs,
             selectedIndex: _selectedTab,
-            onSelected: (index) => setState(() {
-              _selectedTab = index;
-              _selectedTag = null;
-            }),
+            onSelected: (index) {
+              setState(() {
+                _selectedTab = index;
+                _selectedTag = null;
+              });
+              context.read<MemoryProvider>().clearPersonFilter();
+            },
           ),
           Consumer<MemoryProvider>(
             builder: (context, memoryProv, _) {
@@ -409,6 +412,38 @@ class _WishesScreenState extends State<WishesScreen> {
                               onTap: () => setState(() {
                                 _selectedTag = _selectedTag == tag ? null : tag;
                               }),
+                            ),
+                            const SizedBox(width: 6),
+                          ],
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                  ],
+
+                  // People filters row (when people exist in vault)
+                  if (_selectedTab == 0 && memoryProv.allPeople.isNotEmpty) ...[
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: [
+                          _TagChip(
+                            label: 'All people',
+                            isSelected: memoryProv.selectedPerson == null,
+                            onTap: () => memoryProv.clearPersonFilter(),
+                          ),
+                          const SizedBox(width: 6),
+                          for (final person in memoryProv.allPeople) ...[
+                            _TagChip(
+                              label: '👤 ${person.name}',
+                              isSelected: memoryProv.selectedPerson?.id == person.id,
+                              onTap: () {
+                                if (memoryProv.selectedPerson?.id == person.id) {
+                                  memoryProv.clearPersonFilter();
+                                } else {
+                                  memoryProv.setSelectedPerson(person);
+                                }
+                              },
                             ),
                             const SizedBox(width: 6),
                           ],

@@ -160,6 +160,24 @@ class MemoryMediaItem {
     };
   }
 
+  /// JSON serialization for export and caching.
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'memory_id': memoryId,
+      if (userId != null) 'user_id': userId,
+      'file_path': filePath,
+      'media_type': mediaType.dbValue,
+      'mime_type': mimeType,
+      'file_size': fileSize,
+      'display_order': displayOrder,
+      if (caption != null) 'caption': caption,
+      if (durationSeconds != null) 'duration_seconds': durationSeconds,
+      if (thumbnailPath != null) 'thumbnail_path': thumbnailPath,
+      if (createdAt != null) 'created_at': createdAt!.toIso8601String(),
+    };
+  }
+
   MemoryMediaItem copyWith({
     String? id,
     String? memoryId,

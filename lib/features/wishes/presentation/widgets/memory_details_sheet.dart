@@ -240,6 +240,48 @@ class _MemoryDetailsSheetState extends State<MemoryDetailsSheet> {
           ),
         ],
 
+        // Tagged People
+        if (item.people.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [
+              for (final person in item.people)
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: AppColors.glassSurfaceRaised,
+                    borderRadius: AppRadius.radiusPill,
+                    border: Border.all(
+                      color: AppColors.glassAccentPink.withValues(alpha: 0.35),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.person_rounded,
+                        size: 13,
+                        color: AppColors.glassAccentPink,
+                      ),
+                      const SizedBox(width: 5),
+                      Text(
+                        person.name,
+                        style: AppTextStyles.labelSmall.copyWith(
+                          color: AppColors.glassOnSurface,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+        ],
+
         // Rich Media Gallery Section
         if (item.allMedia.isNotEmpty) ...[
           const SizedBox(height: 16),

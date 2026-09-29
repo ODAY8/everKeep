@@ -141,6 +141,7 @@ class SearchMatcher {
       item.date?.year.toString(),
       monthName,
       ...item.tagList,
+      ...item.peopleNames,
     ];
 
     return matchesTokens(fields, t);

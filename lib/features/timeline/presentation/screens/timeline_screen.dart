@@ -75,13 +75,22 @@ class TimelineScreen extends StatefulWidget {
       if (mem.isMemory) {
         final date = mem.date ?? mem.createdAt;
         if (date != null) {
+          final parts = <String>[];
+          if (mem.location != null && mem.location!.isNotEmpty) {
+            parts.add('📍 ${mem.location}');
+          }
+          if (mem.people.isNotEmpty) {
+            parts.add('👤 ${mem.people.map((p) => p.name).join(', ')}');
+          } else if (mem.tagList.isNotEmpty) {
+            parts.add('#${mem.tagList.first}');
+          }
+          final subtitle = parts.isNotEmpty ? parts.join(' · ') : null;
+
           events.add(
             TimelineEvent(
               id: mem.id,
               title: mem.title,
-              subtitle: mem.location != null && mem.location!.isNotEmpty
-                  ? '📍 ${mem.location}'
-                  : (mem.tagList.isNotEmpty ? '#${mem.tagList.first}' : null),
+              subtitle: subtitle,
               date: date,
               kind: TimelineEventKind.memory,
               icon: Icons.favorite_rounded,
@@ -500,6 +509,49 @@ class _TimelineRow extends StatelessWidget {
                           color: AppColors.glassOnSurfaceMuted,
                           fontSize: 11,
                         ),
+                      ),
+                    ],
+                    if (event.item is MemoryItem &&
+                        (event.item as MemoryItem).people.isNotEmpty) ...[
+                      const SizedBox(height: 6),
+                      Wrap(
+                        spacing: 4,
+                        runSpacing: 4,
+                        children: [
+                          for (final person in (event.item as MemoryItem).people)
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: AppColors.glassAccentPink.withValues(alpha: 0.12),
+                                borderRadius: AppRadius.radiusSM,
+                                border: Border.all(
+                                  color: AppColors.glassAccentPink.withValues(alpha: 0.3),
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(
+                                    Icons.person_rounded,
+                                    size: 10,
+                                    color: AppColors.glassAccentPink,
+                                  ),
+                                  const SizedBox(width: 3),
+                                  Text(
+                                    person.name,
+                                    style: AppTextStyles.labelSmall.copyWith(
+                                      color: AppColors.glassAccentPink,
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                        ],
                       ),
                     ],
                   ],

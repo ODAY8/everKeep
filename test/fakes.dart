@@ -5,6 +5,7 @@ import 'package:everkeep/models/document_item.dart';
 import 'package:everkeep/models/document_upload.dart';
 import 'package:everkeep/models/memory_item.dart';
 import 'package:everkeep/models/memory_media_item.dart';
+import 'package:everkeep/models/person_item.dart';
 import 'package:everkeep/models/security_settings.dart';
 import 'package:everkeep/models/trusted_contact_item.dart';
 import 'package:everkeep/models/user.dart';
@@ -13,6 +14,7 @@ import 'package:everkeep/repositories/account_repository.dart';
 import 'package:everkeep/repositories/auth_repository.dart';
 import 'package:everkeep/repositories/document_repository.dart';
 import 'package:everkeep/repositories/memory_repository.dart';
+import 'package:everkeep/repositories/people_repository.dart';
 import 'package:everkeep/repositories/settings_repository.dart';
 import 'package:everkeep/repositories/trusted_contact_repository.dart';
 import 'package:everkeep/repositories/user_repository.dart';
@@ -442,6 +444,85 @@ class FakeMemoryRepository with Failable implements MemoryRepository {
   }
 }
 
+class FakePeopleRepository with Failable implements PeopleRepository {
+  final List<PersonItem> people;
+  final Map<String, List<String>> memoryPeopleMap;
+  int _nextId = 1;
+
+  FakePeopleRepository([List<PersonItem>? seed])
+      : people = seed ?? [],
+        memoryPeopleMap = {};
+
+  @override
+  Future<List<PersonItem>> fetchPeople() async {
+    throwIfFailing();
+    final list = List.of(people)
+      ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+    return list;
+  }
+
+  @override
+  Future<PersonItem> createPerson(String name) async {
+    throwIfFailing();
+    final validation = PersonItem.validateName(name);
+    if (validation != null) throw Exception(validation);
+    final clean = PersonItem.sanitizeName(name);
+
+    final existing = people
+        .where((p) => p.name.toLowerCase() == clean.toLowerCase())
+        .firstOrNull;
+    if (existing != null) return existing;
+
+    final created = PersonItem(
+      id: 'person-${_nextId++}',
+      name: clean,
+      createdAt: DateTime.now(),
+    );
+    people.add(created);
+    return created;
+  }
+
+  @override
+  Future<PersonItem> updatePerson(String id, String newName) async {
+    throwIfFailing();
+    final validation = PersonItem.validateName(newName);
+    if (validation != null) throw Exception(validation);
+    final clean = PersonItem.sanitizeName(newName);
+
+    final index = people.indexWhere((p) => p.id == id);
+    if (index == -1) throw Exception('Person not found');
+
+    final updated = people[index].copyWith(
+      name: clean,
+      updatedAt: DateTime.now(),
+    );
+    people[index] = updated;
+    return updated;
+  }
+
+  @override
+  Future<void> deletePerson(String id) async {
+    throwIfFailing();
+    people.removeWhere((p) => p.id == id);
+    for (final key in memoryPeopleMap.keys) {
+      memoryPeopleMap[key]?.remove(id);
+    }
+  }
+
+  @override
+  Future<List<PersonItem>> fetchPeopleForMemory(String memoryId) async {
+    throwIfFailing();
+    final ids = memoryPeopleMap[memoryId] ?? const [];
+    return people.where((p) => ids.contains(p.id)).toList();
+  }
+
+  @override
+  Future<void> setMemoryPeople(String memoryId, List<String> personIds) async {
+    throwIfFailing();
+    memoryPeopleMap[memoryId] = List.of(personIds);
+  }
+}
+
 class FakeAccountRepository with Failable implements AccountRepository {
   final List<AccountItem> items;
 
@@ -698,3 +779,84 @@ class FakeUserRepository with Failable implements UserRepository {
     accountDeleted = true;
   }
 }
+
+class FakePeopleRepository with Failable implements PeopleRepository {
+  final List<PersonItem> people;
+  final Map<String, List<String>> memoryPeopleMap;
+  int _nextId = 1;
+
+  FakePeopleRepository([
+    List<PersonItem>? seed,
+    Map<String, List<String>>? seedAssociations,
+  ])  : people = seed != null ? List.of(seed) : [],
+        memoryPeopleMap = seedAssociations != null ? Map.of(seedAssociations) : {};
+
+  @override
+  Future<List<PersonItem>> fetchPeople() async {
+    throwIfFailing();
+    return List.of(people);
+  }
+
+  @override
+  Future<PersonItem> createPerson(String name) async {
+    throwIfFailing();
+    final trimmed = name.trim();
+    final existing = people.any(
+      (p) => p.name.trim().toLowerCase() == trimmed.toLowerCase(),
+    );
+    if (existing) {
+      throw Exception('A person with that name already exists.');
+    }
+    final person = PersonItem(
+      id: 'person-${_nextId++}',
+      userId: 'user-001',
+      name: trimmed,
+      createdAt: DateTime.now(),
+      updatedAt: DateTime.now(),
+    );
+    people.add(person);
+    return person;
+  }
+
+  @override
+  Future<PersonItem> updatePerson(String id, String name) async {
+    throwIfFailing();
+    final trimmed = name.trim();
+    final idx = people.indexWhere((p) => p.id == id);
+    if (idx == -1) {
+      throw Exception('Person not found.');
+    }
+    final duplicate = people.any(
+      (p) => p.id != id && p.name.trim().toLowerCase() == trimmed.toLowerCase(),
+    );
+    if (duplicate) {
+      throw Exception('A person with that name already exists.');
+    }
+    final updated = people[idx].copyWith(name: trimmed, updatedAt: DateTime.now());
+    people[idx] = updated;
+    return updated;
+  }
+
+  @override
+  Future<void> deletePerson(String id) async {
+    throwIfFailing();
+    people.removeWhere((p) => p.id == id);
+    for (final key in memoryPeopleMap.keys) {
+      memoryPeopleMap[key]?.remove(id);
+    }
+  }
+
+  @override
+  Future<List<PersonItem>> fetchPeopleForMemory(String memoryId) async {
+    throwIfFailing();
+    final ids = memoryPeopleMap[memoryId] ?? [];
+    return people.where((p) => ids.contains(p.id)).toList();
+  }
+
+  @override
+  Future<void> setMemoryPeople(String memoryId, List<String> personIds) async {
+    throwIfFailing();
+    memoryPeopleMap[memoryId] = List.of(personIds);
+  }
+}
+

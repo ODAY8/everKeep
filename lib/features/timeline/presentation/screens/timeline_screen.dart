@@ -75,16 +75,11 @@ class TimelineScreen extends StatefulWidget {
       if (mem.isMemory) {
         final date = mem.date ?? mem.createdAt;
         if (date != null) {
-          final parts = <String>[];
-          if (mem.location != null && mem.location!.isNotEmpty) {
-            parts.add('📍 ${mem.location}');
-          }
-          if (mem.people.isNotEmpty) {
-            parts.add('👤 ${mem.people.map((p) => p.name).join(', ')}');
-          } else if (mem.tagList.isNotEmpty) {
-            parts.add('#${mem.tagList.first}');
-          }
-          final subtitle = parts.isNotEmpty ? parts.join(' · ') : null;
+          final subtitle = mem.location != null && mem.location!.isNotEmpty
+              ? '📍 ${mem.location}'
+              : (mem.people.isNotEmpty
+                  ? '👤 ${mem.people.map((p) => p.name).join(', ')}'
+                  : (mem.tagList.isNotEmpty ? '#${mem.tagList.first}' : null));
 
           events.add(
             TimelineEvent(

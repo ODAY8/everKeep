@@ -22,6 +22,7 @@ create table if not exists public.people (
 );
 
 -- Trigger for automated updated_at timestamping
+drop trigger if exists people_set_updated_at on public.people;
 create trigger people_set_updated_at
   before update on public.people
   for each row execute function public.set_updated_at();
@@ -43,11 +44,18 @@ create table if not exists public.memory_people (
   person_id  uuid not null references public.people(id) on delete cascade,
   user_id    uuid not null default auth.uid() references auth.users(id) on delete cascade,
   created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
 
   -- Prevent duplicate person tagging on the same memory
   constraint memory_people_memory_person_unique
     unique (memory_id, person_id)
 );
+
+-- Trigger for automated updated_at timestamping
+drop trigger if exists memory_people_set_updated_at on public.memory_people;
+create trigger memory_people_set_updated_at
+  before update on public.memory_people
+  for each row execute function public.set_updated_at();
 
 -- Indexes for fast bi-directional lookups and RLS enforcement
 create index if not exists memory_people_memory_idx
@@ -65,19 +73,23 @@ create index if not exists memory_people_user_idx
 
 alter table public.people enable row level security;
 
+drop policy if exists people_select_own on public.people;
 create policy people_select_own on public.people
   for select to authenticated
   using ((select auth.uid()) = user_id);
 
+drop policy if exists people_insert_own on public.people;
 create policy people_insert_own on public.people
   for insert to authenticated
   with check ((select auth.uid()) = user_id);
 
+drop policy if exists people_update_own on public.people;
 create policy people_update_own on public.people
   for update to authenticated
   using ((select auth.uid()) = user_id)
   with check ((select auth.uid()) = user_id);
 
+drop policy if exists people_delete_own on public.people;
 create policy people_delete_own on public.people
   for delete to authenticated
   using ((select auth.uid()) = user_id);
@@ -88,10 +100,14 @@ create policy people_delete_own on public.people
 
 alter table public.memory_people enable row level security;
 
+-- Read: Users can only view memory-people links they own
+drop policy if exists memory_people_select_own on public.memory_people;
 create policy memory_people_select_own on public.memory_people
   for select to authenticated
   using ((select auth.uid()) = user_id);
 
+-- Insert: Users can only link their own memories to their own people
+drop policy if exists memory_people_insert_own on public.memory_people;
 create policy memory_people_insert_own on public.memory_people
   for insert to authenticated
   with check (
@@ -106,6 +122,26 @@ create policy memory_people_insert_own on public.memory_people
     )
   );
 
+-- Update: Users can only update their own links, and cannot reparent
+-- to another user's memory or another user's person
+drop policy if exists memory_people_update_own on public.memory_people;
+create policy memory_people_update_own on public.memory_people
+  for update to authenticated
+  using ((select auth.uid()) = user_id)
+  with check (
+    (select auth.uid()) = user_id
+    and exists (
+      select 1 from public.memories_wishes
+      where id = memory_id and user_id = (select auth.uid())
+    )
+    and exists (
+      select 1 from public.people
+      where id = person_id and user_id = (select auth.uid())
+    )
+  );
+
+-- Delete: Users can only delete memory-people links they own
+drop policy if exists memory_people_delete_own on public.memory_people;
 create policy memory_people_delete_own on public.memory_people
   for delete to authenticated
   using ((select auth.uid()) = user_id);
@@ -118,4 +154,4 @@ revoke all on public.people from anon;
 revoke all on public.memory_people from anon;
 
 grant select, insert, update, delete on public.people to authenticated;
-grant select, insert, delete on public.memory_people to authenticated;
+grant select, insert, update, delete on public.memory_people to authenticated;

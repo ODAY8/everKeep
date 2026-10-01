@@ -180,6 +180,63 @@ class _PeopleSelectorSheetState extends State<PeopleSelectorSheet> {
     }
   }
 
+  Future<void> _handleDeletePerson(
+    MemoryProvider memProv,
+    PersonItem person,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.glassBackground,
+        shape: RoundedRectangleBorder(borderRadius: AppRadius.radiusLG),
+        title: Text(
+          'Delete Person',
+          style: AppTextStyles.titleMedium.copyWith(
+            color: AppColors.glassOnSurface,
+          ),
+        ),
+        content: Text(
+          'Are you sure you want to delete "${person.name}"? This will detach them from all memories.',
+          style: AppTextStyles.bodyMedium.copyWith(
+            color: AppColors.glassOnSurfaceMuted,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.lightError,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      final success = await memProv.deletePerson(person.id);
+      if (!mounted) return;
+      if (success) {
+        setState(() {
+          _selectedIds.remove(person.id);
+          _selectedMap.remove(person.id);
+        });
+        showAppSnackBar(context, 'Person deleted');
+      } else {
+        showAppSnackBar(
+          context,
+          memProv.error ?? 'Could not delete person.',
+          isError: true,
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Consumer<MemoryProvider>(
@@ -390,6 +447,10 @@ class _PeopleSelectorSheetState extends State<PeopleSelectorSheet> {
                             memProv,
                             person,
                           ),
+                          onDelete: () => _handleDeletePerson(
+                            memProv,
+                            person,
+                          ),
                         ),
                         const SizedBox(height: 6),
                       ],
@@ -422,12 +483,14 @@ class _PersonListTile extends StatelessWidget {
   final bool isSelected;
   final VoidCallback onToggle;
   final VoidCallback onEdit;
+  final VoidCallback onDelete;
 
   const _PersonListTile({
     required this.person,
     required this.isSelected,
     required this.onToggle,
     required this.onEdit,
+    required this.onDelete,
   });
 
   @override
@@ -481,6 +544,15 @@ class _PersonListTile extends StatelessWidget {
                 ),
                 tooltip: 'Edit name',
                 onPressed: onEdit,
+              ),
+              IconButton(
+                icon: const Icon(
+                  Icons.delete_outline_rounded,
+                  size: 16,
+                  color: AppColors.lightError,
+                ),
+                tooltip: 'Delete person',
+                onPressed: onDelete,
               ),
               Icon(
                 isSelected
